@@ -1,0 +1,77 @@
+---
+title: "KML converter"
+author: "Jill Deines"
+date: "Sunday, May 22, 2016"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Google Earth Engine imports vector data as fusion tables, which must either be .csv or .txt (for points) or .kml (for geometeries).
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE, cache.path='cache/0.0_kml/',
+               fig.path='figure/0.0_kml/',
+               eval=FALSE)
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+```
+
+## Load and convert
+Geometries of interest to me are:
+
+* My RRCA + RRB buffered region
+* the full HPA with a 30km buffer
+* the NE RRB (clipped from full basin)
+* the Middle Republican NRD (clipped from RRB NRDs)
+
+### Load and pre-process
+
+```{r specifyPaths}
+# filepaths
+gisDir <- 'S:/Users/deinesji/HPA/gis'
+outDir <- 'S:/Users/deinesji/HPA/gis/GEE_processing'
+
+# shapefile names of interest (located in gisDir)
+hpabuffname <- 'AquiferBoundary_30kmBuffer_WGS84'
+rrbBuffname <- 'BigExtent_RRB_RRCA_buff'
+rrbstatesname <- 'states_basin_clip'
+nrdsname <- 'RRB_NRDs'
+
+# load and process if necessary
+hpabuff <- readOGR(gisDir, hpabuffname, verbose=F)
+rrbbuff <- readOGR(gisDir, rrbBuffname, verbose=F)
+rrbstates <- readOGR(gisDir, rrbstatesname, verbose=F)
+rrbNE <- rrbstates[rrbstates$state == 'NE',]
+nrds <- readOGR(gisDir, nrdsname, verbose=F)
+nrd1 <- nrds[nrds$NRD_Name == 'Middle Republican',]
+```
+
+### To KML function
+Re-projects to WGS84 as required for KML
+
+```{r kmlFun}
+toKml <- function(spdf, filename, outDir) {
+  # spdf: polygon object in R
+  # filename: for output file
+  # outDir: output directory
+  spdf.wgs84 <- spTransform(spdf, CRS("+proj=longlat +datum=WGS84"))
+  writeOGR(spdf.wgs84, paste0(outDir, '/', filename, '.kml'),
+            layer = 'boundExtent', driver = 'KML')
+}
+```
+
+### Write out KMLs
+
+```{r outKML}
+toKml(hpabuff, 'HPA_30kmBuff', outDir)
+toKml(rrbbuff, rrbBuffname, outDir)
+toKml(rrbNE, 'NE_rrb', outDir)
+toKml(nrd1, 'NRD_MidRepub', outDir)
+```
+
