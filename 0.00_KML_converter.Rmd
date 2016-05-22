@@ -35,7 +35,8 @@ Geometries of interest to me are:
 ```{r specifyPaths}
 # filepaths
 gisDir <- 'S:/Users/deinesji/HPA/gis'
-outDir <- 'S:/Users/deinesji/HPA/gis/GEE_processing'
+#outDir <- 'S:/Users/deinesji/HPA/gis/GEE_processing'
+outDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
 
 # shapefile names of interest (located in gisDir)
 hpabuffname <- 'AquiferBoundary_30kmBuffer_WGS84'
