@@ -20,9 +20,160 @@ opts_chunk$set(cache=TRUE, cache.path='cache/1.1_vPOints/',
 ```{r packages, message=FALSE, echo=TRUE}
 library(rgdal)
 library(raster)
+library(rgeos)
+library(dplyr)
 ```
 
-## CDL points
+## Load Stuff
+CDL for 2011, csv key, and polygon for area extent (here, the Republican River Basin combined with the RRCA groundwater model extent + buffer)
+
+```{r loadStuff}
+#2011 cdl and key
+cdl <- raster('S:/Users/deinesji/HPA/gis/CDL/CDL_RRB_2011_adj.tif')
+cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
+                   stringsAsFactors=F)
+
+# projection datum not read in, fix it
+tweakProj <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs +towgs84=0,0,0"
+proj4string(cdl) <- tweakProj
+
+# big RRB/RRCA boundary and transform to AEA proj
+polybuff <- readOGR('S:/Users/deinesji/HPA/gis', 'BigExtent_RRB_RRCA_buff', 
+                    verbose=F)
+polybuff <- spTransform(polybuff, CRS(tweakProj))
+
+# get area of buffer
+polyArea <- gArea(polybuff)
+polykm2 <- polyArea * 1e-6
+polykm2  # square kilometers
+
+# desired point numbers to mimic density in Brown and Pervez 2010
+polykm2/100 # min number of points?
+polykm2/20 # max number of points
+```
+
+## Here's a thought
+I want stratified random samples based on crop classes and non-crop. I could make a point for every raster cell, convert that to a data frame, and then take stratified samples from there. This would also allow me to make a few different sized sets of points.
+
+But then points are regular, not random. Make random points, then stratify?
+
+## Middle Republican NRD test
+
+### Method 1: Random points
+Generate random points, extract raster CDL values, tabulate
+
+(No control over stratification - could generate more points and thin)
+
+```{r midRep_test}
+# Middle Republican RRB (smaller area for testing)
+nrds <-  readOGR('S:/Users/deinesji/HPA/gis', 'RRB_NRDs', verbose=F)
+midRep <- nrds[nrds$NRD_Name == 'Middle Republican',]
+midRep <- spTransform(midRep, CRS(tweakProj))
+
+# get area of buffer
+nrdArea <- gArea(midRep)
+nrdkm2 <- nrdArea * 1e-6
+nrdkm2  # square kilometers
+
+# desired point numbers to mimic density in Brown and Pervez 2010
+nrdkm2/100 # min number of points?
+nrdkm2/20 # max number of points
+
+# generate random points
+npoints <- 500
+p1 <- spsample(midRep, n =npoints, "random")
+plot(midRep)
+plot(p1, add=T, pch=19)
+
+# conver to spdf
+p1 <- SpatialPointsDataFrame(p1, data=data.frame(ID=1:npoints))
+
+# add CDL crop type from raster and category name from key
+p1$CDLcode <- extract(cdl, p1)
+p1 <- merge(p1, cdlKey[,c('VALUE','CLASS_NAME')], 
+            by.x='CDLcode', by.y='VALUE', all.y = F)
+
+# tabulate to see class representations
+classTab <- table(p1$CLASS_NAME)
+```
+
+
+### Method 2: Raster to Points
+Convert Raster to a point dataset -> data.frame, and do stratified random sampling from there
+
+```{r methodTest2}
+# crop CDL to NRD
+cdl.mr <- crop(cdl, midRep)
+
+# convert to df
+r.points <- as.data.frame(cdl.mr, xy = T, centroids=T)
+names(r.points) <- c('x','y','CDLcode')
+
+# take a proportional sample from all classes
+set.seed(1)
+p1.r <- r.points %>%
+          group_by(CDLcode) %>%
+          sample_frac(size = 4/100000)
+
+# add crop key (do after sampling if final method)
+r.points <- merge(p1.r, cdlKey[,c('VALUE','CLASS_NAME')], 
+            by.x='CDLcode', by.y='VALUE', all.y = F)
+
+classTab.r <- table(p1.r$CLASS_NAME)
+```
+
+## Stratified sampling function
+The raster -> data frame -> stratified sampling -> spdf method
+
+* polygon should be in same projected coordinates as CDL layer
+
+```{r stratFun}
+poly <- midRep  # projected
+sampleDensity <- 5   # per 100 km2
+
+# crop CDL
+cdl.crop <- crop(cdl, poly)
+cdl.mask <- mask(cdl.crop, poly)
+
+getStratCdl <- function(cdl.mask, poly, sampleDensity, cdlKey, seed=1){
+  # get poly area and number of target points
+  area <- gArea(poly) 
+  area.km2 <- area*1e-6
+  pointsDesired <- round((area.km2 * 1e-2) * sampleDensity)
+  
+  # convert to df, rename columns, and remove NAs
+  r.points <- as.data.frame(cdl.mask, xy = T, centroids=T)
+  names(r.points) <- c('x','y','CDLcode')
+  r.points <- r.points[!is.na(r.points$CDLcode),]
+   
+  # convert points desired to sample fraction
+  ncells <- dim(r.points)[1]
+  samFrac <- pointsDesired/ncells
+  
+  # take a proportional sample from all classes
+  set.seed(seed)                        
+  p1.r <- r.points %>%
+          group_by(CDLcode) %>%
+          sample_frac(size = samFrac)
+
+  # add crop key (do after sampling if final method)
+  p1.r2 <- merge(p1.r, cdlKey[,c('VALUE','CLASS_NAME')], 
+            by.x='CDLcode', by.y='VALUE', all.y = F)
+  
+  # turn back to spatial points
+  coordinates(p1.r2) <- ~ x + y
+  
+  return(p1.r2)  
+}
+
+testfun <- getStratCdl(cdl.mask, poly, sampleDensity, cdlKey, seed=5)
+```
+
+
+
+
+
+## Use the CDL to add points from classes of interest
 Use the 2011 CDL to stratify random points among crops of interest
 
 Dominant crops:
@@ -36,15 +187,4 @@ Dominant crops:
 * Grass/Pasture
 * Fallow/Idle Cropland
 
-```{r loadStuff}
-#2011 cdl and key
-cdl <- raster('S:/Users/deinesji/HPA/gis/CDL/CDL_RRB_2011_adj.tif')
-cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv')
-
-# projection datum not read in, fix it
-tweakProj <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs +towgs84=0,0,0"
-proj4string(cdl) <- tweakProj
-
-
-```
-
+## Riparian points
