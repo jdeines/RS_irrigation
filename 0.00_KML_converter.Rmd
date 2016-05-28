@@ -29,6 +29,7 @@ Geometries of interest to me are:
 * the full HPA with a 30km buffer
 * the NE RRB (clipped from full basin)
 * the Middle Republican NRD (clipped from RRB NRDs)
+* Well Point Datasets (?) - start with RRCA wells for MidRep NRD trials to see if it's helpful
 
 ### Load and pre-process
 
@@ -51,6 +52,7 @@ rrbstates <- readOGR(gisDir, rrbstatesname, verbose=F)
 rrbNE <- rrbstates[rrbstates$state == 'NE',]
 nrds <- readOGR(gisDir, nrdsname, verbose=F)
 nrd1 <- nrds[nrds$NRD_Name == 'Middle Republican',]
+rrcaWells <- readOGR(paste0(gisDir,'/Wells'), 'RRCA_NE_wells_2007')
 ```
 
 ### To KML function
@@ -74,5 +76,6 @@ toKml(hpabuff, 'HPA_30kmBuff', outDir)
 toKml(rrbbuff, rrbBuffname, outDir)
 toKml(rrbNE, 'NE_rrb', outDir)
 toKml(nrd1, 'NRD_MidRepub', outDir)
+toKml(rrcaWells, 'RRCA_NE_Wells_2007', outDir)
 ```
 
