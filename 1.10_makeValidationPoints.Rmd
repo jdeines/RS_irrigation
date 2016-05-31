@@ -80,6 +80,8 @@ hpa <- spTransform(hpa, CRS(tweakProj))
 ## Stratified sampling function
 Overview: turns the CDL raster into a data frame and performs stratified random sampling on CDL classes. Then converts data frame back to spatialPointsDataFrame. This is intended to be used on a cdl raster that has already been masked by a polygon area of interest. Polygon should be in same projected coordinates as CDL layer
 
+Because grassland is such a huge proportion of the landscape but relatively easy to classify as irr/nonirr, the function "downweights" this crop class. It does this in a gangsta way by increasingly the # points desired, and then removing half of the grassland points.
+
 Function arguments:
 
 * cdl.mask: a cdl raster masked to polygon of interest. Masking is important so that cells outside the polgyon boundary are NA.
@@ -90,21 +92,8 @@ Function arguments:
 
 
 ```{r stratFun}
-# make a table for CDL weights for sampling (reduce grassland)
-weightTable <- cdlKey[,1:2]
-weightTable$weight <- 1 # standard
-# urban and water: none
-weightTable[122:125, 'weight'] <- 0 # developed classes
-weightTable[112, 'weight'] <- 0 # open water
-weightTable[82, 'weight'] <- 0 # clouds, no data
-weightTable[83, 'weight'] <- 0 # developed
-weightTable[84, 'weight'] <- 0 # water
-# grassland: probability = 1/2
-weightTable[177, 'weight'] <- 0.5
-#
 
-getStratCdl <- function(cdl.mask, poly, sampleDensity, cdlKey, seed=1,
-                        p.weights = weightTable){
+getStratCdl <- function(cdl.mask, poly, sampleDensity, cdlKey, seed=1){
   # get poly area and number of target points
   area <- gArea(poly) 
   area.km2 <- area*1e-6
@@ -114,44 +103,37 @@ getStratCdl <- function(cdl.mask, poly, sampleDensity, cdlKey, seed=1,
   r.points <- as.data.frame(cdl.mask, xy = T, centroids=T)
   names(r.points) <- c('x','y','CDLcode')
   r.points <- r.points[!is.na(r.points$CDLcode),]
-#   # add weights
-   r.points <- merge(r.points, p.weights[,c('VALUE','weight')],
-                     by.x='CDLcode', by.y='VALUE', all.y=F)
    
   # convert points desired to sample fraction
   ncells <- dim(r.points)[1]
-  samFrac <- pointsDesired/ncells
+  # inflate samFrac to allow downscale pruning of grassland samples
+  samFrac <- (pointsDesired*1.45)/ncells
   
-  # develop weights
-  #cdlPresent <- r.points %>% distinct(CDLcode)
-
-  cdlPresent <- r.points %>% 
-                arrange(CDLcode) %>%
-                group_by(CDLcode) %>%
-                summarise()
-  # set grassland to 50% prob
-  cdlPresent$weights <- 1
-  cdlPresent[cdlPresent$CDLcode == 176, 'weights'] <- 0.5 
-
   # take a proportional sample from all classes
   set.seed(seed)                        
   p1.r <- r.points %>%
-          arrange(CDLcode) %>%
           group_by(CDLcode) %>%
-          sample_frac(size = samFrac, weight = cdlPresent$weights)
+          sample_frac(size = samFrac)
 
-  # add crop key (do after sampling if final method)
+    # add crop key (do after sampling if final method)
   p1.r2 <- merge(p1.r, cdlKey[,c('VALUE','CLASS_NAME')], 
             by.x='CDLcode', by.y='VALUE', all.y = F)
-  
+#   dim(p1.r2)
+#   table(p1.r2$CLASS_NAME)
+  # remove half of grassland
+  p1.r2$keep <- 1
+  grassSamples <- sum(p1.r2$CLASS_NAME == 'Grass/Pasture')
+  p1.r2[p1.r2$CLASS_NAME == 'Grass/Pasture','keep'] <- rbinom(grassSamples, 1, 0.5)  
+  p1.r2 <- p1.r2[p1.r2$keep ==1,]
+
   # turn back to spatial points
   coordinates(p1.r2) <- ~ x + y
   proj4string(p1.r2) <- tweakProj
   
-  # add columns for validation
-  p1.r2$Irrig <- NA
-  p1.r2$Certain <- NA
-  p1.r2$Comments <- NA
+#   # add columns for validation
+#   p1.r2$Irrig <- NA
+#   p1.r2$Certain <- NA
+#   p1.r2$Comments <- NA
   
   return(p1.r2)  
 }
@@ -188,13 +170,13 @@ plot(nrdPoints, add=T, pch = 19)
 # write out as WGS84 (needed for kml)
 nrdPoints.ll <- spTransform(nrdPoints, CRS("+proj=longlat +datum=WGS84"))
 outdir <- 'S:/Users/deinesji/HPA/gis/GEE_processing/validPoints'
-writeOGR(nrdPoints.ll, outdir, 'MidRep_20', driver='ESRI Shapefile', 
+writeOGR(nrdPoints.ll, outdir, 'MidRep_20_2010', driver='ESRI Shapefile', 
          overwrite = T)
-writeOGR(nrdPoints.ll, paste0(outdir, '/MidRep_20.kml'),
+writeOGR(nrdPoints.ll, paste0(outdir, '/MidRep_20_2010.kml'),
             layer = 'thislayer', driver='KML', overwrite=T)
 
 # write KML to my dropbox for laptop access
-writeOGR(nrdPoints.ll, 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/MidRep_20.kml', layer = 'thislayer', driver='KML', overwrite=T)
+writeOGR(nrdPoints.ll, 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/MidRep_20_2010.kml', layer = 'thislayer', driver='KML', overwrite=T)
 ```
 
 ### Republican River Basin
