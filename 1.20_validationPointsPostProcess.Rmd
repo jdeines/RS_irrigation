@@ -1,0 +1,96 @@
+---
+title: "Validation Points - Post-processing"
+author: "Jill Deines"
+date: "Sunday, May 29, 2016"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Take the KML exported from GEE during validation point creation and post-process
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE, cache.path='cache/1.2_vPOintsPost/',
+               fig.path='figure/1.2_vPointsPost/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+```
+
+## Process validation points: function
+Wrote out imported GEE points as a csv (since the kml write=out doesn't include a layer name). This extracts coordinates, adds crop class name, and turns back into points to write out as a KML to add to GEE as a feature collection.
+
+```{r csvFun}
+testFile <- 'C:/Users/deinesji/Google Drive/GEE_validation/valid_midRep_10_2010_JMDtest.csv'
+cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
+                   stringsAsFactors=F)
+
+csvToSpdf <- function(csvFilename, cdlKey){
+    # load output from GEE
+    validated <- read.csv(csvFilename, stringsAsFactors=F)
+
+    # extract coordinates from messy .geo string
+    coords <- sub(".*\\[(.*)\\].*", "\\1", validated$.geo, perl=TRUE)
+    coords2 <- do.call(rbind, strsplit(coords, ','))   
+    validated2 <- data.frame(irrigated = validated$irrigated,
+                         CDLcode = validated$max,
+                         x = as.numeric(coords2[,1]),
+                         y = as.numeric(coords2[,2]),
+                         system.index = validated$system.index)
+
+    # add CDL class name
+    validated3 <- merge(validated2, cdlKey[,c('VALUE','CLASS_NAME')], 
+                    by.x = 'CDLcode', by.y='VALUE', all.y=F)
+   
+    # spatialize points
+    coordinates(validated3) <- ~ x + y
+    proj4string(validated3) <- "+proj=longlat +datum=WGS84"
+    
+    return(validated3)
+  }
+
+test <- csvToSpdf(testFile, cdlKey)
+
+```
+
+
+```{r loadKML}
+# load output from GEE
+validated <- read.csv('C:/Users/deinesji/Google Drive/GEE_validation/valid_midRep_20_JMDtest.csv', stringsAsFactors=F)
+
+# extract coordinates from messy .geo string
+coords <- sub(".*\\[(.*)\\].*", "\\1", validated$.geo, perl=TRUE)
+coords2 <- do.call(rbind, strsplit(coords, ','))   
+validated2 <- data.frame(irrigated = validated$Irrigated,
+                         CDLcode = validated$max,
+                         x = as.numeric(coords2[,1]),
+                         y = as.numeric(coords2[,2]),
+                         system.index = validated$system.index)
+
+# add CDL class name
+cdlKey <- cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
+                   stringsAsFactors=F)
+validated3 <- merge(validated2, cdlKey[,c('VALUE','CLASS_NAME')], 
+                    by.x = 'CDLcode', by.y='VALUE', all.y=F)
+
+# spatialize points
+coordinates(validated3) <- ~ x + y
+proj4string(validated3) <- "+proj=longlat +datum=WGS84"
+
+# # test to see if cdl codes line up
+# cdl <- raster('S:/Users/deinesji/HPA/gis/CDL/fullHPA/CDL_2011_HPA_RRB.tif')
+# validated3.proj <- spTransform(validated3, CRS(projection(cdl)))
+# validated3$check <- extract(cdl, validated3)
+# sum(validated3$CDLcode != validated3$check)
+
+plot(validated3)
+
+# write out as kml for GEE feature collection
+
+```
+
