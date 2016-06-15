@@ -20,15 +20,16 @@ opts_chunk$set(cache=TRUE, cache.path='cache/1.2_vPOintsPost/',
 
 ```{r packages, message=FALSE, echo=TRUE}
 library(rgdal)
+library(rgeos)
 ```
 
 ## Process validation points: function
 Wrote out imported GEE points as a csv (since the kml write=out doesn't include a layer name). This extracts coordinates, adds crop class name, and turns back into points to write out as a KML to add to GEE as a feature collection.
 
 ```{r csvFun}
-testFile <- 'C:/Users/deinesji/Google Drive/GEE_validation/valid_midRep_10_2010_JMDtest.csv'
-cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
-                   stringsAsFactors=F)
+# testFile <- 'C:/Users/deinesji/Google Drive/GEE_validation/valid_midRep_10_2010_JMDtest.csv'
+# cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
+#                    stringsAsFactors=F)
 
 csvToSpdf <- function(csvFilename, cdlKey){
     # load output from GEE
@@ -54,43 +55,51 @@ csvToSpdf <- function(csvFilename, cdlKey){
     return(validated3)
   }
 
-test <- csvToSpdf(testFile, cdlKey)
+#test <- csvToSpdf(testFile, cdlKey)
 
 ```
 
+## Point Validation Evaluation
+Undergrad Jeremy Rapp evaluated ~980 random points in the Middle Republican NRD. To compare irrigated/nonirrigated classifications between investigators, Jill recorded 222 points. This compares them.
 
-```{r loadKML}
-# load output from GEE
-validated <- read.csv('C:/Users/deinesji/Google Drive/GEE_validation/valid_midRep_20_JMDtest.csv', stringsAsFactors=F)
+```{r compare}
+# crop key
+cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
+                    stringsAsFactors=F)
 
-# extract coordinates from messy .geo string
-coords <- sub(".*\\[(.*)\\].*", "\\1", validated$.geo, perl=TRUE)
-coords2 <- do.call(rbind, strsplit(coords, ','))   
-validated2 <- data.frame(irrigated = validated$Irrigated,
-                         CDLcode = validated$max,
-                         x = as.numeric(coords2[,1]),
-                         y = as.numeric(coords2[,2]),
-                         system.index = validated$system.index)
+# Jeremey's file
+rappFile <-'C:/Users/deinesji/Google Drive/GEE_validation/valid_midRep_10_2010_jrapp.csv'
+# Jill's file
+jillFile <- 'C:/Users/deinesji/Google Drive/GEE_validation/valid_midRep_10_2010_JMDtest.csv'
 
-# add CDL class name
-cdlKey <- cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
-                   stringsAsFactors=F)
-validated3 <- merge(validated2, cdlKey[,c('VALUE','CLASS_NAME')], 
-                    by.x = 'CDLcode', by.y='VALUE', all.y=F)
+# load/process csvs to spatial points
+rappPoints <- csvToSpdf(rappFile, cdlKey)
+jillPoints <- csvToSpdf(jillFile, cdlKey)
 
-# spatialize points
-coordinates(validated3) <- ~ x + y
-proj4string(validated3) <- "+proj=longlat +datum=WGS84"
+# project to meters
+rappPoints <- spTransform(rappPoints, CRS('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs '))
+jillPoints <- spTransform(jillPoints, CRS('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs '))
 
-# # test to see if cdl codes line up
-# cdl <- raster('S:/Users/deinesji/HPA/gis/CDL/fullHPA/CDL_2011_HPA_RRB.tif')
-# validated3.proj <- spTransform(validated3, CRS(projection(cdl)))
-# validated3$check <- extract(cdl, validated3)
-# sum(validated3$CDLcode != validated3$check)
+# find distances between all points
+distPairs <- as.data.frame(gDistance(jillPoints, rappPoints, byid = T))
+distPairs$cellnum <- 1:nrow(distPairs)
 
-plot(validated3)
+# best guess at paired points
+pointBuddies <- data.frame(jill = 1:222, rapp = NA, crop = jillPoints$CLASS_NAME,
+                           jillIrr = jillPoints$irrigated, rappIrr = NA)
+for (i in 1:222) {
+  pointBuddies[i,'rapp'] <- distPairs[which.min(distPairs[,i]),'cellnum']
+}
+  
+# add irrigation status for rapp
+rappPoints$ind <- 1:nrow(rappPoints)
+pointBuds <- merge(pointBuddies, rappPoints[,c('irrigated','ind')],
+                   by.x = 'rapp', by.y='ind', all.y = F)
+pointBuds$rappIrr <- pointBuds$irrigated
 
-# write out as kml for GEE feature collection
+# summarize agreement
+totalMatching <- sum(pointBuds$rappIrr == pointBuds$jillIrr)
+totalMatching/222
 
 ```
 
