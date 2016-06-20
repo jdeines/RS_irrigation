@@ -99,7 +99,11 @@ pointBuds$rappIrr <- pointBuds$irrigated
 
 # summarize agreement
 totalMatching <- sum(pointBuds$rappIrr == pointBuds$jillIrr)
+# percent matching
 totalMatching/222
 
+# tabulate crop
+pointBuds$identical <- pointBuds$rappIrr == pointBuds$jillIrr
+table(pointBuds[,c('crop','identical')])
 ```
 

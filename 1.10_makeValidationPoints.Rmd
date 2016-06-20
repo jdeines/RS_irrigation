@@ -182,17 +182,17 @@ dim(nrdPoints)[1]
 gArea(midRep)*1e-6/ptDensity.nrd
 ```
 
-```{r nrdWrite, eval=FALSE}
+```{r nrdWrite, eval=TRUE}
 # write out as WGS84 (needed for kml)
 nrdPoints.ll <- spTransform(nrdPoints, CRS("+proj=longlat +datum=WGS84"))
 outdir <- 'S:/Users/deinesji/HPA/gis/GEE_processing/validPoints'
-writeOGR(nrdPoints.ll, outdir, 'MidRep_10_2010', driver='ESRI Shapefile', 
+writeOGR(nrdPoints.ll, outdir, 'valid_MidRep_10_2010', driver='ESRI Shapefile', 
          overwrite = T)
-writeOGR(nrdPoints.ll, paste0(outdir, '/MidRep_10_2010.kml'),
+writeOGR(nrdPoints.ll, paste0(outdir, '/valid_MidRep_10_2010.kml'),
             layer = 'thislayer', driver='KML', overwrite=F)
 
 # write KML to my dropbox for laptop access
-writeOGR(nrdPoints.ll, 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/MidRep_10_2010.kml', layer = 'thislayer', driver='KML', overwrite=F)
+writeOGR(nrdPoints.ll, 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/valid_MidRep_10_2010.kml', layer = 'thislayer', driver='KML', overwrite=F)
 ```
 
 ### Republican River Basin
