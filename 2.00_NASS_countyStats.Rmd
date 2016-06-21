@@ -21,12 +21,15 @@ opts_chunk$set(cache=TRUE, cache.path='cache/4.1_NASS/',
 * `httr`: Vignette at https://cran.r-project.org/web/packages/httr/vignettes/quickstart.html
 
 ```{r packages, message=FALSE, echo=TRUE}
+# for API interaction
 library(httr) 
 library(jsonlite)
 # for county selection:
 library(rgdal)
 library(rgeos)
 library(maps)
+# for data manipulation
+library(dplyr)
 ```
 
 ## NASS Quick Stats API
@@ -182,10 +185,47 @@ write.csv(nass.df, paste0(outdir, '/', outfile), row.names=F)
 ## Clean Data
 
 ### Middle Republican NRD
+Loading saved data so not reliant on functioning AP
 
 #### Irrigated crops
+First question: what crops are irrigated??
 
 ```{r midRep_irrig}
+# load data
+outdir <- 'S:/Users/deinesji/HPA/data/USDA_NASS'
+outfile <- 'NASS_FieldCrops_County_midRep_RRB_raw.csv'
+nass.df <- read.csv(paste0(outdir, '/', outfile), stringsAsFactors=F)
 
+# remove excess columns
+keepThese <- c('state_alpha','prodn_practice_desc','short_desc','Value',
+               'county_name','unit_desc','commodity_desc','year')
+nass.df <- nass.df[,keepThese]
+
+# remove (D) values, remove commas (!), convert to numeric
+nass.df <- nass.df[!grepl('(D)',nass.df$Value),]
+nass.df$Value <- gsub(",", "", nass.df$Value, fixed = T)
+nass.df$Value <- as.numeric(nass.df$Value)
+
+# keep only records with "ACRES HARVESTED"
+phrase <- 'ACRES HARVESTED'
+nass.df <- nass.df[grepl(phrase,nass.df$short_desc),]
+
+# for now, just 2012 (could split into list by year in future..)
+nass.df <- nass.df[nass.df$year == 2012,]
+
+# aggregate over counties
+commodityTally <- aggregate(Value ~ short_desc, data = nass.df, FUN = 'sum')
+
+# add back in some helpful columns
+mergeTable <- nass.df[,c('commodity_desc','unit_desc',
+                         'prodn_practice_desc','short_desc')]
+mergeTable2 <- unique(mergeTable)
+nass.df2 <- merge(commodityTally, mergeTable2, by.x = 'short_desc', all=F,
+                  by.y = 'short_desc',sort=F)
+
+# aggregate by crop type and irrigation status
+summary <- aggregate(Value ~ commodity_desc + prodn_practice_desc,
+                     data = nass.df2, FUN='sum')
+summary
 ```
 
