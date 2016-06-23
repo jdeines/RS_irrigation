@@ -285,6 +285,8 @@ nass.df <- read.csv(paste0(outdir, '/', outfile), stringsAsFactors=F)
 
 # clean/summarize data
 midRep2012 <- cleanNassCensus(nass.df, year = 2012)
+midRep2007 <- cleanNassCensus(nass.df, year = 2007)
+#midRep2002 <- cleanNassCensus(nass.df, year = 2002)
 
 # make  a table
 kable(midRep2012[,1:3])
@@ -301,6 +303,172 @@ ggplot(summary3, aes(x=commodity_desc, y=Value, fill=irrig_type)) +
   ylab('Square Kilometers') + xlab('commodity') + 
   ggtitle('Irrigated Crops - Middle Republican NRD - 2012') + theme_bw()
 ```
-.
+
+#### Other Tests
+I'm curious about irrigated areas in other NASS data groups, incluidng FRUITY & TREE NUTS, HORTICULTURE, and VEGETABLES
+
+nO DATA for 'fruit and tree nuts'
+
+others seem minor
+
+```{r nass_other}
+# set up variables for data calls
+apiKey <- '28EAA9E6-8060-34A4-981A-B2ED4692228A'
+program = 'CENSUS'
+sector <- 'CROPS'
+group <- 'VEGETABLES'
+aggregation <- 'COUNTY'
+
+# make empty list to populate, and loop through counties
+nass.list <- list()
+for(i in 1:nrow(counties)){
+  nass.list[[i]] <- getNASS(apiKey, program, sector, group, aggregation, 
+                              state = counties$abb[i],
+                              county = counties$COUNTYFP[i])
+}
+
+# convert list of data frames to 1 giant dataframe
+nass.df <- do.call("rbind",nass.list)
+
+```
+
+### Republican River Basin
+
+```{r fullRRB, fig.height=4, fig.width = 12}
+# load TIGER counties ----------------------------------------------------------
+countyAll <- readOGR('S:/Data/GIS_Data/Downloaded/TIGER/TIGER2012/COUNTY',
+                     'tl_2012_us_county', verbose=F)
+#polygon denoting area of interest
+gisDir <- 'S:/Users/deinesji/HPA/gis'
+rrb <- readOGR(gisDir,'RepBasin', verbose=F) 
+
+# get counties in AOI and print 
+counties <- makeCountyList(countyAll, rrb)
+
+# set up variables for data calls ----------------------------------------------
+apiKey <- '28EAA9E6-8060-34A4-981A-B2ED4692228A'
+program = 'CENSUS'
+sector <- 'CROPS'
+group <- 'FIELD CROPS'
+aggregation <- 'COUNTY'
+
+# make empty list to populate, and loop through counties
+nass.list <- list()
+for(i in 1:nrow(counties)){
+  nass.list[[i]] <- getNASS(apiKey, program, sector, group, aggregation, 
+                              state = counties$abb[i],
+                              county = counties$COUNTYFP[i])
+}
+
+# convert list of data frames to 1 giant dataframe
+#lapply(nass.list, dim) - make sure none over 50000...
+nass.df <- do.call("rbind",nass.list)
+dim(nass.df) 
+
+# clean/summarize data
+rrb2012 <- cleanNassCensus(nass.df, year = 2012)
+rrb2007 <- cleanNassCensus(nass.df, year = 2007)
+#midRep2002 <- cleanNassCensus(nass.df, year = 2002)
+
+# make  a table
+kable(rrb2012[,1:3])
+
+# make a plot of irrigated crops
+summary.wide2 <- rrb2012[rrb2012$IRRIGATED > 0,
+                              c('commodity_desc','IRRIGATED', 'NON_IRR')]
+
+summary3 <- gather(summary.wide2, key = irrig_type, value = Value,
+                   IRRIGATED:NON_IRR)
+
+ggplot(summary3, aes(x=commodity_desc, y=Value, fill=irrig_type)) +
+  geom_bar(stat='identity') + 
+  ylab('Square Kilometers') + xlab('commodity') + 
+  ggtitle('Irrigated Crops - Republican River Basin - 2012') + theme_bw()
+```
+
+### High Plains Aquifer
+dial it up a notch!
+
+```{r fullHPA, eval=FALSE, message=FALSE}
+# load TIGER counties ----------------------------------------------------------
+countyAll <- readOGR('S:/Data/GIS_Data/Downloaded/TIGER/TIGER2012/COUNTY',
+                     'tl_2012_us_county', verbose=F)
+#polygon denoting area of interest
+gisDir <- 'S:/Users/deinesji/HPA/gis'
+hpa <- readOGR(gisDir,'Aquifer_Regions_dissolve', verbose=F) 
+
+# get counties in AOI and print 
+counties <- makeCountyList(countyAll, hpa)
+
+# api fails with i = 183; remove county
+counties <- counties[!(counties$COUNTYNS == '01266992'),]
+
+# set up variables for data calls ----------------------------------------------
+apiKey <- '28EAA9E6-8060-34A4-981A-B2ED4692228A'
+program = 'CENSUS'
+sector <- 'CROPS'
+group <- 'FIELD CROPS'
+aggregation <- 'COUNTY'
+
+# make empty list to populate, and loop through counties
+nass.list <- list()
+for(i in 1:nrow(counties)){
+  nass.list[[i]] <- getNASS(apiKey, program, sector, group, aggregation, 
+                              state = counties$abb[i],
+                              county = counties$COUNTYFP[i])
+}
+
+# convert list of data frames to 1 giant dataframe
+#lapply(nass.list, dim) - make sure none over 50000...
+nass.df <- do.call("rbind",nass.list)
+
+
+# write out raw data
+outdir <- 'S:/Users/deinesji/HPA/data/USDA_NASS'
+outfile <- 'NASS_FieldCrops_County_HPA_raw.csv'
+write.csv(nass.df, paste0(outdir, '/', outfile), row.names=F)
+```
+
+Load downloaded data and process
+
+```{r fig.height=4, fig.width = 8}
+nass.df <- read.csv(paste0(outdir, '/', outfile), stringsAsFactors=F)
+
+# clean/summarize data
+hpa2012 <- cleanNassCensus(nass.df, year = 2012)
+hpa2007 <- cleanNassCensus(nass.df, year = 2007)
+#midRep2002 <- cleanNassCensus(nass.df, year = 2002)
+
+# make  a table
+kable(hpa2012[,1:3])
+
+# make a plot of irrigated crops
+summary.wide2 <- hpa2012[hpa2012$IRRIGATED > 1000,
+                              c('commodity_desc','IRRIGATED', 'NON_IRR')]
+
+summary3 <- gather(summary.wide2, key = irrig_type, value = Value,
+                   IRRIGATED:NON_IRR)
+
+ggplot(summary3, aes(x=commodity_desc, y=Value, fill=irrig_type)) +
+  geom_bar(stat='identity') + 
+  ylab('Square Kilometers') + xlab('commodity') + 
+  ggtitle('Irrigated Crops - High Plains Aquifer - 2012') + theme_bw()
+
+# make  a table
+kable(hpa2007[,1:3])
+
+# make a plot of irrigated crops
+summary.wide2 <- hpa2007[hpa2007$IRRIGATED > 1000,
+                              c('commodity_desc','IRRIGATED', 'NON_IRR')]
+
+summary3 <- gather(summary.wide2, key = irrig_type, value = Value,
+                   IRRIGATED:NON_IRR)
+
+ggplot(summary3, aes(x=commodity_desc, y=Value, fill=irrig_type)) +
+  geom_bar(stat='identity') + 
+  ylab('Square Kilometers') + xlab('commodity') + 
+  ggtitle('Irrigated Crops - High Plains Aquifer - 2007') + theme_bw()
+```
+
 
 "Your request will return a maximum of 50,000 data records. You can determine the returned record account before you execute the Quick Stats API call using the GET /api/get_counts function. If your request will return more than the maximum limit of 50,000 data records, you can do either of the following:"
