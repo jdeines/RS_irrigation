@@ -214,10 +214,6 @@ nass.df <- nass.df[grepl(phrase,nass.df$short_desc),]
 # for now, just 2012 (could split into list by year in future..)
 nass.df <- nass.df[nass.df$year == 2012,]
 
-# keep only hay records with 'alfalfa' (otherwise overcounting!)
-dropHay <- !(grepl('HAY',nass.df$short_desc)&!grepl('ALFALFA', nass.df$short_desc))
-nass.df <- nass.df[dropHay,]
-
 # aggregate over counties
 commodityTally <- aggregate(Value ~ short_desc, data = nass.df, FUN = 'sum')
 
@@ -232,36 +228,54 @@ nass.df2 <- merge(commodityTally, mergeTable2, by.x = 'short_desc', all=F,
 nass.df2[nass.df2$prodn_practice_desc == 'ALL PRODUCTION PRACTICES',
          'prodn_practice_desc'] <- 'TOTAL'
 
+# HAY: make an alfalfa category
+alfalfaRecords <- grepl('ALFALFA', nass.df2$short_desc) & 
+                    !grepl('EXCL', nass.df2$short_desc)
+nass.df2[alfalfaRecords,'commodity_desc'] <- 'ALFALFA'
+
+# HAY: delete the supersets to leave just "other" classes
+supersets <- c('HAY & HAYLAGE - ACRES HARVESTED',
+               'HAY & HAYLAGE, IRRIGATED - ACRES HARVESTED',
+               'HAY - ACRES HARVESTED',
+               'HAY, IRRIGATED - ACRES HARVESTED',
+               'HAYLAGE - ACRES HARVESTED',
+               'HAYLAGE, IRRIGATED - ACRES HARVESTED')
+
+nass.df3 <- nass.df2[!nass.df2$short_desc %in% supersets,]
+
+# rename HAY and HAYLAGE to TOTAL HAY
+nass.df3[grepl("HAY",nass.df3$commodity_desc),'commodity_desc'] <- 'OTHER HAY'
+nass.df3[grepl("HAYLAGE",nass.df3$commodity_desc),'commodity_desc'] <- 'OTHER HAY'
+
 # aggregate by crop type and irrigation status
 summary <- aggregate(Value ~ commodity_desc + prodn_practice_desc,
-                     data = nass.df2, FUN='sum')
-summary
+                     data = nass.df3, FUN='sum')
 
-# combine hay and haylage by replacing commodity desc with hay
-summary[grepl("HAY",summary$commodity_desc),'commodity_desc'] <- 'HAY'
-# re-aggregate
-summary2 <- aggregate(Value ~ commodity_desc + prodn_practice_desc,
-                     data = summary, FUN='sum')
-summary2
+# convert from acres to square kilometers
+summary$Value <- summary$Value / 247.105
 
 # fill in a non-irrigated value
-summary.wide <- spread(summary2, key = prodn_practice_desc, value = Value)
+summary.wide <- spread(summary, key = prodn_practice_desc, value = Value)
 summary.wide[is.na(summary.wide$IRRIGATED),'IRRIGATED'] <- 0
 summary.wide$NON_IRR <- summary.wide$TOTAL - summary.wide$IRRIGATED
-summary.wide[summary.wide$IRRIGATED == 0 ,'IRRIGATED'] <- NA
+
+# sort
+summary.wide <- summary.wide[rev(order(summary.wide$IRRIGATED)),]
 
 # make  a table
 kable(summary.wide[,1:3])
 
+
 # make a plot
-summary.wide2 <- summary.wide[!is.na(summary.wide$IRRIGATED),
+summary.wide2 <- summary.wide[summary.wide$IRRIGATED > 0,
                               c('commodity_desc','IRRIGATED', 'NON_IRR')]
+
 summary3 <- gather(summary.wide2, key = irrig_type, value = Value,
                    IRRIGATED:NON_IRR)
 
 ggplot(summary3, aes(x=commodity_desc, y=Value, fill=irrig_type)) +
   geom_bar(stat='identity') + 
-  ylab('Acres') + xlab('commodity') + 
+  ylab('Square Kilometers') + xlab('commodity') + 
   ggtitle('Irrigated Crops - Middle Republican NRD - 2012') + theme_bw()
 
 
