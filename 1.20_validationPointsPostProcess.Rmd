@@ -23,7 +23,9 @@ library(rgdal)
 library(rgeos)
 ```
 
-## Process validation points: function
+## Functions
+
+### Process validation points: function
 Wrote out imported GEE points as a csv (since the kml write=out doesn't include a layer name). This extracts coordinates, adds crop class name, and turns back into points to write out as a KML to add to GEE as a feature collection.
 
 ```{r csvFun}
@@ -58,6 +60,37 @@ csvToSpdf <- function(csvFilename, cdlKey){
 #test <- csvToSpdf(testFile, cdlKey)
 
 ```
+
+
+## Csv to KMl
+This section converts datasets exported from GEE as .csv's to spdfs using above function, then writes out as KML's for future import/use as fusion tables in GEE.
+
+```{r csvToKML, eval=FALSE}
+cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
+                    stringsAsFactors=F)
+
+# Jeremy's first full validation set for NE MidRep NRD
+# irrigated and nonirrigated points only (uncertain omitted from export)
+fileDir <- 'C:/Users/deinesji/Google Drive/GEE_validation/'
+valid1 <- paste0(fileDir, 'valid_midRep_10_2010_jrapp_noUncertainty.csv')
+valid1.spdf <- csvToSpdf(valid1, cdlKey)
+# remove built/water classes
+remove <- c(63, 82, 83, 111, 121, 122, 123, 124, 141, 142, 143)
+valid1.spdf <- valid1.spdf[!(valid1.spdf$CDLcode %in% remove),]
+# make class2 column
+noncropCdl <- c(64, 87, 88, 152, 176, 190, 195)
+valid1.spdf$class2 <- 1
+for (i in 1:nrow(valid1.spdf)){
+          if(valid1.spdf$irrigated[i] == "N") valid1.spdf[i,'class2'] <- 0
+          if(valid1.spdf$CDLcode[i] %in% noncropCdl) valid1.spdf[i,'class2'] <- 2
+  }
+# remove system.index column
+valid1.spdf<- valid1.spdf[,-3]
+
+writeOGR(valid1.spdf, paste0(fileDir, 'valid_midRep_10_2010_jrapp_noUncertainty.kml'),
+            layer = 'validPoints', driver = 'KML')
+```
+
 
 ## Point Validation Evaluation
 Undergrad Jeremy Rapp evaluated ~980 random points in the Middle Republican NRD. To compare irrigated/nonirrigated classifications between investigators, Jill recorded 222 points. This compares them.
