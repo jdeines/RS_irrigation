@@ -1,0 +1,240 @@
+---
+title: "Climate Stuff"
+author: "Jill Deines"
+date: "Monday, July 11, 2016"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Modify my NLDAS SALUS script to make output more informative for remote sensing classifications. Initial goals are:
+
+* polygon AOI: annual precip daily time series to identify promising ET scenes
+* landsat cell level: monthly precip values to compare with monthly ET
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(eval=FALSE)  # won't run chunks when making .html reference
+opts_chunk$set(cache=TRUE, cache.path='cache/3.0_nldas/',
+               fig.path='figure/3.0_nldas/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE, eval=TRUE}
+library(rgdal)
+library(raster)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(scales)
+library(lubridate)
+#library(RODBC)
+
+# #Run the next two lines to install non-CRAN 'rhdf5' package if needed
+# source("http://bioconductor.org/biocLite.R")
+# a
+library(rhdf5) # from Bioconductor
+```
+
+## Specify Extraction Parameters
+User modified arguments including:
+
+* Shapefile defining area and attribute field names
+* Years of Interest
+* Output path and names
+
+Not Yet MOdifiable: 
+
+* aggregation parameters (default: mean for each polygon area)
+* variables of interest (from set: max temp, min temp, precip, solrad (and maybe more?))
+  * tweaks needed to modify
+
+```{r specifyOutput, eval=TRUE}
+# shapefile to extract
+shapeDir <- 'S:/Users/deinesji/HPA/gis' 
+shapefile <- 'RRB_NRDs' #.shp name, no extension
+
+# Middle Republican RRB (smaller area for testing)
+nrds <-  readOGR(shapeDir, shapefile, verbose=F)
+midRep <- nrds[nrds$NRD_Name == 'Middle Republican',]
+
+# specify the attribute fields in shapefile 
+# unique polygon ID that will map to StationID in Salus .wdb
+fieldPolyID <- 'OBJECTID'    # used to extract Salus 
+
+# # not needed for this version
+# fieldPlaceName <- 'PlacName' # used to populate output table 'Stations'
+# fieldLat <- 'Lat'            # used to populate output table 'Stations'
+# fieldLong <- 'Long'          # used to populate output table 'Stations'
+# fieldElev <- 'Elev'           # used to populate output table 'Stations'
+
+# specify extraction years 
+extractYearStart = '2010'
+extractYearEnd = '2010'
+
+# vector of desired Array names
+#dnames <- c("maxTemp","minTemp","precip","solarRad")
+dnames <- c('precip')
+
+# Outputs 
+outputScratchPath <- 'S:/Users/deinesji/HPA/data/NLDAS_extractions/RSirrigation'
+csvFile <- paste0('midRep_NLDAS_precip_', extractYearStart, '-',extractYearEnd, '.csv')
+```
+
+## Extract data from NLDAS .h5 files
+This is based on Anthony's reanalysis_extract_yearly_files_SALUS.m function.
+
+NLDAS gridded data has been downloaded and processed for daily values to to 'S:\Data\Climate_Data\Gridded\Derived\NLDAS_2A_Forcing_SALUS', stored as a separate .h5 file for each year.
+
+.h5 datasets:
+
+* latitude: latitude for the centroids of 224 rows of grid cells
+* longitude: longitude for the centroids of 464 columns of grid cells
+* maxTemp, minTemp, precip, solarRad: 
+  * dimensions: 365 x 464 x 224 (days x columns x rows)
+* times: 365 days
+
+### Create spatial Helpers
+Make a nldas grid template for the full US, and make an extent boundary to crop to for my extraction
+
+```{r extractSpaceHelp}
+# create a NLDAS raster grid template (full US) using grid specs
+adjust <- 0.0625 # half of the 1/8 degree grid
+nldasTemplate <- raster(nrow = 224, ncol = 464, crs = "+proj=longlat +datum=WGS84",
+                     extent(-124.9375 - adjust,     #ymin
+                            -67.0625 + adjust,      #ymax
+                            25.0625 - adjust,       #xmin
+                            52.9375 + adjust))      #xmax
+# load shapefile
+#extractSpatialAgg <- readOGR(shapeDir, shapefile, verbose=F)
+extractSpatialAgg <- midRep
+extractSpatialAgg <- spTransform(extractSpatialAgg, crs(proj4string(nldasTemplate)))
+
+# crop to extractSpatialAgg
+cropTemplate <- crop(nldasTemplate, extractSpatialAgg)
+```
+
+### Extract NLDAS data for SALUS 
+This loads the NLDAS_SALUS hdf5 files prepared by A. Kendall, which are yearly files containing daily values for the variables of interest. Note that the 2015 file is only through August. Only full years currently work with the code set up.
+
+```{r extractNLDAS}
+# set nldas Dir and get list of h5 files
+nldasDir <- 'S:/Data/Climate_Data/Gridded/Derived/NLDAS_2A_Forcing_SALUS'
+nldasFiles <- list.files(nldasDir, pattern = '.h5')
+
+# subset file list for years specified
+yearsWanted <- as.character(as.numeric(extractYearStart):as.numeric(extractYearEnd))
+yearsGrep <- paste(yearsWanted,  collapse='|')
+nldasFiles2 <- nldasFiles[grepl(yearsGrep, nldasFiles)]
+
+# # examine h5 structure
+# h5ls(paste(nldasDir,nldasFiles[1],sep='/')) # check h5 list contents
+
+
+# GET THE DATA -----------------------------------------------------------------
+
+# time run
+start.time <- Sys.time()
+
+out <- lapply(nldasFiles2, function(x) {                 # for each nldas File
+    # load .h5 tables for that year
+    climvar <- list()
+    for (dataset in dnames) {
+      climvar[[dataset]] <- h5read(file = paste(nldasDir,x,sep='/'), 
+                           name = dataset)
+    }
+    
+    # extract data spatially for each variable and combine into 1 df
+    annual <- lapply(seq_along(climvar), function(y) {   # for each variable
+      # get dataset name
+      var <- names(climvar)[[y]]
+      ydata <- climvar[[y]]
+      
+      # prep data array
+      y2 <- aperm(ydata, c(3,2,1))  # rearrange array dimensions
+      y2[y2 == -99999] <- NA    # set 'nodata' values to NA
+
+      # spatialize data to nldas grid and crop to extractSpatialAgg extent
+      yBrick <- brick(y2, xmn = -125, xmx = -67, ymn = 25, ymx = 53,
+                crs="+proj=longlat +datum=WGS84")
+      yBrickCrop <- crop(yBrick, cropTemplate)
+   
+      # extract rasterbrick values for each polygon (mean for the poly)
+      extractSpatialAgg$climvar <- raster::extract(yBrickCrop, extractSpatialAgg, fun=mean)
+
+      # turn to data frame and long format
+      climvarWide <- as.data.frame(extractSpatialAgg@data$climvar)
+      climvarWide$StationID <- extractSpatialAgg@data[,fieldPolyID]
+      
+      # test for leap year and act accordingly to get long format
+      if(ncol(climvarWide) == 366) {          # not leap year
+        climvarLong <- gather(climvarWide, key = DOY, value = variable,
+                      layer.1:layer.365)
+      } else if(ncol(climvarWide) == 367) {      # leap year
+        climvarLong <- gather(climvarWide, key = DOY, value = variable,
+                      layer.1:layer.366)
+      }
+      
+      # convert layer.DOY string to numeric DOY
+      climvarLong$DOY <- as.numeric(sub('.*\\.','',climvarLong$DOY))
+      # rename variable for dataset
+      names(climvarLong)[3] <- var
+
+      return(climvarLong)
+    })
+    
+    # combine 4 climate variables into 1 df matching SALUS template
+    # there was more code here for more variables before
+    salusannual <- annual[[1]]
+    salusannual$Year <- as.numeric(strsplit(x, split="[_.]")[[1]][4]) # from file name
+     
+    return(salusannual)
+})
+
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+
+# # process into 1 sorted data frame (sort by station, year, doy) ----------------
+# # process list of data frames into 1 dataframe
+salusWeather <- do.call("rbind",out)
+# 
+# # sort data by 1)Station, 2) Year, 3) DOY
+# salusSorted <- salusWeather[with(salusWeather, order(StationID, Year, DOY)),]
+# rm(salusWeather)
+
+# save as csv
+write.csv(salusWeather, paste0(outputScratchPath, '/',csvFile), row.names=F)
+```
+
+## Visualize
+
+
+```{r plotPrecip, eval=TRUE}
+precip <- read.csv(paste0(outputScratchPath, '/',csvFile))
+# add a date column
+precip$DOY <- sprintf("%03d",precip$DOY) # pad DOY with 0's 
+precip$date <- as.Date(parse_date_time(paste0(precip$Year, precip$DOY), 'Yj'))
+
+springDOY <- as.Date(parse_date_time(paste0('2010','119'), 'Yj'))
+summer1DOY <- as.Date(parse_date_time(paste0('2010','183'), 'Yj'))
+summer2DOY <- as.Date(parse_date_time(paste0('2010','215'), 'Yj'))
+summer3DOY <- as.Date(parse_date_time(paste0('2010','207'), 'Yj'))
+
+# plot annual precip in the MidRep NRD
+ggplot(data = precip,
+       aes(x = date, y = precip)) +
+  geom_line() +   
+  geom_vline(aes(xintercept = as.numeric(springDOY), colour = 'red')) + 
+  geom_vline(aes(xintercept = as.numeric(summer1DOY), colour = 'red')) + 
+  geom_vline(aes(xintercept = as.numeric(summer2DOY), colour = 'red')) + 
+  geom_vline(aes(xintercept = as.numeric(summer3DOY), colour = 'red')) + 
+  scale_x_date(date_breaks='1 month', labels = date_format('%b')) +
+  ylab('precip (mm)') + xlab("Date") + theme_bw() +
+       ggtitle("Daily Precip 2010")
+
+
+  
+```
+
