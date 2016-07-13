@@ -1,0 +1,38 @@
+---
+title: "ET differences - MidRep Corn"
+author: "Jill Deines"
+date: "Wednesday, July 13, 2016"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: See if irrigated/non-irrigated corn clusters in EEFlux derived ET values; compare more arid NW with the wetter east of the Middle Republican NRD.
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE, cache.path='cache/0.1_EEFlux/',
+               fig.path='figure/0.1_EEFlux/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(ggplot2)
+```
+
+## visualize
+plot up the sampled points (manually selected by Jill based on Landsat EVI and CDL.
+
+```{r cornFlux}
+# load data
+et <- read.csv('C:/Users/deinesji/Google Drive/GEE_validation/eeFlux_cornTest.csv',
+         stringsAsFactors=F)
+
+ggplot(data=et, aes(b1, fill = description)) +
+  geom_histogram(alpha=0.2, position = 'identity') + 
+  theme_bw()
+
+```
+
