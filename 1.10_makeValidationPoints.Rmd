@@ -77,12 +77,12 @@ hpa <- spTransform(hpa, CRS(tweakProj))
 
 
 
-## Stratified sampling function
+## Define Stratified sampling function
 Overview: turns the CDL raster into a data frame and performs stratified random sampling on CDL classes. Then converts data frame back to spatialPointsDataFrame. This is intended to be used on a cdl raster that has already been masked by a polygon area of interest. Polygon should be in same projected coordinates as CDL layer
 
-Because grassland is such a huge proportion of the landscape but relatively easy to classify as irr/nonirr, the function "downweights" this crop class. It does this in a gangsta way by increasingly the # points desired, and then removing half of the grassland points.
+Because grassland is such a huge proportion of the landscape but relatively easy to classify as irr/nonirr, the function "downweights" this crop class. It does this in a gangsta way by increasingly the # points desired, and then removing a percentage of the grassland points based on argument 'grassthin'.
 
-Any CDL class with 'DEVELOPED' in it is also removed from the sample.
+The following CDL classes are also removed from the sample: Any CDL class with 'DEVELOPED' in it is also removed from the sample, forests, and wetlands. While this could somewhat alter the density, I'm not too worried since they are relatively rare on the HPA landscape.
 
 Function arguments:
 
@@ -132,6 +132,10 @@ getStratCdl <- function(cdl.mask, poly, sampleDensity, sampleFactor,
   p1.r2[p1.r2$CLASS_NAME == 'Grass/Pasture','keep'] <- rbinom(grassSamples, 1, grassThin)  
   # flag developed classes for removal as well
   p1.r2[grepl('Developed',p1.r2$CLASS_NAME),'keep'] <- 0
+  # flag forests and wetlands for removal, and water
+  p1.r2[grepl('Forest',p1.r2$CLASS_NAME),'keep'] <- 0
+  p1.r2[grepl('Wetlands',p1.r2$CLASS_NAME),'keep'] <- 0
+  p1.r2[grepl('Water',p1.r2$CLASS_NAME),'keep'] <- 0
   
   # remove points
   p1.r2 <- p1.r2[p1.r2$keep ==1,]
@@ -167,11 +171,14 @@ proj4string(cdl.mask.midRep) <- tweakProj
 # get points!
 ptDensity.nrd <- 10 # 1 point per every "x" km2 
 grasslandThin <- 0.3 # keep 30% of grassland points
-sampleFactor <- 1.8 # increase sample points to offset grassland thinning
+sampleFactor <- 1.9 # increase sample points to offset grassland and CDL category thinning
 
 # generate stratified random sample
 nrdPoints <- getStratCdl(cdl.mask.midRep, midRep, ptDensity.nrd, sampleFactor,
                          grasslandThin, cdlKey, seed=1)
+
+# see how points cover classes
+table(nrdPoints@data$CLASS_NAME)
   
 # view
 plot(cdl.mask.midRep)
@@ -182,17 +189,19 @@ dim(nrdPoints)[1]
 gArea(midRep)*1e-6/ptDensity.nrd
 ```
 
+Note: alfalfa is low to reliably get samples for irrigated/non-irrigated alfalfa
+
 ```{r nrdWrite, eval=TRUE}
 # write out as WGS84 (needed for kml)
 nrdPoints.ll <- spTransform(nrdPoints, CRS("+proj=longlat +datum=WGS84"))
 outdir <- 'S:/Users/deinesji/HPA/gis/GEE_processing/validPoints'
-writeOGR(nrdPoints.ll, outdir, 'valid_MidRep_10_2010', driver='ESRI Shapefile', 
-         overwrite = T)
-writeOGR(nrdPoints.ll, paste0(outdir, '/valid_MidRep_10_2010.kml'),
+writeOGR(nrdPoints.ll, outdir, 'valid_MidRep_10_2010_20160725', driver='ESRI Shapefile', 
+         overwrite = F)
+writeOGR(nrdPoints.ll, paste0(outdir, '/valid_MidRep_10_2010_20160725.kml'),
             layer = 'thislayer', driver='KML', overwrite=F)
 
 # write KML to my dropbox for laptop access
-writeOGR(nrdPoints.ll, 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/valid_MidRep_10_2010.kml', layer = 'thislayer', driver='KML', overwrite=F)
+writeOGR(nrdPoints.ll, 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/valid_MidRep_10_2010_20160725.kml', layer = 'thislayer', driver='KML', overwrite=F)
 ```
 
 ### Republican River Basin
