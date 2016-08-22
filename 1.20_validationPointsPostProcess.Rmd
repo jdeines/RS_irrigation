@@ -40,11 +40,13 @@ csvToSpdf <- function(csvFilename, cdlKey){
     # extract coordinates from messy .geo string
     coords <- sub(".*\\[(.*)\\].*", "\\1", validated$.geo, perl=TRUE)
     coords2 <- do.call(rbind, strsplit(coords, ','))   
-    validated2 <- data.frame(irrigated = validated$irrigated,
-                         CDLcode = validated$max,
-                         x = as.numeric(coords2[,1]),
-                         y = as.numeric(coords2[,2]),
-                         system.index = validated$system.index)
+    validated2 <- data.frame(class = validated$class,
+                             classNum = validated$classNum,
+                             certainty = validated$certainty,
+                             CDLcode = validated$max,
+                             x = as.numeric(coords2[,1]),
+                             y = as.numeric(coords2[,2]),
+                             system.index = validated$system.index)
 
     # add CDL class name
     validated3 <- merge(validated2, cdlKey[,c('VALUE','CLASS_NAME')], 
@@ -64,6 +66,8 @@ csvToSpdf <- function(csvFilename, cdlKey){
 
 ## Csv to KMl
 This section converts datasets exported from GEE as .csv's to spdfs using above function, then writes out as KML's for future import/use as fusion tables in GEE.
+
+Note that validation files prior to the 'valid3' versions won't work with the function as written above (valid3 added additional columns)
 
 ```{r csvToKML, eval=FALSE}
 cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
@@ -95,7 +99,10 @@ writeOGR(valid1.spdf, paste0(fileDir, 'valid_midRep_10_2010_jrapp_noUncertainty.
 ## Point Validation Evaluation
 Undergrad Jeremy Rapp evaluated ~980 random points in the Middle Republican NRD. To compare irrigated/nonirrigated classifications between investigators, Jill recorded 222 points. This compares them.
 
-```{r compare}
+### First trial: binary classification approach
+Note this won't work as written after csvToSpdf function update for valid3 versions
+
+```{r compare1}
 # crop key
 cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
                     stringsAsFactors=F)
@@ -140,3 +147,62 @@ pointBuds$identical <- pointBuds$rappIrr == pointBuds$jillIrr
 table(pointBuds[,c('crop','identical')])
 ```
 
+
+### Second trial: 3-level uncertainty approach
+First evaluation on August 22, 2016: neither Jeremy or Jill finished whole set
+
+
+```{r compare2}
+# crop key
+cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
+                    stringsAsFactors=F)
+
+# Jeremey's file
+rappFile <-'C:/Users/deinesji/Google Drive/GEE_validation/valid3_midRep_10_2010_jrappTest.csv'
+# Jill's file
+jillFile <- 'C:/Users/deinesji/Google Drive/GEE_validation/valid3_midRep_10_2010_jmdTest.csv'
+
+# load/process csvs to spatial points
+rappPoints <- csvToSpdf(rappFile, cdlKey)
+jillPoints <- csvToSpdf(jillFile, cdlKey)
+
+# project to meters
+rappPoints <- spTransform(rappPoints, CRS('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs '))
+jillPoints <- spTransform(jillPoints, CRS('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs '))
+
+# find distances between all points
+distPairs <- as.data.frame(gDistance(jillPoints, rappPoints, byid = T))
+distPairs$cellnum <- 1:nrow(distPairs)
+
+# best guess at paired points
+pointBuddies <- data.frame(jill = 1:nrow(jillPoints), rapp = NA, distance = NA,
+                           crop = jillPoints$CLASS_NAME,
+                           jillclass = jillPoints$class, 
+                           rappclass = NA,
+                           jillcert = jillPoints$certainty,
+                           rappcert = NA)
+
+for (i in 1:nrow(jillPoints)) {
+  pointBuddies[i,'rapp'] <- distPairs[which.min(distPairs[,i]),'cellnum']
+  pointBuddies[i, 'distance'] <- distPairs[which.min(distPairs[,i]),i]
+}
+  
+# add irrigation status (class) and certainty for rapp
+rappPoints$ind <- 1:nrow(rappPoints)
+pointBuds <- merge(pointBuddies, rappPoints[,c('class','certainty','ind')],
+                   by.x = 'rapp', by.y='ind', all.y = F)
+pointBuds$rappclass <- pointBuds$class
+pointBuds$rappcert <- pointBuds$certainty
+
+# filter for reasonable distances
+pointBuds <- pointBuds[pointBuds$distance < 200,]
+
+# summarize agreement
+totalMatching <- sum(pointBuds$rappclass == pointBuds$jillclass)
+# percent matching
+totalMatching/nrow(pointBuds)
+
+# tabulate crop
+pointBuds$identical <- pointBuds$rappIrr == pointBuds$jillIrr
+table(pointBuds[,c('crop','identical')])
+```
