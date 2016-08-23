@@ -102,7 +102,7 @@ Undergrad Jeremy Rapp evaluated ~980 random points in the Middle Republican NRD.
 ### First trial: binary classification approach
 Note this won't work as written after csvToSpdf function update for valid3 versions
 
-```{r compare1}
+```{r compare1, eval=FALSE}
 # crop key
 cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
                     stringsAsFactors=F)
@@ -202,7 +202,20 @@ totalMatching <- sum(pointBuds$rappclass == pointBuds$jillclass)
 # percent matching
 totalMatching/nrow(pointBuds)
 
-# tabulate crop
-pointBuds$identical <- pointBuds$rappIrr == pointBuds$jillIrr
+# tabulate irrigated/non-irrigated by crop
+pointBuds$identical <- pointBuds$rappclass == pointBuds$jillclass
 table(pointBuds[,c('crop','identical')])
+
+# check just for certainty level 3
+certainPoints <- pointBuds[pointBuds$jillcert == 3 & pointBuds$rappcert ==3,]
+matching <- sum(certainPoints$rappclass == certainPoints$jillclass)
+matching/nrow(certainPoints)
+
+certainPoints$identical <- certainPoints$rappclass == certainPoints$jillclass
+table(certainPoints[,c('crop','identical')])
+
+# write out shapefiles for further investigations
+outdir <- 'C:/Users/deinesji/Google Drive/GEE_validation/testShapefiles/secondTest_uncertainty'
+#writeOGR(jillPoints, outdir, 'jillpoints_20160822', driver='ESRI Shapefile')
+#writeOGR(rappPoints, outdir, 'rapppoints_20160822', driver='ESRI Shapefile')
 ```
