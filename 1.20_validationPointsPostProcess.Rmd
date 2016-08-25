@@ -154,7 +154,7 @@ First evaluation on August 22, 2016: neither Jeremy or Jill finished whole set
 
 ```{r compare2}
 # crop key
-cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
+cdlKey <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/helper/CDL_key_2014.csv', 
                     stringsAsFactors=F)
 
 # Jeremey's file
