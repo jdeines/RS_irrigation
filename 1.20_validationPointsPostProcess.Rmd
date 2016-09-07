@@ -7,7 +7,9 @@ output:
     toc: yes
 ---
 
-Goal: Take the KML exported from GEE during validation point creation and post-process
+Goal: Take the KML exported from GEE during validation point creation and post-process. 
+
+**Update Sept. 7 2016**: This now has several iterations as the validation point methodology evolved.
 
 
 ```{r knitrOpts, echo=FALSE}
@@ -27,6 +29,8 @@ library(rgeos)
 
 ### Process validation points: function
 Wrote out imported GEE points as a csv (since the kml write=out doesn't include a layer name). This extracts coordinates, adds crop class name, and turns back into points to write out as a KML to add to GEE as a feature collection.
+
+The following updated function version works for valid3 and valid4 methodology (class numbers and certainty levels).
 
 ```{r csvFun}
 # testFile <- 'C:/Users/deinesji/Google Drive/GEE_validation/valid_midRep_10_2010_JMDtest.csv'
@@ -63,21 +67,55 @@ csvToSpdf <- function(csvFilename, cdlKey){
 
 ```
 
+Keep a version of the original function to be able to run with previous validation sets. You know, for posterity.
+
+```{r oldCsvFun}
+# testFile <- 'C:/Users/deinesji/Google Drive/GEE_validation/valid_midRep_10_2010_JMDtest.csv'
+# cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
+#                    stringsAsFactors=F)
+
+csvToSpdf_old <- function(csvFilename, cdlKey){
+    # load output from GEE
+    validated <- read.csv(csvFilename, stringsAsFactors=F)
+
+    # extract coordinates from messy .geo string
+    coords <- sub(".*\\[(.*)\\].*", "\\1", validated$.geo, perl=TRUE)
+    coords2 <- do.call(rbind, strsplit(coords, ','))   
+    validated2 <- data.frame(irrigated = validated$irrigated,
+                             CDLcode = validated$max,
+                             x = as.numeric(coords2[,1]),
+                             y = as.numeric(coords2[,2]),
+                             system.index = validated$system.index)
+
+    # add CDL class name
+    validated3 <- merge(validated2, cdlKey[,c('VALUE','CLASS_NAME')], 
+                    by.x = 'CDLcode', by.y='VALUE', all.y=F)
+   
+    # spatialize points
+    coordinates(validated3) <- ~ x + y
+    proj4string(validated3) <- "+proj=longlat +datum=WGS84"
+    
+    return(validated3)
+  }
+
+#test <- csvToSpdf(testFile, cdlKey)
+
+```
+
 
 ## Csv to KMl
 This section converts datasets exported from GEE as .csv's to spdfs using above function, then writes out as KML's for future import/use as fusion tables in GEE.
 
-Note that validation files prior to the 'valid3' versions won't work with the function as written above (valid3 added additional columns)
+Note that validation files prior to the 'valid3' versions use the old csvToSpdf function version
 
-```{r csvToKML, eval=FALSE}
-cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
-                    stringsAsFactors=F)
+```{r csvToKML_valid1, eval=FALSE}
+cdlKey <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/helper/CDL_key_2014.csv', stringsAsFactors=F)
 
 # Jeremy's first full validation set for NE MidRep NRD
 # irrigated and nonirrigated points only (uncertain omitted from export)
 fileDir <- 'C:/Users/deinesji/Google Drive/GEE_validation/'
 valid1 <- paste0(fileDir, 'valid_midRep_10_2010_jrapp_noUncertainty.csv')
-valid1.spdf <- csvToSpdf(valid1, cdlKey)
+valid1.spdf <- csvToSpdf_old(valid1, cdlKey)
 # remove built/water classes
 remove <- c(63, 82, 83, 111, 121, 122, 123, 124, 141, 142, 143)
 valid1.spdf <- valid1.spdf[!(valid1.spdf$CDLcode %in% remove),]
@@ -100,12 +138,11 @@ writeOGR(valid1.spdf, paste0(fileDir, 'valid_midRep_10_2010_jrapp_noUncertainty.
 Undergrad Jeremy Rapp evaluated ~980 random points in the Middle Republican NRD. To compare irrigated/nonirrigated classifications between investigators, Jill recorded 222 points. This compares them.
 
 ### First trial: binary classification approach
-Note this won't work as written after csvToSpdf function update for valid3 versions
 
-```{r compare1, eval=FALSE}
+
+```{r compare_v1}
 # crop key
-cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
-                    stringsAsFactors=F)
+cdlKey <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/helper/CDL_key_2014.csv', stringsAsFactors=F)
 
 # Jeremey's file
 rappFile <-'C:/Users/deinesji/Google Drive/GEE_validation/valid_midRep_10_2010_jrapp.csv'
@@ -113,8 +150,8 @@ rappFile <-'C:/Users/deinesji/Google Drive/GEE_validation/valid_midRep_10_2010_j
 jillFile <- 'C:/Users/deinesji/Google Drive/GEE_validation/valid_midRep_10_2010_JMDtest.csv'
 
 # load/process csvs to spatial points
-rappPoints <- csvToSpdf(rappFile, cdlKey)
-jillPoints <- csvToSpdf(jillFile, cdlKey)
+rappPoints <- csvToSpdf_old(rappFile, cdlKey)
+jillPoints <- csvToSpdf_old(jillFile, cdlKey)
 
 # project to meters
 rappPoints <- spTransform(rappPoints, CRS('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs '))
@@ -152,10 +189,9 @@ table(pointBuds[,c('crop','identical')])
 First evaluation on August 22, 2016: neither Jeremy or Jill finished whole set
 
 
-```{r compare2}
+```{r compare_v3}
 # crop key
-cdlKey <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/helper/CDL_key_2014.csv', 
-                    stringsAsFactors=F)
+cdlKey <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/helper/CDL_key_2014.csv', stringsAsFactors=F)
 
 # Jeremey's file
 rappFile <-'C:/Users/deinesji/Google Drive/GEE_validation/valid3_midRep_10_2010_jrappTest.csv'
@@ -218,4 +254,72 @@ table(certainPoints[,c('crop','identical')])
 outdir <- 'C:/Users/deinesji/Google Drive/GEE_validation/testShapefiles/secondTest_uncertainty'
 #writeOGR(jillPoints, outdir, 'jillpoints_20160822', driver='ESRI Shapefile')
 #writeOGR(rappPoints, outdir, 'rapppoints_20160822', driver='ESRI Shapefile')
+```
+
+
+### Second trial: 3-level uncertainty approach
+First evaluation on August 22, 2016: neither Jeremy or Jill finished whole set
+
+
+```{r compare_v4}
+# crop key
+cdlKey <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/helper/CDL_key_2014.csv', stringsAsFactors=F)
+
+# Jill's v4 file
+jillFile4 <- 'C:/Users/deinesji/Google Drive/GEE_validation/valid4_midRep_10_2010_jmd.csv'
+# Jill's v3 file
+jillFile3 <- 'C:/Users/deinesji/Google Drive/GEE_validation/valid3_midRep_10_2010_jmdTest.csv'
+
+# load/process csvs to spatial points
+v4Points <- csvToSpdf(jillFile4, cdlKey)
+v3Points <- csvToSpdf(jillFile3, cdlKey)
+
+# project to meters
+v4Points <- spTransform(v4Points, CRS('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs '))
+v3Points <- spTransform(v3Points, CRS('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs '))
+
+# find distances between all points
+distPairs <- as.data.frame(gDistance(v4Points, v3Points, byid = T))
+distPairs$cellnum <- 1:nrow(distPairs)
+
+# best guess at paired points
+pointBuddies <- data.frame(v4 = 1:nrow(v4Points), v3 = NA, distance = NA,
+                           crop = v4Points$CLASS_NAME,
+                           v4class = v4Points$class, 
+                           v3class = NA,
+                           v4cert = v4Points$certainty,
+                           v3cert = NA)
+
+for (i in 1:nrow(v4Points)) {
+  pointBuddies[i,'v3'] <- distPairs[which.min(distPairs[,i]),'cellnum']
+  pointBuddies[i, 'distance'] <- distPairs[which.min(distPairs[,i]),i]
+}
+  
+# add irrigation status (class) and certainty for rapp
+v3Points$ind <- 1:nrow(v3Points)
+pointBuds <- merge(pointBuddies, v3Points[,c('class','certainty','ind')],
+                   by.x = 'v3', by.y='ind', all.y = F)
+pointBuds$v3class <- pointBuds$class
+pointBuds$v3cert <- pointBuds$certainty
+
+# filter for reasonable distances
+pointBuds <- pointBuds[pointBuds$distance < 200,]
+
+# summarize agreement
+totalMatching <- sum(pointBuds$v3class == pointBuds$v4class)
+# percent matching
+totalMatching/nrow(pointBuds)
+
+# tabulate irrigated/non-irrigated by crop
+pointBuds$identical <- pointBuds$v3class == pointBuds$v4class
+table(pointBuds[,c('crop','identical')])
+
+# check just for certainty level 3
+certainPoints <- pointBuds[pointBuds$v4cert == 1 & pointBuds$v3cert ==3,]
+matching <- sum(certainPoints$v3class == certainPoints$v4class)
+matching/nrow(certainPoints)
+
+certainPoints$identical <- certainPoints$v3class == certainPoints$v4class
+table(certainPoints[,c('crop','identical')])
+
 ```
