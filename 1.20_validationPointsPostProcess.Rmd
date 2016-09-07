@@ -9,7 +9,7 @@ output:
 
 Goal: Take the KML exported from GEE during validation point creation and post-process. 
 
-**Update Sept. 7 2016**: This now has several iterations as the validation point methodology evolved.
+**Update Sept. 7 2016**: This now has several iterations as the validation point methodology evolved. 
 
 
 ```{r knitrOpts, echo=FALSE}
@@ -257,8 +257,8 @@ outdir <- 'C:/Users/deinesji/Google Drive/GEE_validation/testShapefiles/secondTe
 ```
 
 
-### Second trial: 3-level uncertainty approach
-First evaluation on August 22, 2016: neither Jeremy or Jill finished whole set
+### Third trial: 2-level uncertainty
+First evaluation on Sept 7, 2016: Jill using the 2-level uncertainty methods in valid4, compared with Jill's previous points using hte similar 3-level uncertainty methods in valid3
 
 
 ```{r compare_v4}
@@ -313,13 +313,46 @@ totalMatching/nrow(pointBuds)
 # tabulate irrigated/non-irrigated by crop
 pointBuds$identical <- pointBuds$v3class == pointBuds$v4class
 table(pointBuds[,c('crop','identical')])
+# tabulate by class
+table(pointBuds[,c('v4class','identical')])
 
 # check just for certainty level 3
 certainPoints <- pointBuds[pointBuds$v4cert == 1 & pointBuds$v3cert ==3,]
 matching <- sum(certainPoints$v3class == certainPoints$v4class)
 matching/nrow(certainPoints)
-
+# tab by crop
 certainPoints$identical <- certainPoints$v3class == certainPoints$v4class
 table(certainPoints[,c('crop','identical')])
+```
+
+## csv to KML: final versions
+These validations points will be used for further classification
+
+```{r makeKmlValidPts, eval = FALSE}
+# crop key
+cdlKey <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/helper/CDL_key_2014.csv', stringsAsFactors=F)
+
+fileDir <- 'C:/Users/deinesji/Google Drive/GEE_validation/'
+
+# Jill's valid4 file - Middle Republican NRD
+jillFile4 <- paste0(fileDir, 'valid4_midRep_10_2010_jmd.csv')
+
+# load/process csvs to spatial points
+v4Points <- csvToSpdf(jillFile4, cdlKey)
+
+# remove uncertain points
+sum(v4Points$certainty == 0) # count number of uncertain poitns
+v4Points <- v4Points[v4Points$certainty != 0,]
+
+# write out
+writeOGR(v4Points, paste0(fileDir, 'valid4_midRep_10_2010_jmd_uncertainRemoved.kml'),
+            layer = 'validPoints', driver = 'KML')
+
+# write out only the "most certain" points
+v4Points.certain <- v4Points[v4Points$certainty == 1,]
+nrow(v4Points.certain)
+writeOGR(v4Points.certain, paste0(fileDir, 'valid4_midRep_10_2010_jmd_certainOnly.kml'),
+            layer = 'validPoints', driver = 'KML')
 
 ```
+
