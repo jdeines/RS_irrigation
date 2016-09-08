@@ -340,8 +340,11 @@ jillFile4 <- paste0(fileDir, 'valid4_midRep_10_2010_jmd.csv')
 # load/process csvs to spatial points
 v4Points <- csvToSpdf(jillFile4, cdlKey)
 
+# remove system.index column
+v4Points <- v4Points[,c('CDLcode','class','classNum','certainty','CLASS_NAME')]
+
 # remove uncertain points
-sum(v4Points$certainty == 0) # count number of uncertain poitns
+sum(v4Points$certainty == 0) # count number of uncertain poitns = 864
 v4Points <- v4Points[v4Points$certainty != 0,]
 
 # write out
