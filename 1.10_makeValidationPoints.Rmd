@@ -200,8 +200,8 @@ writeOGR(nrdPoints.ll, outdir, 'valid_MidRep_10_2010_20160725', driver='ESRI Sha
 writeOGR(nrdPoints.ll, paste0(outdir, '/valid_MidRep_10_2010_20160725.kml'),
             layer = 'thislayer', driver='KML', overwrite=F)
 
-# write KML to my dropbox for laptop access
-writeOGR(nrdPoints.ll, 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/valid_MidRep_10_2010_20160725.kml', layer = 'thislayer', driver='KML', overwrite=F)
+# write KML to my dropbox for laptop access 
+writeOGR(nrdPoints.ll, 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/generatedPointsForUpload/valid_MidRep_10_2010_20160725.kml', layer = 'thislayer', driver='KML', overwrite=F)
 ```
 
 ### Republican River Basin
