@@ -325,7 +325,7 @@ certainPoints$identical <- certainPoints$v3class == certainPoints$v4class
 table(certainPoints[,c('crop','identical')])
 ```
 
-## csv to KML: final versions
+## csv to KML: final versions, valid4
 These validations points will be used for further classification
 
 ```{r makeKmlValidPts, eval = FALSE}
@@ -356,6 +356,13 @@ v4Points.certain <- v4Points[v4Points$certainty == 1,]
 nrow(v4Points.certain)
 writeOGR(v4Points.certain, paste0(fileDir, 'valid4_midRep_10_2010_jmd_certainOnly.kml'),
             layer = 'validPoints', driver = 'KML')
+
+# write out Shapefiles
+outDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/generatedPointsForUpload'
+writeOGR(v4Points, outDir, 'valid4_midRep_10_2010_jmd_uncertainRemoved',
+         driver = 'ESRI Shapefile')
+writeOGR(v4Points.certain, outDir, 'valid4_midRep_10_2010_jmd_certainOnly',
+         driver = 'ESRI Shapefile')
 
 ```
 
