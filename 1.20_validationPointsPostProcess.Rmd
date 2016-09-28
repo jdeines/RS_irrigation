@@ -358,7 +358,7 @@ writeOGR(v4Points.certain, paste0(fileDir, 'valid4_midRep_10_2010_jmd_certainOnl
             layer = 'validPoints', driver = 'KML')
 
 # write out Shapefiles
-outDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/generatedPointsForUpload'
+outDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/generatedPointsForUpload/shapefiles'
 writeOGR(v4Points, outDir, 'valid4_midRep_10_2010_jmd_uncertainRemoved',
          driver = 'ESRI Shapefile')
 writeOGR(v4Points.certain, outDir, 'valid4_midRep_10_2010_jmd_certainOnly',
