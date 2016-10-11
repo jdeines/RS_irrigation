@@ -9,7 +9,7 @@ output:
 
 Goal: Create a set of validation points to be used in evaluating irrigation maps produced from remote sensing classifications. The aim is to have random points stratified among different crop types as well as non-ag land.
 
-I plan to split the points into 3 files to help Jeremey Rapp prioritize aerial image validation so I can get started. 
+There are three tiers of area interest:
 
 * Middle Republican NRD, NE
 * Republican River Basin/RRCA groundwater model
@@ -31,9 +31,7 @@ library(dplyr)
 ```
 
 ## Load Stuff
-CDL for 2011 downloaded from Cropscape on 05/28/2016 and re-formatted via R to reduce file size. It's AOI is the HPA aquifer + RRCA/RRB buffer.
-
-(update: done with 2010)
+CDLs downloaded from Cropscape after 05/28/2016 and re-formatted via R to reduce file size. It's AOI is the HPA aquifer + RRCA/RRB buffer (HPA_RRB_buff.zip).
 
 Also load the CDL csv key (the updated, consistent key across all years), and polygons for area extent.
 
@@ -42,12 +40,12 @@ All polygons are re-projected to match CDL projection. Must use a meters based p
 
 ```{r loadStuff}
 # ## load original cdl download and write out smaller
-# reduce <- raster('F:/deinesji/CDL/zipDownloads/CDL_2010_20160531123051_666969309.tif')
-# writeRaster(reduce, 'F:/deinesji/CDL/hpa_rrbbuff/CDL_2010_HPA_RRB.tif',
-#             datatype = 'INT1U')
+#reduce <- raster('F:/deinesji/CDL/zipDownloads/CDL_2007_clip_20161004135148_550013268.tif')
+#writeRaster(reduce, 'F:/deinesji/CDL/hpa_rrbbuff/CDL_2007_swNebraska.tif',datatype = 'INT1U')
 
 #cdl and key
-cdl <- raster('S:/Users/deinesji/HPA/gis/CDL/fullHPA/CDL_2010_HPA_RRB.tif')
+#cdl <- raster('S:/Users/deinesji/HPA/gis/CDL/fullHPA/CDL_2010_HPA_RRB.tif')
+cdl <- raster('S:/Users/deinesji/HPA/gis/CDL/CDL_RRB_2007_adj.tif')
 cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
                    stringsAsFactors=F)
 
@@ -158,20 +156,20 @@ I might try evaluating classifications in this NRD
 
 ```{r midRep}
 # # # crop CDL
-# cdl.crop2 <- crop(cdl, midRep)
-# cdl.mask2 <- mask(cdl.crop2, midRep)
+#cdl.crop2 <- crop(cdl, midRep)
+#cdl.mask2 <- mask(cdl.crop2, midRep)
 # # 
 # # # write out crop mask so faster next time
-# writeRaster(cdl.mask2, dataType = 'INT1U', filename = 'S:/Users/deinesji/HPA/gis/CDL/rsValidationMaskedSets/2010_midRepMask.tif')
+#writeRaster(cdl.mask2, dataType = 'INT1U', filename = 'S:/Users/deinesji/HPA/gis/CDL/rsValidationMaskedSets/2007_midRepMask.tif')
 
 # load previously masked
-cdl.mask.midRep <- raster('S:/Users/deinesji/HPA/gis/CDL/rsValidationMaskedSets/2010_midRepMask.tif')
+cdl.mask.midRep <- raster('S:/Users/deinesji/HPA/gis/CDL/rsValidationMaskedSets/2007_midRepMask.tif')
 proj4string(cdl.mask.midRep) <- tweakProj
 
 # get points!
 ptDensity.nrd <- 10 # 1 point per every "x" km2 
-grasslandThin <- 0.3 # keep 30% of grassland points
-sampleFactor <- 1.9 # increase sample points to offset grassland and CDL category thinning
+grasslandThin <- 0.08 # keep this proportion of grassland points
+sampleFactor <- 2.8 # increase sample points to offset grassland and CDL category thinning
 
 # generate stratified random sample
 nrdPoints <- getStratCdl(cdl.mask.midRep, midRep, ptDensity.nrd, sampleFactor,
@@ -179,6 +177,8 @@ nrdPoints <- getStratCdl(cdl.mask.midRep, midRep, ptDensity.nrd, sampleFactor,
 
 # see how points cover classes
 table(nrdPoints@data$CLASS_NAME)
+  
+dim(nrdPoints)
   
 # view
 plot(cdl.mask.midRep)
@@ -191,17 +191,17 @@ gArea(midRep)*1e-6/ptDensity.nrd
 
 Note: alfalfa is low to reliably get samples for irrigated/non-irrigated alfalfa
 
-```{r nrdWrite, eval=TRUE}
+```{r nrdWrite, eval=FALSE}
 # write out as WGS84 (needed for kml)
 nrdPoints.ll <- spTransform(nrdPoints, CRS("+proj=longlat +datum=WGS84"))
 outdir <- 'S:/Users/deinesji/HPA/gis/GEE_processing/validPoints'
-writeOGR(nrdPoints.ll, outdir, 'valid_MidRep_10_2010_20160725', driver='ESRI Shapefile', 
+writeOGR(nrdPoints.ll, outdir, 'valid_MidRep_10_2007_20161011', driver='ESRI Shapefile', 
          overwrite = F)
-writeOGR(nrdPoints.ll, paste0(outdir, '/valid_MidRep_10_2010_20160725.kml'),
+writeOGR(nrdPoints.ll, paste0(outdir, '/valid_MidRep_10_2007_20161011.kml'),
             layer = 'thislayer', driver='KML', overwrite=F)
 
 # write KML to my dropbox for laptop access 
-writeOGR(nrdPoints.ll, 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/generatedPointsForUpload/valid_MidRep_10_2010_20160725.kml', layer = 'thislayer', driver='KML', overwrite=F)
+writeOGR(nrdPoints.ll, 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/generatedPointsForUpload/valid_MidRep_10_2007_20161011.kml', layer = 'thislayer', driver='KML', overwrite=F)
 ```
 
 ### Republican River Basin
