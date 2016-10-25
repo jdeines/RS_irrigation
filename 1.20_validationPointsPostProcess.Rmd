@@ -364,5 +364,9 @@ writeOGR(v4Points, outDir, 'valid4_midRep_10_2010_jmd_uncertainRemoved',
 writeOGR(v4Points.certain, outDir, 'valid4_midRep_10_2010_jmd_certainOnly',
          driver = 'ESRI Shapefile')
 
+# summarize most certain points by crop
+table(v4Points.certain$CLASS_NAME)
+table(v4Points.certain$class)
+table(v4Points.certain[,c('class','CLASS_NAME')])
 ```
 
