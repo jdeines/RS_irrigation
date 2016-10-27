@@ -61,7 +61,7 @@ csvToSpdf <- function(csvFilename, cdlKey){
     proj4string(validated3) <- "+proj=longlat +datum=WGS84"
     
     return(validated3)
-  }
+}
 
 #test <- csvToSpdf(testFile, cdlKey)
 
@@ -328,7 +328,9 @@ table(certainPoints[,c('crop','identical')])
 ## csv to KML: final versions, valid4
 These validations points will be used for further classification
 
-```{r makeKmlValidPts, eval = FALSE}
+### MidRep 2010
+
+```{r makeKmlValidPts_midrep_2010}
 # crop key
 cdlKey <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/helper/CDL_key_2014.csv', stringsAsFactors=F)
 
@@ -348,25 +350,69 @@ sum(v4Points$certainty == 0) # count number of uncertain poitns = 864
 v4Points <- v4Points[v4Points$certainty != 0,]
 
 # write out
-writeOGR(v4Points, paste0(fileDir, 'valid4_midRep_10_2010_jmd_uncertainRemoved.kml'),
-            layer = 'validPoints', driver = 'KML')
+#writeOGR(v4Points, paste0(fileDir, 'valid4_midRep_10_2010_jmd_uncertainRemoved.kml'),
+#            layer = 'validPoints', driver = 'KML')
 
 # write out only the "most certain" points
 v4Points.certain <- v4Points[v4Points$certainty == 1,]
 nrow(v4Points.certain)
-writeOGR(v4Points.certain, paste0(fileDir, 'valid4_midRep_10_2010_jmd_certainOnly.kml'),
-            layer = 'validPoints', driver = 'KML')
+#writeOGR(v4Points.certain, paste0(fileDir, 'valid4_midRep_10_2010_jmd_certainOnly.kml'), layer = 'validPoints', driver = 'KML')
 
 # write out Shapefiles
 outDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/generatedPointsForUpload/shapefiles'
-writeOGR(v4Points, outDir, 'valid4_midRep_10_2010_jmd_uncertainRemoved',
-         driver = 'ESRI Shapefile')
-writeOGR(v4Points.certain, outDir, 'valid4_midRep_10_2010_jmd_certainOnly',
-         driver = 'ESRI Shapefile')
+#writeOGR(v4Points, outDir, 'valid4_midRep_10_2010_jmd_uncertainRemoved', driver = 'ESRI Shapefile')
+#writeOGR(v4Points.certain, outDir, 'valid4_midRep_10_2010_jmd_certainOnly', driver = 'ESRI Shapefile')
 
 # summarize most certain points by crop
 table(v4Points.certain$CLASS_NAME)
 table(v4Points.certain$class)
-table(v4Points.certain[,c('class','CLASS_NAME')])
+#table(v4Points.certain[,c('class','CLASS_NAME')])
 ```
 
+
+### MidRep 2007
+
+```{r makeKmlValidPts_midrep_2007}
+# crop key
+cdlKey <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/helper/CDL_key_2014.csv', stringsAsFactors=F)
+
+fileDir <- 'C:/Users/deinesji/Google Drive/GEE_validation/'
+
+# Jill's valid4 file - Middle Republican NRD
+jillFile4 <- paste0(fileDir, 'valid4_midRep_10_2007_jmd.csv')
+
+# load/process csvs to spatial points
+v4Points <- csvToSpdf(jillFile4, cdlKey)
+
+# remove system.index column
+v4Points <- v4Points[,c('CDLcode','class','classNum','certainty','CLASS_NAME')]
+
+# remove uncertain points
+sum(v4Points$certainty == 0) # count number of uncertain poitns = 864
+v4Points <- v4Points[v4Points$certainty != 0,]
+
+# write out
+#writeOGR(v4Points, paste0(fileDir, 'valid4_midRep_10_2007_jmd_uncertainRemoved.kml'), layer = 'validPoints', driver = 'KML')
+
+# write out only the "most certain" points
+v4Points.certain <- v4Points[v4Points$certainty == 1,]
+nrow(v4Points.certain)
+#writeOGR(v4Points.certain, paste0(fileDir, 'valid4_midRep_10_2007_jmd_certainOnly.kml'),layer = 'validPoints', driver = 'KML')
+
+# write out Shapefiles
+outDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/generatedPointsForUpload/shapefiles'
+#writeOGR(v4Points, outDir, 'valid4_midRep_10_2007_jmd_uncertainRemoved', driver = 'ESRI Shapefile')
+#writeOGR(v4Points.certain, outDir, 'valid4_midRep_10_2007_jmd_certainOnly', driver = 'ESRI Shapefile')
+
+# summarize most certain points by crop
+v4Points.certain$class <- as.character(v4Points.certain$class)  # unfactor
+table(v4Points.certain$CLASS_NAME)
+table(v4Points.certain$class)
+#table(v4Points.certain[,c('class','CLASS_NAME')])
+
+# all points including uncertain
+v4Points$class <- as.character(v4Points$class)  # unfactor
+table(v4Points$CLASS_NAME)
+table(v4Points$class)
+#table(v4Points.certain[,c('class','CLASS_NAME')])
+```
