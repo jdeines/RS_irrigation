@@ -27,6 +27,7 @@ Geometries of interest to me are:
 
 * My RRCA + RRB buffered region
 * the full HPA with a 30km buffer
+* the full HPA with a 30 km buffer + the buffered RRB
 * the NE RRB (clipped from full basin)
 * the Middle Republican NRD (clipped from RRB NRDs)
 * Well Point Datasets (?) - start with RRCA wells for MidRep NRD trials to see if it's helpful
@@ -44,8 +45,10 @@ hpabuffname <- 'AquiferBoundary_30kmBuffer_WGS84'
 rrbBuffname <- 'BigExtent_RRB_RRCA_buff'
 rrbstatesname <- 'states_basin_clip'
 nrdsname <- 'RRB_NRDs'
+hpaRrbBuffname <- 'HPA_30km_RRB_buff'
 
 # load and process if necessary
+bigbuff <- readOGR(gisDir, hpaRrbBuffname, verbose=F)
 hpabuff <- readOGR(gisDir, hpabuffname, verbose=F)
 rrbbuff <- readOGR(gisDir, rrbBuffname, verbose=F)
 rrbstates <- readOGR(gisDir, rrbstatesname, verbose=F)
@@ -77,5 +80,7 @@ toKml(rrbbuff, rrbBuffname, outDir)
 toKml(rrbNE, 'NE_rrb', outDir)
 toKml(nrd1, 'NRD_MidRepub', outDir)
 toKml(rrcaWells, 'RRCA_NE_Wells_2007', outDir)
+
+toKml(bigbuff, 'HPA_30km_RRB_buff',outDir)
 ```
 
