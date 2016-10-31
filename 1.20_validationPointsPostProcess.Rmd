@@ -416,3 +416,32 @@ table(v4Points$CLASS_NAME)
 table(v4Points$class)
 #table(v4Points.certain[,c('class','CLASS_NAME')])
 ```
+
+### HPA Extra 2010
+These are randomly placed 2010 HPA points to enhance the preliminary maps made for Jeremy on 10/30/2016.
+
+```{r makeKmlValidPts_HPAextra_2010}
+# crop key
+cdlKey <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/helper/CDL_key_2014.csv', stringsAsFactors=F)
+
+fileDir <- 'C:/Users/deinesji/Google Drive/GEE_validation/'
+
+# Jill's valid4 file - Middle Republican NRD
+jillFile4 <- paste0(fileDir, 'valid4_hpa_extra_2010_jmd.csv')
+
+# load/process csvs to spatial points
+v4Points <- csvToSpdf(jillFile4, cdlKey)
+
+# remove system.index column
+v4Points <- v4Points[,c('CDLcode','class','classNum','certainty','CLASS_NAME')]
+
+# write out
+#writeOGR(v4Points, paste0(fileDir, 'valid4_hpa_extra_2010_jmd.kml'), layer = 'validPoints', driver = 'KML')
+
+
+# all points including uncertain
+v4Points$class <- as.character(v4Points$class)  # unfactor
+table(v4Points$CLASS_NAME)
+table(v4Points$class)
+#table(v4Points.certain[,c('class','CLASS_NAME')])
+```
