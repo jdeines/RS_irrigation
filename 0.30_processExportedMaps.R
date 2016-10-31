@@ -57,8 +57,7 @@ rasMerge <- function(year, outDir, newProj, maskShape){
   outFileName <- paste0(outDir, '/', outRasName, '.tif')
   
   # merge 
-  merged <- merge(ras1, ras2)
-  masked <- mask(merged, maskShape, filename=OutFileName)
+  merged <- merge(ras1, ras2, filename=outFileName)
   return(merged)
 }
 
