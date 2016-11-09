@@ -1,0 +1,77 @@
+---
+title: "Select Counties for Validation Points"
+author: "Jill Deines"
+date: "Saturday, October 29, 2016"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Use Koeppengeiger and USDA Ecoregion climate divisions to sample counties for validation points
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE, cache.path='cache/1.05_sampleCounty/',
+               fig.path='figure/1.05_sampleCounty/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+library(raster)
+library(dplyr)
+```
+
+## Load data
+
+```{r loadData}
+# filepaths -----------------------------------------------------
+# county shapefile
+tigerDir <- 'S:/Data/GIS_Data/Downloaded/TIGER/TIGER2012/COUNTY'
+tigerName <- 'tl_2012_us_county'
+
+# aquifer and basin boundaries
+gisDir <- 'S:/Users/deinesji/HPA/gis'
+rrbName <- 'BigExtent_RRB_RRCA_buff'
+
+# usda ecogreions
+ecoDir <- 'S:/Users/deinesji/HPA/data/climate/climateDivisions/USDA_Ecoregions'
+ecoName <- 'eco_us'
+
+# koeppen
+koepPath <- 'S:/Users/deinesji/HPA/data/climate/climateDivisions/Koeppengeiger/KoeppenGeiger_UScounty.txt'
+
+# read in
+counties <- readOGR(tigerDir, tigerName, verbose=F)
+rrb <- readOGR(gisDir, rrbName, verbose=F)
+ecoregions <- readOGR(ecoDir, ecoName, verbose=F)
+koepdata <- read.delim(koepPath)
+```
+
+
+### Get Counties
+Clips the TIGER 2012 county shapefile to area of interest and adds the counties Koeppengeiger code
+
+```{r getCounties}
+# reproject to wgs84
+rrb.ll <- spTransform(rrb, CRS(proj4string(counties)))
+
+# clip counties to the rrb
+countyRRB <- intersect(counties,rrb.ll)
+
+# trim dataframe and create 5-digit FIPS
+countysub <- countyRRB[,c('STATEFP','COUNTYFP','NAME')]
+countysub$STATEFP <- as.character(countysub$STATEFP)
+countysub$COUNTYFP <- as.character(countysub$COUNTYFP)
+countysub$fips <- paste0(countysub$STATEFP, countysub$COUNTYFP)
+
+# add the koeppengeiger code
+koepdata$FIPS <- as.character(koepdata$FIPS)
+countyClim <- merge(countysub, koepdata, by.x = 'fips', by.y = 'FIPS', all.x = T)
+```
+
+
+
+

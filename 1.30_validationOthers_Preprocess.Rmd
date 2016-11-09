@@ -1,0 +1,74 @@
+---
+title: "Validation Points - Others"
+author: "Jill Deines"
+date: "Friday, November 04, 2016"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: process validation data sets for Kansas from Brian Wardlow (UNL)
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE, cache.path='cache/1.3_vOthers/',
+               fig.path='figure/1.3_vOthers/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+library(raster)
+```
+
+## Load Kansas Points
+Points were provided in .csv format. In an email, Brian Wardlow said that the coordinates are in Lambert Azimuthal Equal Area and Sphere of the Radius (spheroid and datum).
+
+Dataset includes 2,179 field sites (some outside of the HPA) from 2001, and include crop type and irrigation status.
+
+```{r loadData}
+
+#dropboxDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validationFromOthers'
+sDir <- 'S:/Users/deinesji/HPA/gis/rsIrrigation/validationOthers'
+dataFile <- 'Kansas_field_sites.csv'
+
+# load a contextual shapefile to confirm projection
+gisDir <- 'S:/Users/deinesji/HPA/gis'
+rrb <- readOGR(gisDir, 'BigExtent_RRB_RRCA_buff', verbose=F)
+
+# load data
+points <- read.csv(paste(sDir,dataFile, sep='/'))
+
+# possible proj4 string for Sphere_ARC_INFO_Lambert_Azimuthal_Equal_Area
+# from http://spatialreference.org/ref/sr-org/80/
+proj <- '+proj=laea +lat_0=45 +lon_0=-100 +x_0=0 +y_0=0 +a=6370997 +b=6370997 +units=m +no_defs' 
+
+coordinates(points) <- ~X + Y
+proj4string(points) <- proj
+
+# export for projection test in ArcGIS
+#writeOGR(points, sDir, 'Kansas_field_sites', driver='ESRI Shapefile')
+
+points2 <- spTransform(points, CRS(proj4string(rrb)))
+
+# plot
+plot(rrb)
+plot(points2, add=T)
+
+# export points for further investigation
+points.ll <- spTransform(points, CRS("+proj=longlat +datum=WGS84"))
+writeOGR(points.ll, paste0(sDir, '/', 'Kansas_field_sites.kml'),
+            layer = 'points', driver = 'KML')
+
+# add columns for crop type, irrigation status, and class numbers
+
+
+  
+```
+
+
+
+
+
+

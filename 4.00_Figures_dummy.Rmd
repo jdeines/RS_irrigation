@@ -1,0 +1,49 @@
+---
+title: "Dummy Figures"
+author: "Jill Deines"
+date: "Friday, November 04, 2016"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Make dummy figures for manuscript planning
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE, cache.path='cache/4.0_dummyFigs/',
+               fig.path='figure/4.0_dummyFigs/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE, eval=TRUE}
+library(rgdal)
+library(raster)
+library(ggplot2)
+```
+
+## Irrigation Frequency through Time
+
+```{r frequency}
+gisDir <- 'S:/Users/deinesji/HPA/gis'
+
+hpa <- readOGR(gisDir, 'HPA_30km_RRB_buff', verbose=F)
+rrb <- readOGR(gisDir, 'BigExtent_RRB_RRCA_buff', verbose=F)
+
+grid <- raster(extent(rrb), resolution = 1000, crs = proj4string(rrb))
+grid[] <- sample(c(rep(0,3500),
+                   rep(3,5),
+                   rep(4,60),
+                   rep(5,10),
+                   rep(6,10),
+                   rep(8,150),
+                   rep(9,20),
+                   rep(11, 1),
+                   rep(15,150)), 211288, replace=T)
+gridMask <- mask(grid, rrb)
+spplot(gridMask)
+
+```
+
