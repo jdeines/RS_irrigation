@@ -11,6 +11,8 @@ Goal: Take the KML exported from GEE during validation point creation and post-p
 
 **Update Sept. 7 2016**: This now has several iterations as the validation point methodology evolved. 
 
+to do: re-write to use helper csvToSpdf function, and make sure to remove system.index
+
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)

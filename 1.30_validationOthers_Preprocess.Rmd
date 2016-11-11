@@ -20,25 +20,34 @@ opts_chunk$set(cache=TRUE, cache.path='cache/1.3_vOthers/',
 ```{r packages, message=FALSE, echo=TRUE}
 library(rgdal)
 library(raster)
+library(rgeos)
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# source project helper functions
+source('0.50_helperFunctions.R')
 ```
 
-## Load Kansas Points
-Points were provided in .csv format. In an email, Brian Wardlow said that the coordinates are in Lambert Azimuthal Equal Area and Sphere of the Radius (spheroid and datum).
+## Points to KML for Inspection
+Points were provided in .csv format. In an email, Brian Wardlow said that the coordinates are in Lambert Azimuthal Equal Area and Sphere of the Radius (spheroid and datum). I translated this as http://spatialreference.org/ref/sr-org/80/ and Wardlow said those specs were correct.
 
 Dataset includes 2,179 field sites (some outside of the HPA) from 2001, and include crop type and irrigation status.
 
-```{r loadData}
 
-#dropboxDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validationFromOthers'
-sDir <- 'S:/Users/deinesji/HPA/gis/rsIrrigation/validationOthers'
+```{r rawToKml}
+dataDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validationFromOthers'
+#dataDir <- 'S:/Users/deinesji/HPA/gis/rsIrrigation/validationOthers'
 dataFile <- 'Kansas_field_sites.csv'
 
 # load a contextual shapefile to confirm projection
-gisDir <- 'S:/Users/deinesji/HPA/gis'
-rrb <- readOGR(gisDir, 'BigExtent_RRB_RRCA_buff', verbose=F)
+gisDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
+#gisDir <- 'S:/Users/deinesji/HPA/gis'
+rrb <- readOGR(gisDir, 'BigExtent_RRB_RRCA_buff', verbose=F))
 
 # load data
-points <- read.csv(paste(sDir,dataFile, sep='/'))
+points <- read.csv(paste(dataDir,dataFile, sep='/'))
 
 # possible proj4 string for Sphere_ARC_INFO_Lambert_Azimuthal_Equal_Area
 # from http://spatialreference.org/ref/sr-org/80/
@@ -60,14 +69,210 @@ plot(points2, add=T)
 points.ll <- spTransform(points, CRS("+proj=longlat +datum=WGS84"))
 writeOGR(points.ll, paste0(sDir, '/', 'Kansas_field_sites.kml'),
             layer = 'points', driver = 'KML')
+```
 
-# add columns for crop type, irrigation status, and class numbers
+## Clean Bad Point Locations, RRB
+In GEE and ArcGIS, ~15% of points are clearly located adjacent to the intended field. I made a new point dataset at points with "wrong place" or suspected "wrong class". I then sampled annual greenness indices at all points for outlier analysis.
 
+Here, I see if outlier detection can deal with these points in an unbiased and justified manner.
 
+### load and clip points
+
+```{r cleanPoints_RRB_load}
+# load RRB boundary
+gisDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
+#gisDir <- 'S:/Users/deinesji/HPA/gis'
+rrb <- readOGR(paste0(gisDir,'/BigExtent_RRB_RRCA_buff.kml'), 'boundExtent', verbose=F)
+
+# load datasets exported from GEE
+dataDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validationFromOthers'
+dataFile1 <- 'Kansas_field_sites_sampledGreenness.csv'
+dataFile2 <- 'Kansas_field_sites_flagged.csv'
+
+# load csv's and convert to spdf
+allpoints <- csvToSpdf(paste(dataDir,dataFile1, sep='/')) # sourced function
+flagged <- csvToSpdf(paste(dataDir,dataFile2, sep='/'))
+
+# proj strings identical
+rrb <- spTransform(rrb, CRS(proj4string(allpoints)))
+
+# clip points to those inside RRB
+rrbpoints <- allpoints[rrb,]
+flagged <- flagged[rrb,]
+
+# get the actual percentage of suspected bad points
+sum(flagged$type == 'wrongPlace')/nrow(rrbpoints)
+
+plot(rrb)
+plot(rrbpoints, add=T)
+plot(flagged, col='red', add=T)
+```
+
+### Flag suspect points
+Points I suspect are in the wrong place or the wrong type.
+
+```{r flagPoints}
+# project to meters
+rrbMeters <- spTransform(rrbpoints, CRS('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs '))
+flagMeters <- spTransform(flagged, CRS('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs '))
+
+# find distances between all points
+distPairs <- as.data.frame(gDistance(flagMeters, rrbMeters, byid = T))
+distPairs$cellnum <- 1:nrow(distPairs)
+
+# get paired points
+pointBuddies <- data.frame(flagged = 1:nrow(flagMeters), 
+                           rrb = NA, 
+                           type = flagMeters$type)
+for (i in 1:nrow(flagMeters)) {
+  pointBuddies[i,'rrb'] <- distPairs[which.min(distPairs[,i]),'cellnum']
+}
   
+# add flagged status to rrb points
+rrbpoints$ind <- 1:nrow(rrbpoints)
+pointBuds <- merge(rrbpoints, pointBuddies[,c('rrb','type')], 
+                   by.x = 'ind', by.y = 'rrb', all.X = T)
+  
+manualClean <- pointBuds[is.na(pointBuds$type),]
+```
+
+### format data
+
+```{r cleanPoints_rrb_format}
+# add a point id column
+rrbpoints$ID <- 1:nrow(rrbpoints)
+# drop nonsense columns
+rrbpoints <- rrbpoints[,-which(names(rrbpoints) %in% c('description','name'))]
+# split crop/water status to two columns
+rrbpoints$irrigated <- sapply(strsplit(rrbpoints$Crop_type,"\\-"), `[`, 2)
+rrbpoints$crop <- sapply(strsplit(rrbpoints$Crop_type,"\\-"), `[`, 1)
+
+# convert spdf to long df
+rrblong <- gather(as.data.frame(rrbpoints), key = Index, value = value, EVI_max_14:NDWI_max_14)
+
+# manual rrb clean ------------------
+manualClean$ID <- 1:nrow(manualClean)
+# drop nonsense columns
+manualClean <- manualClean[,-which(names(manualClean) %in% c('description','name'))]
+# split crop/water status to two columns
+manualClean$irrigated <- sapply(strsplit(manualClean$Crop_type,"\\-"), `[`, 2)
+manualClean$crop <- sapply(strsplit(manualClean$Crop_type,"\\-"), `[`, 1)
+
+# convert spdf to long df
+manualLong <- gather(as.data.frame(manualClean), key = Index, value = value, 
+                     EVI_max_14:NDWI_max_14)
+
+
+
+# all KS points ---------------------
+allpoints$ID <- 1:nrow(allpoints)
+# drop nonsense columns
+allpoints <- allpoints[,-which(names(allpoints) %in% c('description','name'))]
+# split crop/water status to two columns
+allpoints$irrigated <- sapply(strsplit(allpoints$Crop_type,"\\-"), `[`, 2)
+allpoints$crop <- sapply(strsplit(allpoints$Crop_type,"\\-"), `[`, 1)
+
+# convert spdf to long df
+alllong <- gather(as.data.frame(allpoints), key = Index, value = value, EVI_max_14:NDWI_max_14)
 ```
 
 
+### exploratory plots: histograms by crop
+
+```{r rrb_histsCrop}
+# GI, RRB
+ggplot(data = rrblong[rrblong$Index == 'GI_max_14',], 
+       aes(x = value, fill=irrigated)) +
+       geom_histogram(alpha=.5, position='identity') +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('count') + xlab('Greenness Index') + theme_bw() +
+       ggtitle("All RRB Points, GI")
+
+# GI, RRB manual clean
+ggplot(data = manualLong[manualLong$Index == 'GI_max_14',], 
+       aes(x = value, fill=irrigated)) +
+       geom_histogram(alpha=.5, position='identity') +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('count') + xlab('Greenness Index') + theme_bw() +
+       ggtitle("manual clean RRB Points, GI")
+
+# NDWI, RRB
+ggplot(data = rrblong[rrblong$Index == 'NDWI_max_14',], 
+       aes(x = value, fill=irrigated)) +
+       geom_histogram(alpha=.5, position='identity') +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('count') + xlab('NDWI') + theme_bw() +
+       ggtitle("All RRB Points, NDWI")
+
+# NDVI, RRB
+ggplot(data = rrblong[rrblong$Index == 'NDVI_max_14',], 
+       aes(x = value, fill=irrigated)) +
+       geom_histogram(alpha=.5, position='identity') +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('count') + xlab('NDVI') + theme_bw() +
+       ggtitle("All RRB Points, NDVI")
+
+# EVI, RRB
+ggplot(data = rrblong[rrblong$Index == 'EVI_max_14',], 
+       aes(x = value, fill=irrigated)) + xlim(0,1) +
+       geom_histogram(alpha=.5, position='identity') +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('count') + xlab('EVI') + theme_bw() +
+       ggtitle("All RRB Points, EVI")
+```
+
+
+```{r ks_histsCrop}
+# GI, KS
+ggplot(data = alllong[alllong$Index == 'GI_max_14',], 
+       aes(x = value, fill=irrigated)) +
+       geom_histogram(alpha=.5, position='identity') +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('count') + xlab('Greenness Index') + theme_bw() +
+       ggtitle("All KS Points, GI")
+
+# NDWI, KS
+ggplot(data = alllong[alllong$Index == 'NDWI_max_14',], 
+       aes(x = value, fill=irrigated)) +
+       geom_histogram(alpha=.5, position='identity') +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('count') + xlab('NDWI') + theme_bw() +
+       ggtitle("All KS Points, NDWI")
+
+# NDVI, KS
+ggplot(data = alllong[alllong$Index == 'NDVI_max_14',], 
+       aes(x = value, fill=irrigated)) +
+       geom_histogram(alpha=.5, position='identity') +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('count') + xlab('NDVI') + theme_bw() +
+       ggtitle("All KS Points, NDVI")
+
+# EVI, KS
+ggplot(data = alllong[alllong$Index == 'EVI_max_14',], 
+       aes(x = value, fill=irrigated)) + xlim(0,1) +
+       geom_histogram(alpha=.5, position='identity') +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('count') + xlab('EVI') + theme_bw() +
+       ggtitle("All KS Points, EVI")
+```
+
+### exploratory plots: 
+
+```{r plots}
+dataset = as.data.frame(rrbpoints)
+
+ggplot(data=dataset,
+       aes(x = GI_max_14, y = NDWI_max_14, color=irrigated)) +
+       geom_point() +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('NDWI') + xlab('GI') + theme_bw() +
+       ggtitle("GI vs NDWI")
+
+```
+
+
+
+# add columns for crop type, irrigation status, and class numbers
 
 
 
