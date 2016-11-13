@@ -1,0 +1,95 @@
+---
+title: "Make Validation POints, Full RRB"
+author: "Jill Deines"
+date: "Saturday, November 12, 2016"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Use Koeppengeiger and USDA Ecoregion climate divisions, along with CDL crop layers, to stratify sampled points across the RRB.
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE, cache.path='cache/1.15_sampleRRB/',
+               fig.path='figure/1.15_sampleRRB/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+library(raster)
+library(dplyr)
+```
+
+## Load data
+
+```{r loadData}
+# filepaths -----------------------------------------------------
+# county shapefile
+tigerDir <- 'S:/Data/GIS_Data/Downloaded/TIGER/TIGER2012/COUNTY'
+tigerName <- 'tl_2012_us_county'
+
+# aquifer and basin boundaries
+gisDir <- 'S:/Users/deinesji/HPA/gis'
+rrbName <- 'BigExtent_RRB_RRCA_buff'
+
+# usda ecogreions
+ecoDir <- 'S:/Users/deinesji/HPA/data/climate/climateDivisions/USDA_Ecoregions'
+ecoName <- 'eco_us'
+
+# koeppen
+koepPath <- 'S:/Users/deinesji/HPA/data/climate/climateDivisions/Koeppengeiger/KoeppenGeiger_UScounty.txt'
+
+# read in
+counties <- readOGR(tigerDir, tigerName, verbose=F)
+rrb <- readOGR(gisDir, rrbName, verbose=F)
+ecoregions <- readOGR(ecoDir, ecoName, verbose=F)
+koepdata <- read.delim(koepPath)
+```
+
+
+### County Koepengeiger to Koepengeiger regions
+Clips the TIGER 2012 county shapefile to area of interest and adds the counties Koeppengeiger code, then dissolves into Koep units
+
+```{r getCounties}
+# reproject to wgs84
+rrb.ll <- spTransform(rrb, CRS(proj4string(counties)))
+
+# clip counties to the rrb
+countyRRB <- raster::intersect(counties,rrb.ll)
+
+# trim dataframe and create 5-digit FIPS
+countysub <- countyRRB[,c('STATEFP','COUNTYFP','NAME')]
+countysub$STATEFP <- as.character(countysub$STATEFP)
+countysub$COUNTYFP <- as.character(countysub$COUNTYFP)
+countysub$fips <- paste0(countysub$STATEFP, countysub$COUNTYFP)
+
+# pad the fips codes in koep with a leading zero 
+koepdata$fips5 <- sprintf('%05d', koepdata$FIPS)
+
+# trim koep to rrb to get better idea of counties with multiple koep codes
+rrbcounties <- unique(countysub$fips)
+koepRrb <- koepdata[koepdata$fips5 %in% rrbcounties,]
+sum(duplicated(koepRrb$fips5)) # 25 counties with multiple codes
+
+# do any counties have 3 codes?
+table(koepRrb$fips5) #nope, 2 is the highest count
+
+# for multiple code counties, keep code with greatest proportion
+# since only 2 per county, filter out codes with < 0.5 proportion
+koepRrbUnique <- koepRrb[koepRrb$PROP > 0.5,]
+
+# add the koeppengeiger code
+countyClim <- merge(countysub, koepRrbUnique, by.x = 'fips', by.y = 'fips5', all.x = T)
+
+# write out to not be dependent on S drive
+tempDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/1.15_makeRrbPoints_workspace'
+writeOGR(countyClim, tempDir, 'Koep_county_rrb', driver='ESRI Shapefile')
+```
+
+
+
+

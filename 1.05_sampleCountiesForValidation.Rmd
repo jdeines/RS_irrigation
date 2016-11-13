@@ -9,6 +9,8 @@ output:
 
 Goal: Use Koeppengeiger and USDA Ecoregion climate divisions to sample counties for validation points
 
+Update 11/13/2016: No longer sampling points on a county basis; see 1.15_makeValidationPointsRRB.Rmd for sampling across climate zones and crops.
+
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
