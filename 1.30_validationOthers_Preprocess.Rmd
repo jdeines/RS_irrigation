@@ -7,7 +7,9 @@ output:
     toc: yes
 ---
 
-Goal: process validation data sets for Kansas from Brian Wardlow (UNL)
+Goal: process validation data sets for Kansas from Brian Wardlow (UNL).
+
+Note: This script is ridiculously poorly organized, don't judge.
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
@@ -22,9 +24,11 @@ library(rgdal)
 library(raster)
 library(rgeos)
 
-library(dplyr)
 library(tidyr)
 library(ggplot2)
+
+library(cluster) 
+library(fpc)
 
 # source project helper functions
 source('0.50_helperFunctions.R')
@@ -67,7 +71,7 @@ plot(points2, add=T)
 
 # export points for further investigation
 points.ll <- spTransform(points, CRS("+proj=longlat +datum=WGS84"))
-writeOGR(points.ll, paste0(sDir, '/', 'Kansas_field_sites.kml'),
+#writeOGR(points.ll, paste0(sDir, '/', 'Kansas_field_sites.kml'),
             layer = 'points', driver = 'KML')
 ```
 
@@ -97,14 +101,14 @@ flagged <- csvToSpdf(paste(dataDir,dataFile2, sep='/'))
 rrb <- spTransform(rrb, CRS(proj4string(allpoints)))
 
 # clip points to those inside RRB
-rrbpoints <- allpoints[rrb,]
+rrbpoints0 <- allpoints[rrb,]
 flagged <- flagged[rrb,]
 
 # get the actual percentage of suspected bad points
-sum(flagged$type == 'wrongPlace')/nrow(rrbpoints)
+sum(flagged$type == 'wrongPlace')/nrow(rrbpoints0)
 
 plot(rrb)
-plot(rrbpoints, add=T)
+plot(rrbpoints0, add=T)
 plot(flagged, col='red', add=T)
 ```
 
@@ -113,7 +117,7 @@ Points I suspect are in the wrong place or the wrong type.
 
 ```{r flagPoints}
 # project to meters
-rrbMeters <- spTransform(rrbpoints, CRS('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs '))
+rrbMeters <- spTransform(rrbpoints0, CRS('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs '))
 flagMeters <- spTransform(flagged, CRS('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs '))
 
 # find distances between all points
@@ -129,11 +133,11 @@ for (i in 1:nrow(flagMeters)) {
 }
   
 # add flagged status to rrb points
-rrbpoints$ind <- 1:nrow(rrbpoints)
-pointBuds <- merge(rrbpoints, pointBuddies[,c('rrb','type')], 
+rrbpoints0$ind <- 1:nrow(rrbpoints0)
+rrbpoints <- merge(rrbpoints0, pointBuddies[,c('rrb','type')], 
                    by.x = 'ind', by.y = 'rrb', all.X = T)
   
-manualClean <- pointBuds[is.na(pointBuds$type),]
+manualClean <- rrbpoints[is.na(rrbpoints$type),]
 ```
 
 ### format data
@@ -268,11 +272,337 @@ ggplot(data=dataset,
        ylab('NDWI') + xlab('GI') + theme_bw() +
        ggtitle("GI vs NDWI")
 
+# climate variables
+ggplot(data=dataset,
+       aes(x = GI_max_14, y = pdsi_grow, color=irrigated)) +
+       geom_point() +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('PDSI') + xlab('GI') + theme_bw() +
+       ggtitle("GI vs PDSI, all RRB")
+
+ggplot(data=dataset,
+       aes(x = NDWI_max_14, y = pdsi_grow, color=irrigated)) +
+       geom_point() +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('PDSI') + xlab('NDWI') + theme_bw() +
+       ggtitle("NDWI vs PDSI, all RRB")
+
+ggplot(data=dataset,
+       aes(x = GI_max_14, y = pr_grow, color=irrigated)) +
+       geom_point() +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('growing precip') + xlab('GI') + theme_bw() +
+       ggtitle("GI vs precip, all RRB")
+
+ggplot(data=dataset,
+       aes(x = NDWI_max_14, y = pr_grow, color=irrigated)) +
+       geom_point() +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('growing precip') + xlab('NDWI') + theme_bw() +
+       ggtitle("NDWI vs precip, all RRB")
+
+```
+
+## Outliers
+
+### Quantiles
+
+```{r quantilesFun}
+# function from an R Blogger Klodian Dhana
+outlierKD <- function(dt, var) {
+     var_name <- eval(substitute(var),eval(dt))
+     na1 <- sum(is.na(var_name))
+     m1 <- mean(var_name, na.rm = T)
+     par(mfrow=c(2, 2), oma=c(0,0,3,0))
+     boxplot(var_name, main="With outliers")
+     hist(var_name, main="With outliers", xlab=NA, ylab=NA)
+     outlier <- boxplot.stats(var_name)$out
+     mo <- mean(outlier)
+     var_name <- ifelse(var_name %in% outlier, NA, var_name)
+     boxplot(var_name, main="Without outliers")
+     hist(var_name, main="Without outliers", xlab=NA, ylab=NA)
+     title("Outlier Check", outer=TRUE)
+     na2 <- sum(is.na(var_name))
+     cat("Outliers identified:", na2 - na1, "n")
+     cat("Propotion (%) of outliers:", round((na2 - na1) / sum(!is.na(var_name))*100, 1), "n")
+     cat("Mean of the outliers:", round(mo, 2), "n")
+     m2 <- mean(var_name, na.rm = T)
+     cat("Mean without removing outliers:", round(m1, 2), "n")
+     cat("Mean if we remove outliers:", round(m2, 2), "n")
+     
+     # remove outliers
+      dt[as.character(substitute(var))] <- invisible(var_name)
+      assign(as.character(as.list(match.call())$dt), dt, envir = .GlobalEnv)
+      cat("Outliers successfully removed", "n")
+      return(invisible(dt))
+}
+
 ```
 
 
+Use all 4 indices to reduce by IQR outliers
 
-# add columns for crop type, irrigation status, and class numbers
+```{r quantiles}
+## Irrigated Corn --------------------------------------------------------------
+# fun outlier function by 
+rrbCornI <- rrbpoints@data[rrbpoints@data$Crop_type == 'Corn-I',]
+# remove outliers for corn
+outlierKD(rrbCornI, EVI_max_14)
+outlierKD(rrbCornI, NDVI_max_14)
+outlierKD(rrbCornI, GI_max_14)
+outlierKD(rrbCornI, NDWI_max_14)
+
+## Dryland Corn --------------------------------------------------------------
+rrbCornN <- rrbpoints@data[rrbpoints@data$Crop_type == 'Corn-NI',]
+# remove outliers for corn
+outlierKD(rrbCornN, EVI_max_14)
+outlierKD(rrbCornN, NDVI_max_14)
+outlierKD(rrbCornN, GI_max_14)
+outlierKD(rrbCornN, NDWI_max_14)
+
+# Irrigated Alfalfa ---------------------------------------------
+rrbAlfI <- rrbpoints@data[rrbpoints@data$Crop_type == 'Alfalfa-I',]
+outlierKD(rrbAlfI, EVI_max_14)
+outlierKD(rrbAlfI, NDVI_max_14)
+outlierKD(rrbAlfI, GI_max_14)
+outlierKD(rrbAlfI, NDWI_max_14)
+
+# Dryland Alfalfa -----------------------------------------------------
+rrbAlfN <- rrbpoints@data[rrbpoints@data$Crop_type == 'Alfalfa-NI',]
+outlierKD(rrbAlfN, EVI_max_14)
+outlierKD(rrbAlfN, NDVI_max_14)
+outlierKD(rrbAlfN, GI_max_14)
+outlierKD(rrbAlfN, NDWI_max_14)
+
+# Irrigated Soy -----------------------------------------------------
+rrbSoyI <- rrbpoints@data[rrbpoints@data$Crop_type == 'Soybeans-I',]
+outlierKD(rrbSoyI, EVI_max_14)
+outlierKD(rrbSoyI, NDVI_max_14)
+outlierKD(rrbSoyI, GI_max_14)
+outlierKD(rrbSoyI, NDWI_max_14)
+
+# Dryland Soy -----------------------------------------------------
+rrbSoyN <- rrbpoints@data[rrbpoints@data$Crop_type == 'Soybeans-NI',]
+outlierKD(rrbSoyN, EVI_max_14)
+outlierKD(rrbSoyN, NDVI_max_14)
+outlierKD(rrbSoyN, GI_max_14)
+outlierKD(rrbSoyN, NDWI_max_14)
+
+# Irrigated wheat -----------------------------------------------------
+rrbWheatI <- rrbpoints@data[rrbpoints@data$Crop_type == 'Wheat-I',]
+outlierKD(rrbWheatI, EVI_max_14)
+outlierKD(rrbWheatI, NDVI_max_14)
+outlierKD(rrbWheatI, GI_max_14)
+outlierKD(rrbWheatI, NDWI_max_14)
+
+# Dryland wheat -----------------------------------------------------
+rrbWheatN <- rrbpoints@data[rrbpoints@data$Crop_type == 'Wheat-NI',]
+outlierKD(rrbWheatN, EVI_max_14)
+outlierKD(rrbWheatN, NDVI_max_14)
+outlierKD(rrbWheatN, GI_max_14)
+outlierKD(rrbWheatN, NDWI_max_14)
+
+# Irrigated sorghum -----------------------------------------------------
+rrbSorghumI <- rrbpoints@data[rrbpoints@data$Crop_type == 'Sorghum-I',]
+outlierKD(rrbSorghumI, EVI_max_14)
+outlierKD(rrbSorghumI, NDVI_max_14)
+outlierKD(rrbSorghumI, GI_max_14)
+outlierKD(rrbSorghumI, NDWI_max_14)
+
+# Dryland sorghum -----------------------------------------------------
+rrbSorghumN <- rrbpoints@data[rrbpoints@data$Crop_type == 'Sorghum-NI',]
+outlierKD(rrbSorghumN, EVI_max_14)
+outlierKD(rrbSorghumN, NDVI_max_14)
+outlierKD(rrbSorghumN, GI_max_14)
+outlierKD(rrbSorghumN, NDWI_max_14)
+
+# fallow ---------------------------------------------------------
+rrbFallow <- rrbpoints@data[rrbpoints@data$Crop_type == 'Fallow',]
+outlierKD(rrbFallow, EVI_max_14)
+outlierKD(rrbFallow, NDVI_max_14)
+outlierKD(rrbFallow, GI_max_14)
+outlierKD(rrbFallow, NDWI_max_14)
+
+
+# reassemble and process ----------------------------------------
+rrbpoints2 <- rbind(rrbCornI, rrbCornN, rrbAlfI, rrbAlfN, rrbWheatI,
+                    rrbWheatN, rrbSoyI, rrbSoyN, rrbSorghumI, rrbSorghumN,
+                    rrbFallow)
+# make a column with NA anywhere an outlier removed
+for (i in 1:nrow(rrbpoints2)){
+  rrbpoints2$outlier[i] <- sum(rrbpoints2[i,c('EVI_max_14','GI_max_14','NDVI_max_14','NDWI_max_14')])
+}
+  
+# remove na's
+rrbpoints3 <- rrbpoints2[!is.na(rrbpoints2$outlier),]
+
+# convert spdf to long df
+rrbOuts <- gather(rrbpoints3, key = Index, value = value, EVI_max_14:NDWI_max_14)
+
+ggplot(data = rrbOuts[rrbOuts$Index == 'GI_max_14',], 
+       aes(x = value, fill=irrigated)) +
+       geom_histogram(alpha=.5, position='identity') +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('count') + xlab('Greenness Index') + theme_bw() +
+       ggtitle("RRB Points, no Outliers, GI")
+
+```
+
+Use indices that best match flagged points for each crop category
+
+```{r quantilesMinimalist}
+## Irrigated Corn --------------------------------------------------------------
+# fun outlier function by 
+rrbCornI <- rrbpoints@data[rrbpoints@data$Crop_type == 'Corn-I',]
+# remove outliers for corn
+outlierKD(rrbCornI, EVI_max_14)
+outlierKD(rrbCornI, NDWI_max_14)
+
+## Dryland Corn --------------------------------------------------------------
+rrbCornN <- rrbpoints@data[rrbpoints@data$Crop_type == 'Corn-NI',]
+# no points flagged
+
+# Irrigated Alfalfa ---------------------------------------------
+rrbAlfI <- rrbpoints@data[rrbpoints@data$Crop_type == 'Alfalfa-I',]
+outlierKD(rrbAlfI, NDWI_max_14)
+
+# Dryland Alfalfa -----------------------------------------------------
+rrbAlfN <- rrbpoints@data[rrbpoints@data$Crop_type == 'Alfalfa-NI',]
+outlierKD(rrbAlfN, GI_max_14)
+
+# Irrigated Soy -----------------------------------------------------
+rrbSoyI <- rrbpoints@data[rrbpoints@data$Crop_type == 'Soybeans-I',]
+outlierKD(rrbSoyI, NDWI_max_14)
+
+# Dryland Soy -----------------------------------------------------
+rrbSoyN <- rrbpoints@data[rrbpoints@data$Crop_type == 'Soybeans-NI',]
+outlierKD(rrbSoyN, EVI_max_14)
+
+# Irrigated wheat -----------------------------------------------------
+rrbWheatI <- rrbpoints@data[rrbpoints@data$Crop_type == 'Wheat-I',]
+outlierKD(rrbWheatI, NDWI_max_14)
+
+# Dryland wheat -----------------------------------------------------
+rrbWheatN <- rrbpoints@data[rrbpoints@data$Crop_type == 'Wheat-NI',]
+# one flagged, none picked up by indices
+
+# Irrigated sorghum -----------------------------------------------------
+rrbSorghumI <- rrbpoints@data[rrbpoints@data$Crop_type == 'Sorghum-I',]
+# none flagged
+
+# Dryland sorghum -----------------------------------------------------
+rrbSorghumN <- rrbpoints@data[rrbpoints@data$Crop_type == 'Sorghum-NI',]
+# none flagged
+
+# fallow ---------------------------------------------------------
+rrbFallow <- rrbpoints@data[rrbpoints@data$Crop_type == 'Fallow',]
+outlierKD(rrbFallow, GI_max_14)
+
+# reassemble and process ----------------------------------------
+rrbpoints2 <- rbind(rrbCornI, rrbCornN, rrbAlfI, rrbAlfN, rrbWheatI,
+                    rrbWheatN, rrbSoyI, rrbSoyN, rrbSorghumI, rrbSorghumN,
+                    rrbFallow)
+# make a column with NA anywhere an outlier removed
+for (i in 1:nrow(rrbpoints2)){
+  rrbpoints2$outlier[i] <- sum(rrbpoints2[i,c('EVI_max_14','GI_max_14','NDVI_max_14','NDWI_max_14')])
+}
+  
+# remove na's
+rrbpoints3 <- rrbpoints2[!is.na(rrbpoints2$outlier),]
+
+# convert spdf to long df
+rrbOuts <- gather(rrbpoints3, key = Index, value = value, EVI_max_14:NDWI_max_14)
+
+ggplot(data = rrbOuts[rrbOuts$Index == 'GI_max_14',], 
+       aes(x = value, fill=irrigated)) +
+       geom_histogram(alpha=.5, position='identity') +
+       facet_wrap(~crop, nrow = 3) + 
+       ylab('count') + xlab('Greenness Index') + theme_bw() +
+       ggtitle("RRB Points, minimal Outliers, GI")
+
+```
+
+### K Means Aborted attempt
+Functions to do outlier tests. Includes k-means clustering..
+
+```{r kmeans_fun}
+# function to visualize cluster numbers
+clusterPlot <- function(mydata){
+  # Determine number of clusters
+  wss <- (nrow(mydata)-1)*sum(apply(mydata,2,var))
+  for (i in 2:15) wss[i] <- sum(kmeans(mydata, 
+      centers=i)$withinss)
+  plot(1:15, wss, type="b", xlab="Number of Clusters",
+    ylab="Within groups sum of squares")
+}
+
+# run kmeans
+kmeansTest <- function(mydata, numClusters){
+    # K-Means Cluster Analysis
+  fit <- kmeans(mydata, numClusters) # 5 cluster solution
+  # get cluster means 
+  aggregate(mydata,by=list(fit$cluster),FUN=mean)
+  # append cluster assignment
+  dataout <- data.frame(mydata, fit$cluster)
+  
+  # Cluster Plot against 1st 2 principal components
+  # vary parameters for most readable graph
+  clusplot(dataout, fit$cluster, color=TRUE, shade=TRUE, 
+      labels=2, lines=0)
+  
+  return(dataout)
+}
+
+```
+
+
+```{r kmeans}
+# irrigated corn ------------------------------------------
+# extract corn points and standardize variables
+rrbCornI <- rrbpoints@data[rrbpoints@data$Crop_type == 'Corn-I',c(3:8)]
+rrbCornI <- scale(rrbCornI)
+# run cluster analysis
+clusterPlot(rrbCornI)
+set.seed(10)
+cornI <- kmeansTest(rrbCornI, 5)
+# put fits back with original data
+cornI2 <- data.frame(rrbpoints@data[rrbpoints@data$Crop_type == 'Corn-I',], 
+                     fit.cluster = cornI$fit.cluster)
+# sort by fit.cluster
+cornI2 <- cornI2[order(cornI2$fit.cluster),]
+
+
+# irrigated alfalfa ------------------------------------------
+# extract corn points and standardize variables
+rrbAlfI <- rrbpoints@data[rrbpoints@data$Crop_type == 'Alfalfa-I',c(3:8)]
+rrbAlfI <- scale(rrbAlfI)
+# run cluster analysis
+clusterPlot(rrbAlfI)
+set.seed(10)
+kout <- kmeansTest(rrbAlfI, 3)
+# put fits back with original data
+rrbAlfI2 <- data.frame(rrbpoints@data[rrbpoints@data$Crop_type == 'Alfalfa-I',], 
+                     fit.cluster = kout$fit.cluster)
+# sort by fit.cluster
+rrbAlfI2 <- rrbAlfI2[order(rrbAlfI2$fit.cluster),]
+
+# soy irrigated ------------------------------------------
+# extract and standardize variables
+rrbSoyI <- rrbpoints@data[rrbpoints@data$Crop_type == 'Soybeans-I',c(3:8)]
+rrbSoyI <- scale(rrbSoyI)
+# run cluster analysis
+clusterPlot(rrbSoyI)
+set.seed(10)
+kout <- kmeansTest(rrbSoyI, 7)
+# put fits back with original data
+rrbSoyI2 <- data.frame(rrbpoints@data[rrbpoints@data$Crop_type == 'Soybeans-I',], 
+                     fit.cluster = kout$fit.cluster)
+# sort by fit.cluster
+rrbSoyI2 <- rrbSoyI2[order(rrbSoyI2$fit.cluster),]
+
+
+
+```
 
 
 
