@@ -21,7 +21,7 @@ opts_chunk$set(cache=TRUE, cache.path='cache/1.15_sampleRRB/',
 ```{r packages, message=FALSE, echo=TRUE}
 library(rgdal)
 library(raster)
-library(dplyr)
+library(maptools)
 ```
 
 ## Load data
@@ -87,9 +87,69 @@ countyClim <- merge(countysub, koepRrbUnique, by.x = 'fips', by.y = 'fips5', all
 
 # write out to not be dependent on S drive
 tempDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/1.15_makeRrbPoints_workspace'
-writeOGR(countyClim, tempDir, 'Koep_county_rrb', driver='ESRI Shapefile')
+#writeOGR(countyClim, tempDir, 'Koep_county_rrb', driver='ESRI Shapefile')
 ```
 
+### Dissolve and Merge regions
+Moved to Dropbox based files to work without internet...
 
+```{r startLocalLoad}
+# basin boundaries
+gisDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
+rrb <- readOGR(paste0(gisDir,'/BigExtent_RRB_RRCA_buff.kml'), 'boundExtent', verbose=F)
 
+# usda ecogreions
+ecoDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/helper/USDA_Ecoregions'
+ecoName <- 'eco_us'
+ecoregions <- readOGR(ecoDir, ecoName, verbose=F)
+
+# Koepen counties
+tempDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/1.15_makeRrbPoints_workspace'
+countyClim <- readOGR(tempDir, 'Koep_county_rrb', verbose=F)
+
+# Dissolve koepen counties
+koepRrb1 <- unionSpatialPolygons(countyClim, countyClim$CLS)
+row.names(koepRrb1) <- as.character(1:length(koepRrb1))
+koepData <- data.frame(koep = c('BSk','Cfa','Dfa'))
+koepRrb <- SpatialPolygonsDataFrame(koepRrb1, koepData)
+
+spplot(koepRrb, main = 'Koeppengeiger counties in the RRB')
+
+# work in WGS84 latlong
+koepRrb <- spTransform(koepRrb, CRS("+proj=longlat +datum=WGS84"))
+rrb <- spTransform(rrb, CRS("+proj=longlat +datum=WGS84"))
+ecoregions <- spTransform(ecoregions, CRS("+proj=longlat +datum=WGS84"))
+
+# USDA Eco Regions in the RRB
+ecoRrb <- raster::intersect(ecoregions, rrb)
+# dissolve by province
+ecoRrb$PROVINCE <- as.character(ecoRrb$PROVINCE)
+eco1 <- unionSpatialPolygons(ecoRrb, ecoRrb$PROVINCE)
+row.names(eco1) <- as.character(1:length(eco1))
+ecoData <- data.frame(ProvinceShort = c('Dry Steppe','Steppe','Prairie'),
+                      Province = c(ecoRrb$PROVINCE[2],
+                                   ecoRrb$PROVINCE[1],
+                                   ecoRrb$PROVINCE[5]))
+ecoRrb2 <- SpatialPolygonsDataFrame(eco1, ecoData)
+
+# intersect the two
+#climDivsRrb <- raster::intersect(ecoRrb2, koepRrb)
+
+# write out Koeppengieger
+#writeOGR(koepRrb, tempDir, "Koep_RRB_dissolve", driver='ESRI Shapefile')
+```
+
+Intersecting the two failed due to orphaned holes in the Ecoregion file. I've decided that the Koeppengeiger divisions will be sufficient.
+
+## Make Stratefied samples
+Using the Koeppengieger RRb Shapefile and the CDL raster
+
+```{r makePointsRRB_starthere}
+# Koepen counties
+tempDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/1.15_makeRrbPoints_workspace'
+countyClim <- readOGR(tempDir, 'Koep_RRB_dissolve', verbose=F)
+
+# cdl
+
+```
 

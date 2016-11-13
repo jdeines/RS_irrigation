@@ -46,9 +46,11 @@ dataDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validatio
 dataFile <- 'Kansas_field_sites.csv'
 
 # load a contextual shapefile to confirm projection
-gisDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
 #gisDir <- 'S:/Users/deinesji/HPA/gis'
-rrb <- readOGR(gisDir, 'BigExtent_RRB_RRCA_buff', verbose=F))
+#rrb <- readOGR(gisDir, 'BigExtent_RRB_RRCA_buff', verbose=F))
+
+gisDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
+rrb <- readOGR(paste0(gisDir,'/BigExtent_RRB_RRCA_buff.kml'), 'boundExtent', verbose=F)
 
 # load data
 points <- read.csv(paste(dataDir,dataFile, sep='/'))
