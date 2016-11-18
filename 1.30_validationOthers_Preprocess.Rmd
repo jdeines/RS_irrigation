@@ -41,7 +41,7 @@ Dataset includes 2,179 field sites (some outside of the HPA) from 2001, and incl
 
 
 ```{r rawToKml}
-dataDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validationFromOthers'
+dataDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validationFromOthers/Wardlow_2001'
 #dataDir <- 'S:/Users/deinesji/HPA/gis/rsIrrigation/validationOthers'
 dataFile <- 'Kansas_field_sites.csv'
 
@@ -91,7 +91,7 @@ gisDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
 rrb <- readOGR(paste0(gisDir,'/BigExtent_RRB_RRCA_buff.kml'), 'boundExtent', verbose=F)
 
 # load datasets exported from GEE
-dataDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validationFromOthers'
+dataDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validationFromOthers/Wardlow_2001'
 dataFile1 <- 'Kansas_field_sites_sampledGreenness.csv'
 dataFile2 <- 'Kansas_field_sites_flagged.csv'
 
@@ -117,6 +117,8 @@ plot(flagged, col='red', add=T)
 ### Flag suspect points
 Points I suspect are in the wrong place or the wrong type.
 
+This also writes out a "manually cleaned" KML/Shapefile for the RRB
+
 ```{r flagPoints}
 # project to meters
 rrbMeters <- spTransform(rrbpoints0, CRS('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs '))
@@ -140,6 +142,14 @@ rrbpoints <- merge(rrbpoints0, pointBuddies[,c('rrb','type')],
                    by.x = 'ind', by.y = 'rrb', all.X = T)
   
 manualClean <- rrbpoints[is.na(rrbpoints$type),]
+
+## write out manually cleaned points
+manual.ll <- spTransform(manualClean, CRS("+proj=longlat +datum=WGS84"))
+#writeOGR(manual.ll, paste0(dataDir, '/Wardlow_RRB_manualClean_20161118.kml'),
+#            layer = 'layer1', driver = 'KML')
+#writeOGR(manual.ll, paste0(dataDir, '/Shapefiles'), 
+#         'Wardlow_RRB_manualClean_20161118', driver = 'ESRI Shapefile')
+
 ```
 
 ### format data
