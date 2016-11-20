@@ -1,0 +1,42 @@
+---
+title: "NASS vs Remote Sensing Validation"
+author: "Jill Deines"
+date: "Friday, November 18, 2016"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Compare irrigated acreages between remote sensing products and USDA NASS Ag Census Data. NASS data acquired through the Quick Stats API.
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE, cache.path='cache/2.1_NASS_v/',
+               fig.path='figure/2.1_NASS_v/')
+```
+
+**R Packages Needed**
+
+* `httr`: Vignette at https://cran.r-project.org/web/packages/httr/vignettes/quickstart.html
+
+```{r packages, message=FALSE, echo=TRUE}
+# for API interaction
+library(httr) 
+library(jsonlite)
+# for county selection:
+library(rgdal)
+library(rgeos)
+library(maps)
+# for data manipulation
+library(tidyr)
+library(ggplot2)
+```
+
+## Functions: NASS Quick Stats API 
+This script builds on work in 4.1_USDA_NASS.Rmd in the RRB_Rcode r project.
+
+* API website: http://quickstats.nass.usda.gov/api
+* My API key: 28EAA9E6-8060-34A4-981A-B2ED4692228A
+
+Here, I'll make functions to ID counties of interest and pull NASS data from the API, and apply it over the counties.
