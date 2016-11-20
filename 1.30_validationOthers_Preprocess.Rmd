@@ -31,7 +31,7 @@ library(cluster)
 library(fpc)
 
 # source project helper functions
-source('0.50_helperFunctions.R')
+source('functions/GeeCsvToSpdf.R')
 ```
 
 ## Points to KML for Inspection
@@ -96,8 +96,8 @@ dataFile1 <- 'Kansas_field_sites_sampledGreenness.csv'
 dataFile2 <- 'Kansas_field_sites_flagged.csv'
 
 # load csv's and convert to spdf
-allpoints <- csvToSpdf(paste(dataDir,dataFile1, sep='/')) # sourced function
-flagged <- csvToSpdf(paste(dataDir,dataFile2, sep='/'))
+allpoints <- GeeCsvToSpdf(paste(dataDir,dataFile1, sep='/')) # sourced function
+flagged <- GeeCsvToSpdf(paste(dataDir,dataFile2, sep='/'))
 
 # proj strings identical
 rrb <- spTransform(rrb, CRS(proj4string(allpoints)))
@@ -143,13 +143,6 @@ rrbpoints <- merge(rrbpoints0, pointBuddies[,c('rrb','type')],
   
 manualClean <- rrbpoints[is.na(rrbpoints$type),]
 
-## write out manually cleaned points
-manual.ll <- spTransform(manualClean, CRS("+proj=longlat +datum=WGS84"))
-#writeOGR(manual.ll, paste0(dataDir, '/Wardlow_RRB_manualClean_20161118.kml'),
-#            layer = 'layer1', driver = 'KML')
-#writeOGR(manual.ll, paste0(dataDir, '/Shapefiles'), 
-#         'Wardlow_RRB_manualClean_20161118', driver = 'ESRI Shapefile')
-
 ```
 
 ### format data
@@ -173,6 +166,21 @@ manualClean <- manualClean[,-which(names(manualClean) %in% c('description','name
 # split crop/water status to two columns
 manualClean$irrigated <- sapply(strsplit(manualClean$Crop_type,"\\-"), `[`, 2)
 manualClean$crop <- sapply(strsplit(manualClean$Crop_type,"\\-"), `[`, 1)
+
+## write out manually cleaned points --------------------------------------
+
+# add classification categories column using a lookup table
+lookup <- data.frame(Crop_type = unique(manualClean$Crop_type),
+                     ClassCats = c(1,0,0,0,1,1,0,1,2,1,0))
+manualClean2 <- merge(manualClean, lookup)
+
+
+manual.ll <- spTransform(manualClean2, CRS("+proj=longlat +datum=WGS84"))
+writeOGR(manual.ll, paste0(dataDir, '/Wardlow_RRB_manualClean_20161118.kml'),
+            layer = 'layer1', driver = 'KML')
+writeOGR(manual.ll, paste0(dataDir, '/Shapefiles'), 
+         'Wardlow_RRB_manualClean_20161118', driver = 'ESRI Shapefile')
+
 
 # convert spdf to long df
 manualLong <- gather(as.data.frame(manualClean), key = Index, value = value, 
