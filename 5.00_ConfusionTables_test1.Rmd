@@ -20,7 +20,7 @@ opts_chunk$set(cache=TRUE, cache.path='cache/5.0_confusion/',
 ```{r packages, message=FALSE, echo=TRUE}
 library(rgdal)
 library(caret)
-library(tidyr)
+
 
 # source project helper functions
 source('functions/GeeCsvToSpdf.R')
@@ -31,7 +31,28 @@ source('functions/prettyConfusion.R')
 From Brian Wardlow's Kansas dataset of validation points, clipped to the RRB and manually cleaned for bad location points.
 
 ```{r Wardlow}
+# load data
+dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
+file2001 <- '2001_Wardlow_confusionData_RRB_test1.csv'
+wardlow01 <- read.csv(paste(dataDir, file2001, sep='/'))
 
+# lookup table for classification codes
+predictedCode = data.frame(classification = c(0:2),
+                       predictedClass = c('Dryland','Irrigated','Noncrop'))
+referenceCode = data.frame(ClassCats = c(0:2),
+                       referenceClass = c('Dryland','Irrigated','Noncrop'))
+# add category names
+wardlow01 <- merge(wardlow01, predictedCode)
+wardlow01 <- merge(wardlow01, referenceCode)
+
+# confusion table
+wardlowConfusion <- confusionMatrix(data = wardlow01$predictedClass, 
+                                      reference = wardlow01$referenceClass)
+
+# make it pretty
+wardlow.ct <- prettyConfusion(wardlowConfusion)
+
+kable(wardlow.ct, digits=1)
 ```
 
 ## 2007
