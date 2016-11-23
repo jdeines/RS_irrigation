@@ -24,19 +24,103 @@ opts_chunk$set(cache=TRUE, cache.path='cache/2.1_NASS_v/',
 # for API interaction
 library(httr) 
 library(jsonlite)
-# for county selection:
-library(rgdal)
-library(rgeos)
-library(maps)
+
 # for data manipulation
 library(tidyr)
 library(ggplot2)
+
+# my functions (to be packaged)
+source('functions/getNASS.R')
+source('functions/cleanNassCensus.R')
 ```
 
-## Functions: NASS Quick Stats API 
-This script builds on work in 4.1_USDA_NASS.Rmd in the RRB_Rcode r project.
+
+## Load county data
+In GEE, I calculated the number of cells of each classification type in each county fully contained within the RRB/RRCA boundary.
+
+Here, I load this dataset from yearly files, add a year attribute, and split out the histogram column from the GEE 'dictionary' format to individual columns, converting cell counts to areas (both retained).
+
+TO DO: The histogram splitting part could probably be more elegant, and certainly more robust to apply to any classification used.
+
+
+```{r loadGee}
+yearsDesired <- c(2002, 2007, 2012)
+cellArea <- 30*30 # m^2
+
+countyDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/county_counts_RRB_test1_clean'
+
+# get filenames
+countyfiles <- list.files(countyDir, pattern="*.csv")
+# read in to a single dataframe
+countyAll0 = do.call(rbind, lapply(countyfiles, function(x) {
+              csv <- read.csv(paste0(countyDir,'/',x), stringsAsFactors = FALSE)
+              csv$year <- as.numeric(substr(x, start=1,stop=4))
+              csv$fips5 <- sprintf("%05d",csv$GEOID)
+              csv$fips3 <- sprintf("%03d",csv$COUNTYFP)
+              csv$state2 <- sprintf("%02d",csv$STATEFP)
+              csv <- csv[,c('fips5','state2','fips3','histogram','name','year')]
+            }))
+
+# subset for the years desired
+countyAll <- countyAll0[countyAll$year %in% yearsDesired,]
+
+# split up the histogram column (check order is 1,2,null,0)
+for(i in 1:length(countyAll$histogram)){
+  # split histogram dictionary by = and ,
+  vars = unlist(strsplit(countyAll$histogram[i], split="[=]|[,]|[}]"))
+  # extract relevant bits
+  countyAll$irrCount[i] <- as.numeric(vars[2])  
+  countyAll$dryCount[i] <- as.numeric(vars[8])
+  countyAll$nonCount[i] <- as.numeric(vars[4])
+  countyAll$nullCount[i] <- as.numeric(vars[6])
+  # convert to Area
+  countyAll$irrArea.m2[i] <- countyAll$irrCount[i] * cellArea
+  countyAll$dryArea.m2[i] <- countyAll$dryCount[i] * cellArea
+  countyAll$nonArea.m2[i] <- countyAll$nonCount[i] * cellArea
+  countyAll$nullArea.m2[i] <- countyAll$nullCount[i] * cellArea
+}
+```
+
+## Get and Clean NASS Data
+From the NASS Quick Stats API, using county list generated above
+
+### Get Data 
+And write out to not rely on NASS API
 
 * API website: http://quickstats.nass.usda.gov/api
 * My API key: 28EAA9E6-8060-34A4-981A-B2ED4692228A
 
-Here, I'll make functions to ID counties of interest and pull NASS data from the API, and apply it over the counties.
+This isn't working for some reason, but I think I already wrote out all counties for the HPA so I'm going to start there in the next chunk
+
+```{r getNASS, eval=FALSE}
+# set up variables for data calls
+apiKey <- '28EAA9E6-8060-34A4-981A-B2ED4692228A'
+program = 'CENSUS'
+sector <- 'CROPS'
+group <- 'FIELD CROPS'
+aggregation <- 'COUNTY'
+
+counties <- countyAll
+
+# make empty list to populate, and loop through counties
+nass.list <- list()
+for(i in 1:nrow(counties)){
+  nass.list[[i]] <- getNASS(apiKey, program, sector, group, aggregation, 
+                              state = counties$state2[i],
+                              county = counties$fips3[i])
+}
+
+# convert list of data frames to 1 giant dataframe
+nass.df <- do.call("rbind",nass.list)
+
+# write out raw data
+
+```
+
+
+### clean data
+
+```{r}
+
+```
+

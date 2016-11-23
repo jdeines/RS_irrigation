@@ -4,7 +4,7 @@
 #' in the caret package into something that more closely resembles a 
 #' "standard" confusion table for remote sensing accuracy reporting
 #' 
-#' @param object of class 'confusionMatrix'
+#' @param confusionMatrixOutput object of class 'confusionMatrix'
 #' @keywords confusion
 #' @export
 #' @examples
