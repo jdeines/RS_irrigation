@@ -47,10 +47,16 @@ cleanNassCensusCounty <- function(nass.df, year){
   nass.df2[nass.df2$prodn_practice_desc == 'ALL PRODUCTION PRACTICES',
            'prodn_practice_desc'] <- 'TOTAL'
   
+#   # hay/haylage check
+#   hay_commodities <- c('HAY','HAY & HAYLAGE','HAYLAGE')
+#   hays <- nass.df2[nass.df2$commodity_desc %in% hay_commodities,
+#                    c('short_desc','commodity_desc')]
+#   
   # HAY: make an alfalfa category
   alfalfaRecords <- grepl('ALFALFA', nass.df2$short_desc) & 
                       !grepl('EXCL', nass.df2$short_desc)
   nass.df2[alfalfaRecords,'commodity_desc'] <- 'ALFALFA'
+  
   
   # HAY: delete the supersets to leave just "other" classes
   supersets <- c('HAY & HAYLAGE - ACRES HARVESTED',

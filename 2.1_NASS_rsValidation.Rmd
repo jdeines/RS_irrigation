@@ -92,6 +92,12 @@ data(state.fips)  # from maps package
 state.fips$STATEFP <- sprintf("%02d",state.fips$fips) # add leading zero
 countyAll <- merge(countyAll, state.fips[,c('abb','STATEFP')], 
                    by.x = 'state2', by.y = 'STATEFP',all.y=F)
+
+# # write out csv for Anthony to use
+# anthony <- countyAll[countyAll$year == 2002,c('state2','fips5','fips3','abb')]
+# outdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass'
+# outfile3 <- 'NASS_countiesToGet_forADK.csv'
+# write.csv(anthony, paste0(outdir, '/', outfile3), row.names=F)
 ```
 
 ## Get and Clean NASS Data
@@ -140,6 +146,20 @@ load raw nass download file, clean it up
 outdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass'
 outfile <- 'NASS_FieldCrops_County_RRB_raw.csv'
 nass.df <- read.csv(paste0(outdir, '/', outfile), stringsAsFactors=F)
+
+# # get a list of commodities for Anthony
+#  # remove (D) values, remove commas (!), convert to numeric
+#   nass.df <- nass.df[!grepl('(D)',nass.df$Value),]
+#   nass.df$Value <- gsub(",", "", nass.df$Value, fixed = T)
+#   nass.df$Value <- as.numeric(nass.df$Value)
+#   
+#   # keep only records with "ACRES HARVESTED"
+#   phrase <- 'ACRES HARVESTED'
+#   nass.df <- nass.df[grepl(phrase,nass.df$short_desc),]
+# 
+#   commodities <- unique(nass.df$commodity_desc)
+#   outfile2 <- 'NASS_commodities_Anthony.csv'
+#   write.csv(commodities, paste0(outdir, '/', outfile2), row.names=F)
 
 # clean data
 rrb2002 <- cleanNassCensusCounty(nass.df, year = 2002)
