@@ -8,7 +8,7 @@
 #' @param sector 'CROPS' here -or DEMOGRAPHICS, ECONOMICS, ENVIRONMENTAL, ANIMALS & pRODUCTS
 #' @param group 'FIELD CROPS' -or HORTICULTURE, VEGETABLES, FRUIT & TREE NUTS
 #' @param aggregation specify geographic granularity of the data: 'STATE','AG DISTRICT','COUNTY','REGION','ZIP CODE'. Function currently set up for county level only
-#' @param state state 2 character alpha code
+#' @param state state 2 character alpha code (ie, NE)
 #' @param county county 3-digit ANSI code
 #' @keywords NASS get
 #' @export

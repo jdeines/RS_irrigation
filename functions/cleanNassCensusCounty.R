@@ -1,8 +1,9 @@
 #' Clean NASS field crop data
 #'
 #' Given a raw NASS data frame for the 'field crop' group and the summary year desired,
-#' the function cleans the data and aggregates all counties into total commodities for 
-#' the input region, split by irrigation status. For Hay, it tallies alfalfa hay/haylage
+#' the function cleans the data  for the input region, split by irrigation status. 
+#' This version retains county-level numbers for later manual aggregation.
+#' For Hay, it tallies alfalfa hay/haylage
 #' as one category, and "other hay" for all other hay/haylages (after removing superset 
 #' categories). Returns a sorted data frame with commodity, irrigated area (km^2), 
 #' non-irrigated area (km^2), and total area (km^2)
@@ -15,11 +16,11 @@
 #' test <- cleanNassCensus(nass.df, year)
 
 
-cleanNassCensus <- function(nass.df, year){
+cleanNassCensusCounty <- function(nass.df, year){
   library(tidyr)
   # remove excess columns
   keepThese <- c('state_alpha','prodn_practice_desc','short_desc','Value',
-                 'county_name','unit_desc','commodity_desc','year')
+                 'county_name','unit_desc','commodity_desc','year','state_ansi','county_code')
   nass.df <- nass.df[,keepThese]
   
   # remove (D) values, remove commas (!), convert to numeric
@@ -34,16 +35,14 @@ cleanNassCensus <- function(nass.df, year){
   # for now, just year specified (could split into list by year in future..)
   nass.df <- nass.df[nass.df$year == year,]
   
-  # aggregate over counties
-  commodityTally <- aggregate(Value ~ short_desc, data = nass.df, FUN = 'sum')
+  # make 5 digit fips code
+  nass.df$state_ansi <- sprintf("%02d",nass.df$state_ansi) 
+  nass.df$county_code <- sprintf("%03d",nass.df$county_code) 
+  nass.df$fips5 <- paste0(nass.df$state_ansi, nass.df$county_code)
   
-  # add back in some helpful columns
-  mergeTable <- nass.df[,c('commodity_desc','unit_desc',
-                           'prodn_practice_desc','short_desc')]
-  mergeTable2 <- unique(mergeTable)
-  nass.df2 <- merge(commodityTally, mergeTable2, by.x = 'short_desc', all=F,
-                    by.y = 'short_desc',sort=F)
-  
+  # so variable names match after a change  
+  nass.df2 <- nass.df
+
   # change 'all production practices' to 'total
   nass.df2[nass.df2$prodn_practice_desc == 'ALL PRODUCTION PRACTICES',
            'prodn_practice_desc'] <- 'TOTAL'
@@ -68,7 +67,7 @@ cleanNassCensus <- function(nass.df, year){
   nass.df3[grepl("HAYLAGE",nass.df3$commodity_desc),'commodity_desc'] <- 'OTHER HAY'
   
   # aggregate by crop type and irrigation status
-  summary <- aggregate(Value ~ commodity_desc + prodn_practice_desc,
+  summary <- aggregate(Value ~ commodity_desc + prodn_practice_desc + fips5,
                        data = nass.df3, FUN='sum')
   
   # convert from acres to square kilometers
@@ -81,6 +80,7 @@ cleanNassCensus <- function(nass.df, year){
   
   # sort
   summary.wide <- summary.wide[rev(order(summary.wide$IRRIGATED)),]
+  summary.wide <- summary.wide[rev(order(summary.wide$fips5)),]
   
   return(summary.wide)
 }

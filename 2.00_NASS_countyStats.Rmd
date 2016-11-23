@@ -277,7 +277,7 @@ write.csv(nass.df, paste0(outdir, '/', outfile), row.names=F)
 ```
 
 #### Clean Data: Get Irrigated Areas
-Loading saved data so not reliant on functioning AP. Goal: what crops are irrigated, and in what proportion?
+Loading saved data so not reliant on functioning API. Goal: what crops are irrigated, and in what proportion?
 
 ```{r midRep_irrig, fig.height=4, fig.width=8}
 # load data
