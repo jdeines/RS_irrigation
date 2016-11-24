@@ -1,0 +1,354 @@
+---
+title: "Make Validation POints, Full RRB"
+author: "Jill Deines"
+date: "Saturday, November 12, 2016"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Use Koeppengeiger climate divisions, along with CDL crop layers, to stratify sampled points across the RRB.
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE, cache.path='cache/1.15_sampleRRB/',
+               fig.path='figure/1.15_sampleRRB/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+library(raster)
+library(maptools)
+library(rgeos)
+library(dplyr)
+
+# my functions (to be packaged)
+source('functions/getStratCdl.R')
+```
+
+## Load data
+
+```{r loadData}
+# filepaths -----------------------------------------------------
+# county shapefile
+tigerDir <- 'S:/Data/GIS_Data/Downloaded/TIGER/TIGER2012/COUNTY'
+tigerName <- 'tl_2012_us_county'
+
+# aquifer and basin boundaries
+gisDir <- 'S:/Users/deinesji/HPA/gis'
+rrbName <- 'BigExtent_RRB_RRCA_buff'
+
+# usda ecogreions
+ecoDir <- 'S:/Users/deinesji/HPA/data/climate/climateDivisions/USDA_Ecoregions'
+ecoName <- 'eco_us'
+
+# koeppen
+koepPath <- 'S:/Users/deinesji/HPA/data/climate/climateDivisions/Koeppengeiger/KoeppenGeiger_UScounty.txt'
+
+# read in
+counties <- readOGR(tigerDir, tigerName, verbose=F)
+rrb <- readOGR(gisDir, rrbName, verbose=F)
+ecoregions <- readOGR(ecoDir, ecoName, verbose=F)
+koepdata <- read.delim(koepPath)
+```
+
+
+### County Koepengeiger to Koepengeiger regions
+Clips the TIGER 2012 county shapefile to area of interest and adds the counties Koeppengeiger code, then dissolves into Koep units
+
+```{r getCounties}
+# reproject to wgs84
+rrb.ll <- spTransform(rrb, CRS(proj4string(counties)))
+
+# clip counties to the rrb
+countyRRB <- raster::intersect(counties,rrb.ll)
+
+# trim dataframe and create 5-digit FIPS
+countysub <- countyRRB[,c('STATEFP','COUNTYFP','NAME')]
+countysub$STATEFP <- as.character(countysub$STATEFP)
+countysub$COUNTYFP <- as.character(countysub$COUNTYFP)
+countysub$fips <- paste0(countysub$STATEFP, countysub$COUNTYFP)
+
+# pad the fips codes in koep with a leading zero 
+koepdata$fips5 <- sprintf('%05d', koepdata$FIPS)
+
+# trim koep to rrb to get better idea of counties with multiple koep codes
+rrbcounties <- unique(countysub$fips)
+koepRrb <- koepdata[koepdata$fips5 %in% rrbcounties,]
+sum(duplicated(koepRrb$fips5)) # 25 counties with multiple codes
+
+# do any counties have 3 codes?
+table(koepRrb$fips5) #nope, 2 is the highest count
+
+# for multiple code counties, keep code with greatest proportion
+# since only 2 per county, filter out codes with < 0.5 proportion
+koepRrbUnique <- koepRrb[koepRrb$PROP > 0.5,]
+
+# add the koeppengeiger code
+countyClim <- merge(countysub, koepRrbUnique, by.x = 'fips', by.y = 'fips5', all.x = T)
+
+# write out to not be dependent on S drive
+tempDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/1.15_makeRrbPoints_workspace'
+#writeOGR(countyClim, tempDir, 'Koep_county_rrb', driver='ESRI Shapefile')
+```
+
+### Dissolve and Merge regions
+Moved to Dropbox based files to work without internet...
+
+```{r startLocalLoad}
+# basin boundaries
+gisDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
+rrb <- readOGR(paste0(gisDir,'/BigExtent_RRB_RRCA_buff.kml'), 'boundExtent', verbose=F)
+
+# usda ecogreions
+ecoDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/helper/USDA_Ecoregions'
+ecoName <- 'eco_us'
+ecoregions <- readOGR(ecoDir, ecoName, verbose=F)
+
+# Koepen counties
+tempDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/1.15_makeRrbPoints_workspace'
+countyClim <- readOGR(tempDir, 'Koep_county_rrb', verbose=F)
+
+# Dissolve koepen counties
+koepRrb1 <- unionSpatialPolygons(countyClim, countyClim$CLS)
+row.names(koepRrb1) <- as.character(1:length(koepRrb1))
+koepData <- data.frame(koep = c('BSk','Cfa','Dfa'))
+koepRrb <- SpatialPolygonsDataFrame(koepRrb1, koepData)
+
+spplot(koepRrb, main = 'Koeppengeiger counties in the RRB')
+
+# work in WGS84 latlong
+koepRrb <- spTransform(koepRrb, CRS("+proj=longlat +datum=WGS84"))
+rrb <- spTransform(rrb, CRS("+proj=longlat +datum=WGS84"))
+ecoregions <- spTransform(ecoregions, CRS("+proj=longlat +datum=WGS84"))
+
+# USDA Eco Regions in the RRB
+ecoRrb <- raster::intersect(ecoregions, rrb)
+# dissolve by province
+ecoRrb$PROVINCE <- as.character(ecoRrb$PROVINCE)
+eco1 <- unionSpatialPolygons(ecoRrb, ecoRrb$PROVINCE)
+row.names(eco1) <- as.character(1:length(eco1))
+ecoData <- data.frame(ProvinceShort = c('Dry Steppe','Steppe','Prairie'),
+                      Province = c(ecoRrb$PROVINCE[2],
+                                   ecoRrb$PROVINCE[1],
+                                   ecoRrb$PROVINCE[5]))
+ecoRrb2 <- SpatialPolygonsDataFrame(eco1, ecoData)
+
+# intersect the two
+#climDivsRrb <- raster::intersect(ecoRrb2, koepRrb)
+
+# write out Koeppengieger
+#writeOGR(koepRrb, tempDir, "Koep_RRB_dissolve", driver='ESRI Shapefile')
+
+# write out Koeppengieger kml?
+```
+
+Intersecting the two failed due to orphaned holes in the Ecoregion file. I've decided that the Koeppengeiger divisions will be sufficient.
+
+## Make Stratefied samples
+Using the Koeppengieger RRb Shapefile and the CDL raster
+
+```{r makeCDLRRB, eval=FALSE}
+# Koepen counties
+tempDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/1.15_makeRrbPoints_workspace'
+koep <- readOGR(tempDir, 'Koep_RRB_dissolve', verbose=F)
+
+
+#cdl and key
+cdl <- raster('S:/Users/deinesji/HPA/gis/CDL/fullHPA/CDL_2010_HPA_RRB.tif')
+#cdl <- raster('S:/Users/deinesji/HPA/gis/CDL/CDL_RRB_2007_adj.tif')
+cdlKey <- read.csv('S:/Users/deinesji/HPA/gis/CDL/CDL_key_2014.csv', 
+                   stringsAsFactors=F)
+
+# projection datum not read in for cdl, fix 
+tweakProj <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+proj4string(cdl) <- tweakProj
+
+# reproject koeppen
+koep <- spTransform(koep, CRS(tweakProj))
+
+# I will process by koep divisions, so mask and export a CDL for each division
+for(i in 1:nrow(koep)){
+  cdl.clip <- crop(cdl, koep[i,])
+  cdl.mask  <- mask(cdl.clip, koep[i,], filename=paste0(tempDir, '/RRB_',
+                                                   koep@data[i,1],'.tif'),
+                    dataType = 'INT1U')
+}
+```
+
+Remove the Middle Republican NRD for 2010 and 2007 (already done)
+
+```{r removeMidRep}
+# Koepen 
+tempDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/1.15_makeRrbPoints_workspace'
+koep <- readOGR(tempDir, 'Koep_RRB_dissolve', verbose=F)
+
+# get relative area of koeppen areas
+# projection datum not read in for cdl, fix 
+tweakProj <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+# reproject koeppen
+koep <- spTransform(koep, CRS(tweakProj))
+
+# subtract area of MidRep NRD (already done?)
+gisDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
+midRep <- readOGR(paste0(gisDir,'/NRD_MidRepub.kml'), 'boundExtent', verbose=F)
+midRep <- spTransform(midRep, CRS(tweakProj))
+koephole <- koep - midRep
+
+spplot(koephole)
+
+# add areas to koep
+koephole$area <- gArea(koephole, byid=T)
+
+# calculate points ratios for each region
+koephole$ratio <- koephole$area / sum(koephole$area)
+
+# remask CDL's for the hole
+for(i in 1:nrow(koephole)){
+  bah <- raster(paste0(tempDir,'/RRB_',koephole@data[i,1],'.tif'))
+  cdl.clip <- crop(bah, koephole[i,])
+  cdl.mask  <- mask(cdl.clip, koephole[i,], 
+         filename=paste0(tempDir,'/CDL_RRB_noMidRep',koephole@data[i,1],'.tif'),
+                    dataType = 'INT1U')
+}
+
+## write out koephole
+#writeOGR(koephole, tempDir, 'Koep_RRB_noMidRep',driver='ESRI Shapefile', overwrite=T)
+```
+
+# 2010 RRB wide points
+
+Actually make points!! using hole-y CDL/Koepen poly's (with MidRep NRD removed because already sampled)
+
+```{r START_makepoints}
+# Koepen to get area ratios
+tempDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/1.15_makeRrbPoints_workspace'
+koephole <- readOGR(tempDir, 'Koep_RRB_noMidRep', verbose=F)
+
+# projection datum not read in for cdl, fix 
+tweakProj <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+
+# reproject koeppen
+koephole <- spTransform(koephole, CRS(tweakProj))
+
+# cdl key
+cdlKey <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/helper/CDL_key_2014.csv', stringsAsFactors=F)
+  
+# Do Cfa region ---------------------------------------------------------
+koepClass <- 'Cfa'
+cdl <- raster(paste0(tempDir, '/CDL_RRB_noMidRep', koepClass,'.tif'))
+proj4string(cdl) <- tweakProj
+
+polygon <- koephole[koephole$koep == koepClass,]
+
+# set point parameters
+ptDensity <- 250 # 1 point per every "x" km2 (not precise due to thinning)
+grasslandThin <- 0.08 # keep this proportion of grassland points
+sampleFactor <- 2.1 # increase sample points to offset grassland and CDL category thinning
+
+# generate stratified random sample
+points1 <- getStratCdl(cdl, polygon, ptDensity, sampleFactor,
+                         grasslandThin, cdlKey, seed=1)
+
+# see how points cover classes
+table(points1@data$CLASS_NAME)
+  
+dim(points1)
+  
+# view
+plot(cdl)
+plot(points1, add=T, pch = 19)
+
+# see how close to target density after grassland/developed thinning
+dim(points1)[1]
+gArea(polygon)*1e-6/ptDensity
+
+
+
+# Do BSk region ---------------------------------------------------------
+koepClass <- 'BSk'
+cdl <- raster(paste0(tempDir, '/CDL_RRB_noMidRep', koepClass,'.tif'))
+proj4string(cdl) <- tweakProj
+
+polygon <- koephole[koephole$koep == koepClass,]
+
+# set point parameters
+ptDensity <- 250 # 1 point per every "x" km2 (not precise due to thinning)
+grasslandThin <- 0.08 # keep this proportion of grassland points
+sampleFactor <- 2.0 # increase sample points to offset grassland and CDL category thinning
+
+# generate stratified random sample
+points2 <- getStratCdl(cdl, polygon, ptDensity, sampleFactor,
+                         grasslandThin, cdlKey, seed=1)
+
+# see how points cover classes
+table(points2@data$CLASS_NAME)
+  
+dim(points2)
+  
+# view
+plot(cdl)
+plot(points2, add=T, pch = 19)
+
+# see how close to target density after grassland/developed thinning
+dim(points2)[1]
+gArea(polygon)*1e-6/ptDensity
+
+
+# Do Dfa region ---------------------------------------------------------
+koepClass <- 'Dfa'
+cdl <- raster(paste0(tempDir, '/CDL_RRB_noMidRep', koepClass,'.tif'))
+proj4string(cdl) <- tweakProj
+
+polygon <- koephole[koephole$koep == koepClass,]
+
+# set point parameters
+ptDensity <- 250 # 1 point per every "x" km2 (not precise due to thinning)
+grasslandThin <- 0.08 # keep this proportion of grassland points
+sampleFactor <- 2.0 # increase sample points to offset grassland and CDL category thinning
+
+# generate stratified random sample
+points3 <- getStratCdl(cdl, polygon, ptDensity, sampleFactor,
+                         grasslandThin, cdlKey, seed=1)
+
+# see how points cover classes
+table(points3@data$CLASS_NAME)
+  
+dim(points3)
+  
+# view
+plot(cdl)
+plot(points3, add=T, pch = 19)
+
+# see how close to target density after grassland/developed thinning
+dim(points3)[1]
+gArea(polygon)*1e-6/ptDensity
+
+
+```
+
+
+```{r writeOut, eval=FALSE}
+# merge 3 points
+
+# write out as WGS84 (needed for kml)
+points1.ll <- spTransform(points1, CRS("+proj=longlat +datum=WGS84"))
+
+outdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/generatedPointsForUpload'
+outfilename <- 'valid4_RRB_75_2010_20161011'
+
+writeOGR(points1.ll, paste0(outdir,'/shapefiles'), outfilename, driver='ESRI Shapefile', 
+         overwrite = F)
+writeOGR(points1.ll, paste0(outdir, '/',outfilename,'.kml'),
+            layer = 'thislayer', driver='KML', overwrite=F)
+```
+
+
+## 2012 RRB
+Need training and validation!
+
+No NAIP imagery for Colorado (use 2011?)
+
