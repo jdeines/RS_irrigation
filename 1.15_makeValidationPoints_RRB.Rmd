@@ -143,7 +143,10 @@ ecoRrb2 <- SpatialPolygonsDataFrame(eco1, ecoData)
 # write out Koeppengieger
 #writeOGR(koepRrb, tempDir, "Koep_RRB_dissolve", driver='ESRI Shapefile')
 
-# write out Koeppengieger kml?
+# # write out Koeppengieger kml
+# kmlDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
+# writeOGR(koepRrb, paste0(kmlDir, "/Koep_RRB_dissolve.kml"), layer = 'thislayer', 
+#                         driver='KML', overwrite=F)
 ```
 
 Intersecting the two failed due to orphaned holes in the Ecoregion file. I've decided that the Koeppengeiger divisions will be sufficient.
