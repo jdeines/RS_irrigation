@@ -19,6 +19,8 @@ opts_chunk$set(cache=TRUE, cache.path='cache/1.16_trainRRB/',
 
 ```{r packages, message=FALSE, echo=TRUE}
 library(rgdal)
+library(ggplot2)
+library(tidyr)
 ```
 
 ## Load and Merge Data
@@ -26,7 +28,7 @@ library(rgdal)
 ```{r loadData}
 # file directory and filenames
 trainFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/trainingSets'
-files <- list.files(trainFolder, full.names = T, pattern = '*2010')
+files <- list.files(trainFolder, full.names = T)
 
 # load and merge
 trainList <- list()
@@ -34,7 +36,231 @@ for (i in 1:length(files)){
   trainList[[i]] <- read.csv(files[i]) 
 }
 trainAll <- do.call("rbind",trainList)
+
+# number of total training points
+nrow(trainAll)
 ```
 
 
+
+## Visualize
+
+### format dataframe for visualization
+
+```{r visFormatting}
+# remove .geo column
+trainAll <- trainAll[ , -which(names(trainAll) %in% 
+                      c(".geo",'certainty', 'system.index', 'lat','long'))]
+
+# change from wide to long format
+trainAllLong <- gather(trainAll, key = rasValue, value = value, 
+                       EVI_max_10:slope_mean, # combine these columns
+                       # except for these columns
+                       -c(class,crop,koep,classNum))
+
+# add a month/year timestamp
+monthvector <- as.numeric(unlist(regmatches(trainAllLong$rasValue, 
+                          gregexpr("[[:digit:]]+", trainAllLong$rasValue))))
+monthvectorPlus <- c(monthvector, rep(0, nrow(trainAllLong) - length(monthvector)))
+trainAllLong$month <- monthvectorPlus
+
+# add a master category
+trainAllLong$masterType <- paste0(trainAllLong$crop,'_',trainAllLong$class)
+
+# point count by crop type (per year)
+train2010 <- trainAllLong[grepl('GI',trainAllLong$rasValue) 
+                       & trainAllLong$month != 14
+                       & trainAllLong$year == 2010,]
+# 2010 breakdown
+table(train2010$masterType)/8
+
+train2012 <- trainAllLong[grepl('GI',trainAllLong$rasValue) 
+                       & trainAllLong$month != 14
+                       & trainAllLong$year == 2012,]
+# 2012 breakdown
+table(train2012$masterType)/8
+```
+
+```{r plotHelperFunctions}
+# function to unnest column list from aggregate
+flatter<-function (x, recursive = TRUE) {
+   dfcolumns <- vapply(x, is.matrix, logical(1))
+   cbind(x[!dfcolumns], do.call(cbind, x[dfcolumns]))
+}
+
+# function to get mean/stdev for each crop type/irrigation status
+# for each month/year for any index or year
+aggregateIndexByCrop <- function(index, year, df){
+  # select by index and year
+  df2 <- df[grepl(index,df$rasValue) & df$year == year
+                       & df$month != 14
+                       & df$crop != 'fallow',]
+  df_agg <- stats::aggregate(value ~ crop + class + month + year, data = df2, 
+                               FUN = function(x) {c(mean = mean(x), sd = sd(x))})
+  # apply function
+  dfPlot <- flatter(df_agg)
+}  
+
+# function to plot irrigation status by crop type facet
+plotIndexByCrop <- function(dfPlot, title, index){
+  ggplot(data = dfPlot,
+         aes(x = month, y = mean, colour = class, group = class)) +
+       geom_ribbon(aes(ymin = mean - sd, 
+                       ymax = mean + sd, 
+                       fill = class), alpha = 0.2) +
+       geom_line() +
+       facet_wrap(~crop) +
+       ylab(paste0(index, ' Index')) + 
+       xlab('month') + theme_bw() +
+       ggtitle(title)
+}
+
+```
+
+### Plot: all messy
+A plot of irrigated status by crop facet, both years
+
+```{r plotAllMessy}
+index <- 'GI'
+
+# select by index and remove fallow
+gi <- trainAllLong[grepl(index,trainAllLong$rasValue) 
+                       & trainAllLong$month != 14
+                       & trainAllLong$crop != 'fallow',]
+table(gi$masterType)/8
+
+# aggregate mean and st.dev by crop/status, month, and year
+gi_agg <- stats::aggregate(value ~ crop + class + month + year, data = gi, 
+                               FUN = function(x) {c(mean = mean(x), sd = sd(x))})
+# unnest list
+giPlot <- flatter(gi_agg)
+
+# plot all together
+ggplot(data = giPlot,
+       aes(x = month, y = mean, 
+           colour = interaction(year,class),
+           group = interaction(year, class))) +
+       geom_ribbon(aes(ymin = mean - sd, 
+                       ymax = mean + sd, 
+                       fill = interaction(year,class)), alpha = 0.2) +
+       geom_line() +
+       facet_wrap(~crop) +
+       ylab('Greenness Index') + xlab('month') + theme_bw() +
+       ggtitle("2010 + 2012 Greenness Index (Green/NIR), full RRB")
+
+# aggregate across years! ----------------------------------------------------
+# aggregate mean and st.dev by crop/status, month, and year
+gi_agg <- stats::aggregate(value ~ crop + class + month, data = gi, 
+                               FUN = function(x) {c(mean = mean(x), sd = sd(x))})
+# unnest list
+giPlot <- flatter(gi_agg)
+
+# plot all together
+ggplot(data = giPlot,
+       aes(x = month, y = mean, 
+           colour = class,
+           group = class)) +
+       geom_ribbon(aes(ymin = mean - sd, 
+                       ymax = mean + sd, 
+                       fill = class), alpha = 0.2) +
+       geom_line() +
+       facet_wrap(~crop) +
+       ylab('Greenness Index') + xlab('month') + theme_bw() +
+       ggtitle("2010 + 2012 Combined GI (Green/NIR), full RRB")
+```
+
+### Index Plots by Year
+```{r indexPlotsByCrop}
+# Greenness Index, 2010  
+dfagg <- aggregateIndexByCrop(index = 'GI', year = 2010, df=trainAllLong)
+plotIndexByCrop(dfPlot = dfagg, title = '2010 GI', index = 'GI')
+
+# Greenness Index, 2012  
+dfagg <- aggregateIndexByCrop(index = 'GI', year = 2012, df=trainAllLong)
+plotIndexByCrop(dfPlot = dfagg, title = '2012 GI', index = 'GI')
+
+# EVI, 2010  
+dfagg <- aggregateIndexByCrop(index = 'EVI', year = 2010, df=trainAllLong)
+plotIndexByCrop(dfPlot = dfagg, title = '2010 EVI', index = 'EVI')
+
+# EVI, 2012  
+dfagg <- aggregateIndexByCrop(index = 'EVI', year = 2012, df=trainAllLong)
+plotIndexByCrop(dfPlot = dfagg, title = '2012 EVI', index = 'EVI')
+
+# NDVI, 2010  
+dfagg <- aggregateIndexByCrop(index = 'NDVI', year = 2010, df=trainAllLong)
+plotIndexByCrop(dfPlot = dfagg, title = '2010 NDVI', index = 'NDVI')
+
+# NDVI, 2012  
+dfagg <- aggregateIndexByCrop(index = 'NDVI', year = 2012, df=trainAllLong)
+plotIndexByCrop(dfPlot = dfagg, title = '2012 NDVI', index = 'NDVI')
+
+# NDWI, 2010  
+dfagg <- aggregateIndexByCrop(index = 'NDWI', year = 2010, df=trainAllLong)
+plotIndexByCrop(dfPlot = dfagg, title = '2010 NDWI', index = 'NDWI')
+
+# NDWI, 2012  
+dfagg <- aggregateIndexByCrop(index = 'NDWI', year = 2012, df=trainAllLong)
+plotIndexByCrop(dfPlot = dfagg, title = '2012 NDWI', index = 'NDWI')
+```
+
+### Plots By Irrigation Status
+Combine crop types to compare irrigated, dryland, and noncrop curves
+```{r plotByStatus}
+index <- 'GI'
+
+# select by index and remove fallow
+gi <- trainAllLong[grepl(index,trainAllLong$rasValue) 
+                       & trainAllLong$month != 14
+                       & trainAllLong$crop != 'fallow',]
+
+# aggregate mean and st.dev by crop/status, month, and year
+gi_agg <- stats::aggregate(value ~ class + month + year, data = gi, 
+                               FUN = function(x) {c(mean = mean(x), sd = sd(x))})
+# unnest list
+giPlot <- flatter(gi_agg)
+
+# plot all together
+ggplot(data = giPlot,
+       aes(x = month, y = mean, 
+           colour = class,
+           group = class)) +
+       geom_ribbon(aes(ymin = mean - sd, 
+                       ymax = mean + sd, 
+                       fill = class), alpha = 0.2) +
+       geom_line() +
+       facet_wrap(~year) +
+       ylab('Greenness Index') + xlab('month') + theme_bw() +
+       ggtitle("2010 + 2012 Greenness Index (Green/NIR), full RRB")
+```
+
+### Plots By Koeppengeiger
+
+```{r plotByKoep}
+index <- 'GI'
+
+# select by index and remove fallow
+gi <- trainAllLong[grepl(index,trainAllLong$rasValue) 
+                       & trainAllLong$month != 14
+                       & trainAllLong$crop != 'fallow',]
+
+# aggregate mean and st.dev by crop/status, month, and year
+gi_agg <- stats::aggregate(value ~ class + month + year + koep, data = gi, 
+                               FUN = function(x) {c(mean = mean(x), sd = sd(x))})
+# unnest list
+giPlot <- flatter(gi_agg)
+
+# plot all together
+ggplot(data = giPlot,
+       aes(x = month, y = mean, 
+           colour = class,
+           group = class)) +
+       geom_ribbon(aes(ymin = mean - sd, 
+                       ymax = mean + sd, 
+                       fill = class), alpha = 0.2) +
+       geom_line() +
+       facet_wrap(~year + koep) +
+       ylab('Greenness Index') + xlab('month') + theme_bw() +
+       ggtitle("2010 + 2012 Greenness Index (Green/NIR), full RRB")
+```
 
