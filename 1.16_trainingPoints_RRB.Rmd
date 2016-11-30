@@ -11,7 +11,7 @@ Goal: Merge training points exports from GEE for each year (starting with 2010 a
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
-opts_chunk$set(cache=TRUE, cache.path='cache/1.16_trainRRB/',
+opts_chunk$set(cache=FALSE, cache.path='cache/1.16_trainRRB/',
                fig.path='figure/1.16_trainRRB/')
 ```
 
@@ -19,6 +19,7 @@ opts_chunk$set(cache=TRUE, cache.path='cache/1.16_trainRRB/',
 
 ```{r packages, message=FALSE, echo=TRUE}
 library(rgdal)
+library(latticeExtra)
 library(ggplot2)
 library(tidyr)
 ```
@@ -28,7 +29,7 @@ library(tidyr)
 ```{r loadData}
 # file directory and filenames
 trainFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/trainingSets'
-files <- list.files(trainFolder, full.names = T)
+files <- list.files(trainFolder, full.names = T, pattern='*csv')
 
 # load and merge
 trainList <- list()
@@ -39,8 +40,60 @@ trainAll <- do.call("rbind",trainList)
 
 # number of total training points
 nrow(trainAll)
+
+# spatialize
+trainPoints <- trainAll
+coordinates(trainPoints) <- ~ long + lat
+proj4string(trainPoints) <- CRS("+proj=longlat +datum=WGS84")
+
+# Plot with Koepen counties
+tempDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/1.15_makeRrbPoints_workspace'
+koep <- readOGR(tempDir, 'Koep_RRB_dissolve', verbose=F)
+
+spplot(koep, col.regions=terrain.colors(10)[c(4,5,9)]) +
+  latticeExtra::layer(sp.points(trainPoints, col='blue', pch=3, cex=1)) 
 ```
 
+## Export training sets for GEE
+This exports combined points as KML's for use in classification in GEE. Exports include:
+
+* 2010 combined points for the RRB
+* 2012 combined points for the RRB
+* 2010 + 2012 combined points for the RRB
+
+First, I will try exporting points with the full set of variables in tact, in hopes that it will eliminate re-sampling imagery in the classification step. Therefore, I remove all variables except the numerical categories (masterType) and the image values.
+
+```{r exportForGee, eval = FALSE}
+exportFolder <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/training'
+
+# use a crop/irrigated status crossed class type to maximize downstream flexibility
+trainPoints$masterType <- paste0(trainPoints$crop,'_',trainPoints$class)
+masterKey <- data.frame(masterType = sort(unique(trainPoints$masterType)),
+                        masterNum = 0:(length(unique(trainPoints$masterType))-1))
+trainPoints1 <- merge(trainPoints, masterKey)
+
+# clean up data
+trainExport <- trainPoints1[ , -which(names(trainPoints1) %in% 
+                c(".geo",'certainty', 'system.index','class','crop','koep','classNum'))]
+
+# split up points
+train2010 <- trainExport[trainExport$year == 2010,]
+train2012 <- trainExport[trainExport$year == 2012,]
+
+# remove year column
+train2010 <- train2010[ , -which(names(train2010) == 'year')]
+train2012 <- train2012[ , -which(names(train2012) == 'year')]                       
+trainExport1 <- trainExport[ , -which(names(trainExport) == 'year')]                      
+
+# write out KML's
+writeOGR(train2010, paste0(exportFolder, '/2010_training_12class_v1.kml'),
+         layer = 'layer', driver = 'KML')
+writeOGR(train2012, paste0(exportFolder, '/2012_training_12class_v1.kml'),
+         layer = 'layer', driver = 'KML')
+writeOGR(trainExport1, paste0(exportFolder, '/2010_2012_COMBINED_training_12class_v1.kml'),
+         layer = 'layer', driver = 'KML')
+
+```
 
 
 ## Visualize
