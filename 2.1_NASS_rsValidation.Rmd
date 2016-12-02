@@ -12,7 +12,7 @@ Goal: Compare irrigated acreages between remote sensing products and USDA NASS A
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
-opts_chunk$set(cache=TRUE, cache.path='cache/2.1_NASS_v/',
+opts_chunk$set(cache=FALSE, cache.path='cache/2.1_NASS_v/',
                fig.path='figure/2.1_NASS_v/')
 ```
 
@@ -45,13 +45,13 @@ TO DO: The histogram splitting part could probably be more elegant, and certainl
 
 
 ```{r loadGee}
-yearsDesired <- c(2002, 2007, 2012)
+yearsDesired <- c(1997,2002, 2007, 2012)
 cellArea <- 30*30 # m^2
 
-countyDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/county_counts_RRB_test1_clean'
+countyDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/county_counts_RRB_test2_cleaned'
 
 # get filenames
-countyfiles <- list.files(countyDir, pattern="*.csv")
+countyfiles <- list.files(countyDir, pattern="*cleaned.csv")
 # read in to a single dataframe
 countyAll0 = do.call(rbind, lapply(countyfiles, function(x) {
               csv <- read.csv(paste0(countyDir,'/',x), stringsAsFactors = FALSE)
@@ -162,16 +162,19 @@ nass.df <- read.csv(paste0(outdir, '/', outfile), stringsAsFactors=F)
 #   write.csv(commodities, paste0(outdir, '/', outfile2), row.names=F)
 
 # clean data
+rrb1997 <- cleanNassCensusCounty(nass.df, year = 1997)
 rrb2002 <- cleanNassCensusCounty(nass.df, year = 2002)
 rrb2007 <- cleanNassCensusCounty(nass.df, year = 2007)
 rrb2012 <- cleanNassCensusCounty(nass.df, year = 2012)
 
 # get irrigated acreage by county
+rrb1997.irr <- aggregate(IRRIGATED ~ fips5, data=rrb1997, FUN='sum')
 rrb2002.irr <- aggregate(IRRIGATED ~ fips5, data=rrb2002, FUN='sum')
 rrb2007.irr <- aggregate(IRRIGATED ~ fips5, data=rrb2007, FUN='sum')
 rrb2012.irr <- aggregate(IRRIGATED ~ fips5, data=rrb2012, FUN='sum')
 
 # add years
+rrb1997.irr$year <- 1997
 rrb2002.irr$year <- 2002
 rrb2007.irr$year <- 2007
 rrb2012.irr$year <- 2012
@@ -189,6 +192,16 @@ abline(b=1, a=0)
 Here we go: compare irrigated areas by county
 
 ```{r compare}
+# merge data
+countyAll.1997 <- countyAll[countyAll$year == 1997,]
+merged1997 <- merge(rrb1997.irr, countyAll.1997[,c('fips5','irrArea.km2')])
+
+ggplot(merged1997, aes(x=IRRIGATED,y=irrArea.km2)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) + 
+  ylab('RS km^2') + xlab('nass km^2') +
+  ggtitle('1997 RS vs NASS by County') + theme_bw()
+
 # merge data
 countyAll.2002 <- countyAll[countyAll$year == 2002,]
 merged2002 <- merge(rrb2002.irr, countyAll.2002[,c('fips5','irrArea.km2')])
@@ -221,8 +234,22 @@ ggplot(merged2012, aes(x=IRRIGATED,y=irrArea.km2)) +
   geom_abline(slope = 1, intercept = 0) + 
   ylab('remotely sensed km^2') + xlab('nass km^2') +
   ggtitle('2012 RS vs NASS by County') + theme_bw()
+```
 
+```{r multipanel, fig.width = 9.5, fig.height = 3.3}
+allyears <- rbind(merged1997, merged2002, merged2007, merged2012)
 
+#library(devtools)
+#source_gist("524eade46135f6348140")
+ggplot(allyears, aes(x=IRRIGATED,y=irrArea.km2)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) + 
+ # stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE) +
+  #geom_smooth(method="lm",se=FALSE) +
+  facet_wrap(~year, nrow=1) +
+  ylab(expression(paste("AMIHiP 30 County Area (", km^2," )"))) + 
+  xlab(expression(paste('NASS County Area (', km^2,' )'))) + theme_bw() #+
+  #ggtitle('2012 RS vs NASS by County')  
 ```
 
 

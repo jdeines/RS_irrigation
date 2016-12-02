@@ -11,7 +11,7 @@ Goal: Accuracy assessment via confusion tables
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
-opts_chunk$set(cache=TRUE, cache.path='cache/5.0_confusion/',
+opts_chunk$set(cache=FALSE, cache.path='cache/5.0_confusion/',
                fig.path='figure/5.0_confusion/')
 ```
 
@@ -33,7 +33,7 @@ From Brian Wardlow's Kansas dataset of validation points, clipped to the RRB and
 ```{r Wardlow}
 # load data
 dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
-file2001 <- '2001_Wardlow_confusionData_RRB_test1.csv'
+file2001 <- '2001_Wardlow_confusionData_RRB_test2_nosoy_noag.csv'
 wardlow01 <- read.csv(paste(dataDir, file2001, sep='/'))
 
 # lookup table for classification codes
@@ -61,7 +61,7 @@ Jill's points for the Middle Republican 2007; I think I used 60% of the points f
 ```{r midRep2007}
 # load data
 dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
-file2007 <- '2007_MidRep60_confusionData_RRB_test1_randomnesstest.csv'
+file2007 <- '2007_MidRep60_confusionData_RRB_test2_nosoy_noag.csv'
 midRep07 <- read.csv(paste(dataDir, file2007, sep='/'))
 
 # lookup table for classification codes
@@ -91,7 +91,7 @@ Jill's points for the Middle Republican 2010; I think I used 20% of the points f
 ```{r midRep2010}
 # load data
 dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
-file2010 <- '2010_MidRep20_confusionData_RRB_test1.csv'
+file2010 <- '2010_MidRep60_confusionData_RRB_test2_nosoy_noag.csv'
 midRep10 <- read.csv(paste(dataDir, file2010, sep='/'))
 
 # lookup table for classification codes
