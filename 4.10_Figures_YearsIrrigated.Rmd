@@ -1,0 +1,44 @@
+---
+title: "Figures"
+author: "Jill Deines"
+date: "Friday, December 02, 2016"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Make dummy figures for manuscript planning
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE, cache.path='cache/4.1_FreqFigs/',
+               fig.path='figure/4.1_FreqFigs/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE, eval=TRUE}
+library(rgdal)
+library(raster)
+```
+
+## Irrigation frequency
+
+```{r frequency}
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test2_cleaned'
+rasFiles <- list.files(rasDir, full.names=T)
+
+# rrb boundary
+
+rasStack <- stack(rasFiles)
+names(rasStack) <- 1995:2012
+rasStack[rasStack == 2] <- 0
+
+spplot(rasStack)
+
+irrFreq <- sum(rasStack)
+
+spplot(irrFreq)
+```
+

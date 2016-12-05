@@ -20,6 +20,7 @@ opts_chunk$set(cache=TRUE, cache.path='cache/0.0_kml/',
 
 ```{r packages, message=FALSE, echo=TRUE}
 library(rgdal)
+library(raster)
 ```
 
 ## Load and convert
@@ -31,6 +32,7 @@ Geometries of interest to me are:
 * the NE RRB (clipped from full basin)
 * the Middle Republican NRD (clipped from RRB NRDs)
 * Well Point Datasets (?) - start with RRCA wells for MidRep NRD trials to see if it's helpful
+* additional geometries with which to tally irrigated area
 
 ### Load and pre-process
 
@@ -56,6 +58,12 @@ rrbNE <- rrbstates[rrbstates$state == 'NE',]
 nrds <- readOGR(gisDir, nrdsname, verbose=F)
 nrd1 <- nrds[nrds$NRD_Name == 'Middle Republican',]
 rrcaWells <- readOGR(paste0(gisDir,'/Wells'), 'RRCA_NE_wells_2007')
+
+# new bounds to add to summary part (12/5/16)
+usstates <- readOGR('S:/Users/deinesji/GIS_general',
+                    'States_continental', verbose = F)
+usstates <- spTransform(usstates, proj4string(rrbbuff))
+rrcaExtentStates <- raster::intersect(rrbbuff, usstates)
 ```
 
 ### To KML function
@@ -82,5 +90,11 @@ toKml(nrd1, 'NRD_MidRepub', outDir)
 toKml(rrcaWells, 'RRCA_NE_Wells_2007', outDir)
 
 toKml(bigbuff, 'HPA_30km_RRB_buff',outDir)
-```
 
+# new stuff for summary trends
+toKml(rrbstates, 'RRB_basin_states', outDir)
+toKml(nrds, 'NE_NRDs_rrb_clip', outDir)
+toKml(rrcaExtentStates, 'RRB_fullExtent_states', outDir)
+
+# test <- readOGR(paste0(outDir, '/RRB_basin_states.kml'), 'boundExtent')
+```
