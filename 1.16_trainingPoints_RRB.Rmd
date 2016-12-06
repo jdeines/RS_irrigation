@@ -25,11 +25,12 @@ library(tidyr)
 ```
 
 ## Load and Merge Data
+training points with anthony vars included = v02
 
 ```{r loadData}
 # file directory and filenames
 trainFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/trainingSets'
-files <- list.files(trainFolder, full.names = T, pattern='*csv')
+files <- list.files(trainFolder, full.names = T, pattern='*_v02.csv')
 
 # load and merge
 trainList <- list()
@@ -86,11 +87,11 @@ train2012 <- train2012[ , -which(names(train2012) == 'year')]
 trainExport1 <- trainExport[ , -which(names(trainExport) == 'year')]                      
 
 # write out KML's
-writeOGR(train2010, paste0(exportFolder, '/2010_training_12class_v1.kml'),
+writeOGR(train2010, paste0(exportFolder, '/2010_training_12class_v2.kml'),
          layer = 'layer', driver = 'KML')
-writeOGR(train2012, paste0(exportFolder, '/2012_training_12class_v1.kml'),
+writeOGR(train2012, paste0(exportFolder, '/2012_training_12class_v2.kml'),
          layer = 'layer', driver = 'KML')
-writeOGR(trainExport1, paste0(exportFolder, '/2010_2012_COMBINED_training_12class_v1.kml'),
+writeOGR(trainExport1, paste0(exportFolder, '/2010_2012_COMBINED_training_12class_v2.kml'),
          layer = 'layer', driver = 'KML')
 
 ```
