@@ -64,6 +64,11 @@ usstates <- readOGR('S:/Users/deinesji/GIS_general',
                     'States_continental', verbose = F)
 usstates <- spTransform(usstates, proj4string(rrbbuff))
 rrcaExtentStates <- raster::intersect(rrbbuff, usstates)
+
+gmdDir <- 'S:/Data/GIS_Data/Downloaded/High_Plains_Aquifer/HPA_Water_Entities/Kansas'
+gmds <- readOGR(gmdDir, 'KS - GROUNDWATER_DISTRICTS', verbose=F)
+gmd4 <- gmds[gmds$ID == 4,]
+#plot(gmd4)
 ```
 
 ### To KML function
@@ -91,10 +96,12 @@ toKml(rrcaWells, 'RRCA_NE_Wells_2007', outDir)
 
 toKml(bigbuff, 'HPA_30km_RRB_buff',outDir)
 
-# new stuff for summary trends
+# new stuff for summary trends (note post-hoc addition of masterID column in fusion tables
 toKml(rrbstates, 'RRB_basin_states', outDir)
 toKml(nrds, 'NE_NRDs_rrb_clip', outDir)
 toKml(rrcaExtentStates, 'RRB_fullExtent_states', outDir)
+toKml(gmd4, 'KS_GMD4', outDir)
 
 # test <- readOGR(paste0(outDir, '/RRB_basin_states.kml'), 'boundExtent')
 ```
+
