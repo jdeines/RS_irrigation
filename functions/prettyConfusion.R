@@ -44,9 +44,9 @@ prettyConfusionBinary <- function(confusionMatrixOutput){
   
   # make column sum
   core3 <- rbind(core2, colSums(core2[,1:3]))
-  core3$ProducerAccuracy <- c(core3$NotIrrigated[2]/core3$Total[2]*100,
-                              core3$Irrigated[1]/core3$Total[1]*100,
-                              NA)
+  core3$ProducerAccuracy <- c(core3$Irrigated[1]/core3$Total[1]*100,
+                              core3$NotIrrigated[2]/core3$Total[2]*100,
+                                                            NA)
   overallAccuracy <- confusionMatrixOutput$overall[1] *100
   names(overallAccuracy) <- NULL
   core4 <- rbind(core3,c(core3$Irrigated[1]/core3$Irrigated[3]*100,

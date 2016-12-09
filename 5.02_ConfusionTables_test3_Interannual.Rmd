@@ -8,7 +8,7 @@ output:
 ---
 
 Goal: Accuracy assessment via confusion tables for test 3, CART, cleaned 3x3,
-but not interannual cleaning
+with interannual cleaning (pixels irrigated in a single year removed)
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
@@ -34,7 +34,7 @@ From Brian Wardlow's Kansas dataset of validation points, clipped to the RRB and
 ```{r Wardlow}
 # load data
 dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
-file2001 <- '2001_Wardlow_confusionData_RRB_test3_cart_interannual.csv'
+file2001 <- '2001_Wardlow_confusionData_RRB_test3_cart_interannual_maskFixed.csv'
 wardlow01 <- read.csv(paste(dataDir, file2001, sep='/'))
 
 # adjust categories for a binary evaluation (irrigated/not irrigated)
@@ -70,7 +70,7 @@ Jill's points for the Middle Republican 2007; I think I used 60% of the points f
 ```{r midRep2007}
 # load data
 dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
-file2007 <- '2007_MidRep60_confusionData_RRB_test3_cart_interannual.csv'
+file2007 <- '2007_MidRep60_confusionData_RRB_test3_cart_interannual_maskFixed.csv'
 midRep07 <- read.csv(paste(dataDir, file2007, sep='/'))
 
 # adjust categories for a binary evaluation (irrigated/not irrigated)
@@ -107,7 +107,7 @@ Jill's points for the Middle Republican 2010; I think I used 20% of the points f
 ```{r midRep2010}
 # load data
 dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
-file2010 <- '2010_MidRep60_confusionData_RRB_test3_cart_interannual.csv'
+file2010 <- '2010_MidRep60_confusionData_RRB_test3_cart_interannual_maskFixed.csv'
 midRep10 <- read.csv(paste(dataDir, file2010, sep='/'))
 
 # adjust categories for a binary evaluation (irrigated/not irrigated)

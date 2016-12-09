@@ -36,23 +36,46 @@ dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforCo
 file2001 <- '2001_Wardlow_confusionData_RRB_test2_nosoy_noag.csv'
 wardlow01 <- read.csv(paste(dataDir, file2001, sep='/'))
 
+# adjust categories for a binary evaluation (irrigated/not irrigated)
+wardlow01$binaryClassification <- wardlow01$classification
+wardlow01$binaryClassification[wardlow01$binaryClassification == 2] <- 0 
+
+wardlow01$binaryClassCats <- wardlow01$ClassCats
+wardlow01$binaryClassCats[wardlow01$binaryClassCats == 2] <- 0 
+
 # lookup table for classification codes
 predictedCode = data.frame(classification = c(0:2),
                        predictedClass = c('Dryland','Irrigated','Noncrop'))
 referenceCode = data.frame(ClassCats = c(0:2),
                        referenceClass = c('Dryland','Irrigated','Noncrop'))
-# add category names
+
+# binary tables
+predCodeBinary = data.frame(binaryClassification = c(0:1),
+                       predictedClassBinary = c('NotIrrigated','Irrigated'))
+refCodeBinary = data.frame(binaryClassCats = c(0:1),
+                       referenceClassBinary = c('NotIrrigated','Irrigated'))
+
+# add category names to df via merge
 wardlow01 <- merge(wardlow01, predictedCode)
 wardlow01 <- merge(wardlow01, referenceCode)
+wardlow01 <- merge(wardlow01, predCodeBinary)
+wardlow01 <- merge(wardlow01, refCodeBinary)
 
-# confusion table
+# confusion table all 3 classes
 wardlowConfusion <- confusionMatrix(data = wardlow01$predictedClass, 
                                       reference = wardlow01$referenceClass)
 
-# make it pretty
-wardlow.ct <- prettyConfusion(wardlowConfusion)
+# confusion table binary
+wardlowConfusionBin <- confusionMatrix(data = wardlow01$predictedClassBinary, 
+                                      reference = wardlow01$referenceClassBinary)
 
+# make it pretty : all 3 classes
+wardlow.ct <- prettyConfusion(wardlowConfusion)
 kable(wardlow.ct, digits=1)
+
+# make it pretty : binary
+wardlow.ct.b <- prettyConfusionBinary(wardlowConfusionBin)
+kable(wardlow.ct.b, digits=1)
 ```
 
 ## 2007
@@ -64,23 +87,46 @@ dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforCo
 file2007 <- '2007_MidRep60_confusionData_RRB_test2_nosoy_noag.csv'
 midRep07 <- read.csv(paste(dataDir, file2007, sep='/'))
 
+# adjust categories for a binary evaluation (irrigated/not irrigated)
+midRep07$binaryClassification <- midRep07$classification
+midRep07$binaryClassification[midRep07$binaryClassification == 2] <- 0 
+
+midRep07$binaryClassNum <- midRep07$classNum
+midRep07$binaryClassNum[midRep07$binaryClassNum == 2] <- 0 
+
 # lookup table for classification codes
 predictedCode = data.frame(classification = c(0:2),
                        predictedClass = c('Dryland','Irrigated','Noncrop'))
 referenceCode = data.frame(classNum = c(0:2),
                        referenceClass = c('Dryland','Irrigated','Noncrop'))
+
+# binary tables
+predCodeBinary = data.frame(binaryClassification = c(0:1),
+                       predictedClassBinary = c('NotIrrigated','Irrigated'))
+refCodeBinary = data.frame(binaryClassNum = c(0:1),
+                       referenceClassBinary = c('NotIrrigated','Irrigated'))
+
 # add category names
 midRep07 <- merge(midRep07, predictedCode)
 midRep07 <- merge(midRep07, referenceCode)
+midRep07 <- merge(midRep07, predCodeBinary)
+midRep07 <- merge(midRep07, refCodeBinary)
 
 # confusion table
 midRep07confusion <- confusionMatrix(data = midRep07$predictedClass, 
                                       reference = midRep07$referenceClass)
 
+# binary
+midRep07confusionBinary <- confusionMatrix(data = midRep07$predictedClassBinary, 
+                                      reference = midRep07$referenceClassBinary)
+
 # make it pretty
 midrep07.ct <- prettyConfusion(midRep07confusion)
-
 kable(midrep07.ct, digits=1)
+
+# binary one
+midrep07.ct.b <- prettyConfusionBinary(midRep07confusionBinary)
+kable(midrep07.ct.b, digits=1)
 ```
 
 
@@ -94,21 +140,44 @@ dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforCo
 file2010 <- '2010_MidRep60_confusionData_RRB_test2_nosoy_noag.csv'
 midRep10 <- read.csv(paste(dataDir, file2010, sep='/'))
 
+# adjust categories for a binary evaluation (irrigated/not irrigated)
+midRep10$binaryClassification <- midRep10$classification
+midRep10$binaryClassification[midRep10$binaryClassification == 2] <- 0 
+
+midRep10$binaryClassNum <- midRep10$classNum
+midRep10$binaryClassNum[midRep10$binaryClassNum == 2] <- 0 
+
+
 # lookup table for classification codes
 predictedCode = data.frame(classification = c(0:2),
                        predictedClass = c('Dryland','Irrigated','Noncrop'))
 referenceCode = data.frame(classNum = c(0:2),
                        referenceClass = c('Dryland','Irrigated','Noncrop'))
+
+# binary tables
+predCodeBinary = data.frame(binaryClassification = c(0:1),
+                       predictedClassBinary = c('NotIrrigated','Irrigated'))
+refCodeBinary = data.frame(binaryClassNum = c(0:1),
+                       referenceClassBinary = c('NotIrrigated','Irrigated'))
+
 # add category names
 midRep10 <- merge(midRep10, predictedCode)
 midRep10 <- merge(midRep10, referenceCode)
+midRep10 <- merge(midRep10, predCodeBinary)
+midRep10 <- merge(midRep10, refCodeBinary)
 
 # confusion table
 midRep10confusion <- confusionMatrix(data = midRep10$predictedClass, 
                                       reference = midRep10$referenceClass)
 
+# confusion table
+midRep10confusionBinary <- confusionMatrix(data = midRep10$predictedClassBinary, 
+                                      reference = midRep10$referenceClassBinary)
+
 # make it pretty
 midrep10.ct <- prettyConfusion(midRep10confusion)
-
 kable(midrep10.ct, digits=1)
+
+midrep10.ct.b <- prettyConfusionBinary(midRep10confusionBinary)
+kable(midrep10.ct.b, digits=1)
 ```

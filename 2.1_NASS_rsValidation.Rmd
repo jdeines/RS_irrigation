@@ -33,6 +33,7 @@ library(ggplot2)
 # my functions (to be packaged)
 source('functions/getNASS.R')
 source('functions/cleanNassCensusCounty.R')
+source('functions/stat_smooth_func.R')
 ```
 
 
@@ -236,20 +237,35 @@ ggplot(merged2012, aes(x=IRRIGATED,y=irrArea.km2)) +
   ggtitle('2012 RS vs NASS by County') + theme_bw()
 ```
 
-```{r multipanel, fig.width = 9.5, fig.height = 3.3}
-allyears <- rbind(merged1997, merged2002, merged2007, merged2012)
+```{r multipanel, fig.width = 6.7, fig.height = 2.6}
+allyears <- rbind(merged2002, merged2007, merged2012)
 
-#library(devtools)
-#source_gist("524eade46135f6348140")
 ggplot(allyears, aes(x=IRRIGATED,y=irrArea.km2)) +
   geom_point() +
   geom_abline(slope = 1, intercept = 0) + 
- # stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE) +
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 100, ypos = 800) +
   #geom_smooth(method="lm",se=FALSE) +
   facet_wrap(~year, nrow=1) +
   ylab(expression(paste("AMIHiP 30 County Area (", km^2," )"))) + 
   xlab(expression(paste('NASS County Area (', km^2,' )'))) + theme_bw() #+
   #ggtitle('2012 RS vs NASS by County')  
+```
+
+```{r totalAreaBar, fig.height = 2.5, fig.width = 3.5}
+areadata <- allyears
+names(areadata) <- c('fips5', 'NASS','Year','AIM')
+
+# sum area by year
+areaAgg <- aggregate(cbind(NASS, AIM) ~ Year, data = areadata, FUN = 'sum')
+
+# long format
+area.gg <- gather(areaAgg, key = dataset, value = sq_km, NASS:AIM)
+
+ggplot(data = area.gg, aes(Year, sq_km)) +
+  geom_bar(aes(fill = dataset), position = 'dodge', stat='identity') +
+   ylab(expression(paste("Irrigated Area (", km^2," )"))) + 
+  theme_bw() 
+
 ```
 
 
