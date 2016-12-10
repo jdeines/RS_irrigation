@@ -169,6 +169,24 @@ plotIndexByCrop <- function(dfPlot, title, index){
        ggtitle(title)
 }
 
+
+# 1 index per year plot functions for combo vars
+
+subsetIndexByCrop <- function(index, year, df){
+  # select by index and year
+  df2 <- df[grepl(index,df$rasValue) & df$year == year & df$crop != 'fallow',]
+}  
+
+
+plotCombo <- function(dfPlot, title, index){
+  ggplot(data = dfPlot,
+         aes(x = crop, y = value, colour = class)) +
+       geom_boxplot(aes(colour = class), position = 'dodge') +
+       ylab(paste0(index, ' Index')) + 
+       xlab('crop') + theme_bw() +
+       ggtitle(title)
+}
+
 ```
 
 ### Plot: all messy
@@ -256,6 +274,26 @@ plotIndexByCrop(dfPlot = dfagg, title = '2010 NDWI', index = 'NDWI')
 # NDWI, 2012  
 dfagg <- aggregateIndexByCrop(index = 'NDWI', year = 2012, df=trainAllLong)
 plotIndexByCrop(dfPlot = dfagg, title = '2012 NDWI', index = 'NDWI')
+```
+
+
+```{r comboVars}
+# greenArid 2010
+dfsub <- subsetIndexByCrop(index = 'greenArid', year = 2010, df=trainAllLong)
+plotCombo(dfPlot = dfsub, title = '2010 Greenness Aridity', index = 'greenness/Arid')
+
+# greenArid 2012
+dfsub <- subsetIndexByCrop(index = 'greenArid', year = 2012, df=trainAllLong)
+plotCombo(dfPlot = dfsub, title = '2012 Greenness Aridity', index = 'greenness/Arid')
+
+# ndwi*gi 2010
+dfsub <- subsetIndexByCrop(index = 'ndwi_gi', year = 2010, df=trainAllLong)
+plotCombo(dfPlot = dfsub, title = '2010 NDWI * GI', index = 'ndwi*gi')
+
+# ndwi*gi 2012
+dfsub <- subsetIndexByCrop(index = 'ndwi_gi', year = 2012, df=trainAllLong)
+plotCombo(dfPlot = dfsub, title = '2012 NDWI * GI', index = 'ndwi*gi')
+
 ```
 
 ### Plots By Irrigation Status
