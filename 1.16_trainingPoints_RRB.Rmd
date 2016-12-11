@@ -27,7 +27,7 @@ library(tidyr)
 ## Load and Merge Data
 training points with anthony vars included = v02
 
-```{r loadData}
+```{r loadData, fig.width = 3.25, fig.height=1.75}
 # file directory and filenames
 trainFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/trainingSets'
 files <- list.files(trainFolder, full.names = T, pattern='*_v02.csv')
@@ -51,8 +51,14 @@ proj4string(trainPoints) <- CRS("+proj=longlat +datum=WGS84")
 tempDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/1.15_makeRrbPoints_workspace'
 koep <- readOGR(tempDir, 'Koep_RRB_dissolve', verbose=F)
 
-spplot(koep, col.regions=terrain.colors(10)[c(4,5,9)]) +
-  latticeExtra::layer(sp.points(trainPoints, col='blue', pch=3, cex=1)) 
+# basin boundaries
+gisDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
+rrb <- readOGR(paste0(gisDir,'/BigExtent_RRB_RRCA_buff.kml'), 'boundExtent', verbose=F)
+
+par(mar=c(0,0,0,0))
+plot(rrb, col='seashell2')
+plot(trainPoints[trainPoints$year == 2010,], col='#5e3c99',add=T, cex=.8)
+plot(trainPoints[trainPoints$year == 2012,], col='#e66101',add=T, cex=.8)
 ```
 
 ## Export training sets for GEE
@@ -155,18 +161,56 @@ aggregateIndexByCrop <- function(index, year, df){
   dfPlot <- flatter(df_agg)
 }  
 
+
+# for quartile ribbons
+aggregateIndexByCrop_quartiles <- function(index, year, df){
+  # select by index and year
+  df2 <- df[grepl(index,df$rasValue) & df$year == year
+                       & df$month != 14
+                       & df$crop != 'fallow',]
+  df_agg <- stats::aggregate(value ~ crop + class + month + year, data = df2, 
+                               FUN = 'summary')
+  # apply function
+  dfPlot <- flatter(df_agg)
+  
+  names(dfPlot)[6] <- 'Q1'
+  names(dfPlot)[9] <- 'Q3'
+    
+  return(dfPlot)
+}  
+
+
 # function to plot irrigation status by crop type facet
 plotIndexByCrop <- function(dfPlot, title, index){
   ggplot(data = dfPlot,
          aes(x = month, y = mean, colour = class, group = class)) +
        geom_ribbon(aes(ymin = mean - sd, 
                        ymax = mean + sd, 
-                       fill = class), alpha = 0.2) +
+                       fill = class), alpha = 0.2, colour=NA) +
+      scale_color_manual(values=c('gold2','slateblue2','saddlebrown')) +
+      scale_fill_manual(values=c('gold2','slateblue2','saddlebrown')) + 
        geom_line() +
        facet_wrap(~crop) +
        ylab(paste0(index, ' Index')) + 
-       xlab('month') + theme_bw() +
+       xlab('Month (April - November)') + theme_bw() +
        ggtitle(title)
+}
+
+
+# quartiles: function to plot irrigation status by crop type facet
+plotIndexByCrop_quartiles <- function(dfPlot, title, index){
+  ggplot(data = dfPlot,
+         aes(x = month, y = Mean, colour = class, group = class)) +
+       geom_ribbon(aes(ymin = Q1, 
+                       ymax = Q3, 
+                       fill = class), alpha = 0.2, colour=NA) +
+      scale_color_manual(values=c('gold2','slateblue2','saddlebrown')) +
+      scale_fill_manual(values=c('gold2','slateblue2','saddlebrown')) + 
+       geom_line() +
+       facet_wrap(~crop) +
+       ylab(paste0(index, ' Index')) + 
+       xlab('Month (April - November)') + theme_bw() +
+       theme(text = element_text(size = 16)) 
 }
 
 
@@ -241,8 +285,12 @@ ggplot(data = giPlot,
        ggtitle("2010 + 2012 Combined GI (Green/NIR), full RRB")
 ```
 
-### Index Plots by Year
-```{r indexPlotsByCrop}
+### Index Plots by Year - talk fig
+```{r indexPlotsByCrop, fig.width = 6.75, fig.height = 4.75}
+# Greenness Index, 2010: Quartiles for talk 
+dfagg <- aggregateIndexByCrop_quartiles(index = 'GI', year = 2010, df=trainAllLong)
+plotIndexByCrop_quartiles(dfPlot = dfagg, title = '2010 Greenness Index (GI)', index = 'GI')
+
 # Greenness Index, 2010  
 dfagg <- aggregateIndexByCrop(index = 'GI', year = 2010, df=trainAllLong)
 plotIndexByCrop(dfPlot = dfagg, title = '2010 GI', index = 'GI')
@@ -355,4 +403,6 @@ ggplot(data = giPlot,
        ylab('Greenness Index') + xlab('month') + theme_bw() +
        ggtitle("2010 + 2012 Greenness Index (Green/NIR), full RRB")
 ```
+
+
 
