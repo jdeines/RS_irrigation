@@ -7,12 +7,12 @@ output:
     toc: yes
 ---
 
-Goal: Make dummy figures for manuscript planning
+Goal: Make figures of irrigation frequency over the region
 
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
-opts_chunk$set(cache=TRUE, cache.path='cache/4.1_FreqFigs/',
+opts_chunk$set(cache=FALSE, cache.path='cache/4.1_FreqFigs/',
                fig.path='figure/4.1_FreqFigs/')
 ```
 
@@ -21,24 +21,83 @@ opts_chunk$set(cache=TRUE, cache.path='cache/4.1_FreqFigs/',
 ```{r packages, message=FALSE, echo=TRUE, eval=TRUE}
 library(rgdal)
 library(raster)
+library(grid)
+library(colorRamps)
 ```
 
 ## Irrigation frequency
+Exported raster of years irrigated from 06.6_summaryMaps in GEE
 
-```{r frequency}
-rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test2_cleaned'
-rasFiles <- list.files(rasDir, full.names=T)
+```{r frequencyPrep, eval=FALSE}
+# dirs and names
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_cart_interannualClean'
+rasVis <- 'IrrigationFrequencyMap_masked.tif'
+rasAll <- 'IrrigationFrequencyMap_0and1neg.tif'
 
-# rrb boundary
+# load pre-masked, pre-color scaled image
+vis <- raster(paste0(rasDir,'/',rasVis))
 
-rasStack <- stack(rasFiles)
-names(rasStack) <- 1995:2012
-rasStack[rasStack == 2] <- 0
-
-spplot(rasStack)
-
-irrFreq <- sum(rasStack)
-
-spplot(irrFreq)
+# load full raster
+freq <- raster(paste0(rasDir,'/',rasAll))
+freq[freq == -1] <- NA
+# write out masked raster
+writeRaster(freq, paste0(rasDir,'/IrrigationFrequencyMap_0and1neg_boundMask.tif'))
 ```
 
+
+
+```{r freqMap_matlab2, fig.width = 10, fig.height = 5, dpi=96}
+library(grid)
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_cart_interannualClean'
+rasAll <- 'IrrigationFrequencyMap_0and1neg_boundMask.tif'
+
+# load full raster
+freq <- raster(paste0(rasDir,'/',rasAll))
+
+# plot scale
+scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
+  offset = c(-225000,1760000), scale = 100000, fill=c("transparent","black"))
+text1 = list("sp.text", c(-220000,1750000), "0")
+text2 = list("sp.text", c(-125000,1750000), "100 km")
+
+# color ramp 
+matlab <- matlab.like2(15)
+spplot(freq, col.regions = c('black',matlab), maxpixels = 2000000,
+       par.settings = list(layout.widths=list(right.padding=4.5)),
+       sp.layout=list(scale, text1, text2),
+       colorkey=list(labels=list(cex=1.2,
+                  labels = c(0,2,4,6,8,10,12,14),
+                  at = c(-.5,1.5,3.5,5.5,7.5,9.5,11.5,13.5))))
+
+
+# scale bar legend title
+grid.text('Years Irrigated',x=unit(0.975, "npc"),y=unit(0.5, 'npc'), rot=-90, gp=gpar(fontsize=18))
+```
+
+```{r freqMap_byr, fig.width = 10, fig.height = 5, dpi=96}
+library(grid)
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_cart_interannualClean'
+rasAll <- 'IrrigationFrequencyMap_0and1neg_boundMask.tif'
+
+# load full raster
+freq <- raster(paste0(rasDir,'/',rasAll))
+
+# plot scale
+scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
+  offset = c(-225000,1760000), scale = 100000, fill=c("transparent","black"))
+text1 = list("sp.text", c(-220000,1750000), "0")
+text2 = list("sp.text", c(-125000,1750000), "100 km")
+
+# color ramp with black for 0, blue:yellow:red for 1-14
+palette <- colorRampPalette(c('blue','yellow','red'))(15)
+spplot(freq, col.regions = c('black',palette), maxpixels = 2000000,
+       par.settings = list(layout.widths=list(right.padding=4.5)),
+       sp.layout=list(scale, text1, text2),
+       colorkey=list(labels=list(cex=1.2,
+                  labels = c(0,2,4,6,8,10,12,14),
+                  at = c(-.5,1.5,3.5,5.5,7.5,9.5,11.5,13.5))))
+
+
+# scale bar legend title
+grid.text('Years Irrigated',x=unit(0.975, "npc"),y=unit(0.5, 'npc'), rot=-90, gp=gpar(fontsize=18))
+```

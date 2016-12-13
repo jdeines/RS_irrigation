@@ -33,7 +33,7 @@ cellArea <- 30*30 # m^2
 regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/regionalStats_RRB'
 
 # get filenames
-files <- list.files(regionsDir, pattern="*plusAncillary.csv")
+files <- list.files(regionsDir, pattern="*plusAncillary_interannual.csv")
 
 # read in to a single dataframe
 all1 = as.data.frame(do.call(rbind, lapply(files, function(x) {
@@ -45,6 +45,10 @@ all1 = as.data.frame(do.call(rbind, lapply(files, function(x) {
 # convert cell count to area
 all1$irrigated_m2 <- all1$X1 * cellArea
 all1$irrigated_km2 <- all1$irrigated_m2 / 1000000
+
+# find total #cells in the rrcaExtent
+all1$totalCells <- all1$X0 + all1$X1 + all1$null
+all1[all1$masterID == 'rrcaRrbBuffExtent','totalCells'][1]
 ```
 
 ## Plot Data
