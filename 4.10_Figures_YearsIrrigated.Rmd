@@ -12,7 +12,7 @@ Goal: Make figures of irrigation frequency over the region
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
-opts_chunk$set(cache=FALSE, cache.path='cache/4.1_FreqFigs/',
+opts_chunk$set(cache=TRUE, cache.path='cache/4.1_FreqFigs/',
                fig.path='figure/4.1_FreqFigs/')
 ```
 
@@ -23,6 +23,8 @@ library(rgdal)
 library(raster)
 library(grid)
 library(colorRamps)
+library(fields)
+library(RColorBrewer)
 ```
 
 ## Irrigation frequency
@@ -34,6 +36,8 @@ rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_cart_inte
 rasVis <- 'IrrigationFrequencyMap_masked.tif'
 rasAll <- 'IrrigationFrequencyMap_0and1neg.tif'
 
+rasEarly <- 'EarliestYearIrrigated_0and1neg.tif'
+
 # load pre-masked, pre-color scaled image
 vis <- raster(paste0(rasDir,'/',rasVis))
 
@@ -42,8 +46,29 @@ freq <- raster(paste0(rasDir,'/',rasAll))
 freq[freq == -1] <- NA
 # write out masked raster
 writeRaster(freq, paste0(rasDir,'/IrrigationFrequencyMap_0and1neg_boundMask.tif'))
+
+# load early raster
+early <- raster(paste0(rasDir,'/',rasEarly))
+early[early == -1] <- NA
+early[early == 0] <- 1998
+
+# write out masked raster
+writeRaster(early, paste0(rasDir,'/EarliestYearIrrigated_0and1neg_boundMask.tif'))
 ```
 
+```{r earliestMap_PiYG, fig.width = 6, fig.height=3.5, dpi=96}
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_cart_interannualClean'
+rasEarly <- 'EarliestYearIrrigated_0and1neg_boundMask.tif'
+
+# load full raster
+early <- raster(paste0(rasDir,'/',rasEarly))
+
+# palette
+colRamp <- c('black',rev(colorRampPalette(brewer.pal(11,'PiYG'))(15)))
+
+spplot(early, col.regions = colRamp, maxpixels = 1000000, colorkey=F)
+
+```
 
 
 ```{r freqMap_matlab2, fig.width = 10, fig.height = 5, dpi=96}
@@ -100,4 +125,49 @@ spplot(freq, col.regions = c('black',palette), maxpixels = 2000000,
 
 # scale bar legend title
 grid.text('Years Irrigated',x=unit(0.975, "npc"),y=unit(0.5, 'npc'), rot=-90, gp=gpar(fontsize=18))
+```
+
+```{r byr, fig.width = 8, fig.height = 4}
+colRamp <- c('black',colorRampPalette(c('blue','yellow','red'))(15))
+
+plot(1:10)
+image.plot(z=0:15,add=F,legend.only=T, nlevel=16,  col=colRamp, 
+           horizontal = T,
+           smallplot=c(0.1,.9,.93,.98), 
+           axis.args=list(at=c(0,2,4,6,8,10,12,14), 
+                          labels=as.character(c(0,2,4,6,8,10,12,14))))
+
+```
+
+```{r colorbar_matlab,fig.width = 8, fig.height = 4}
+colRamp <- c('black',matlab.like2(15))
+
+plot(1:10)
+image.plot(z=0:15,add=F,legend.only=T, nlevel=16,  col=colRamp, 
+           horizontal = T,
+           smallplot=c(0.1,.9,.93,.98), 
+           axis.args=list(at=c(0,2,4,6,8,10,12,14), 
+                          labels=as.character(c(0,2,4,6,8,10,12,14))))
+```
+
+```{r colorbar_PiYG,fig.width = 5, fig.height = 4}
+colRamp <- rev(colorRampPalette(brewer.pal(11,'PiYG'))(14))
+
+plot(1:10)
+image.plot(z=0:13,add=F,legend.only=T, nlevel=14,  col=colRamp, 
+           horizontal = T,
+           smallplot=c(0.1,.9,.93,.98), 
+           axis.args=list(at=c(1,3,5,7,9,11,13), 
+                          labels=as.character(c(2000,2002,2004,2006,2008,2010,2012))))
+```
+
+```{r colorbar_PRGn,fig.width = 5, fig.height = 4}
+colRamp <- rev(colorRampPalette(brewer.pal(11,'PRGn'))(14))
+
+plot(1:10)
+image.plot(z=0:13,add=F,legend.only=T, nlevel=14,  col=colRamp, 
+           horizontal = T,
+           smallplot=c(0.1,.9,.93,.98), 
+           axis.args=list(at=c(1,3,5,7,9,11,13), 
+                          labels=as.character(c(2000,2002,2004,2006,2008,2010,2012))))
 ```

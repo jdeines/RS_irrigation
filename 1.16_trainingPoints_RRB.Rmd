@@ -56,9 +56,9 @@ gisDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
 rrb <- readOGR(paste0(gisDir,'/BigExtent_RRB_RRCA_buff.kml'), 'boundExtent', verbose=F)
 
 par(mar=c(0,0,0,0))
-plot(rrb, col='seashell2')
-plot(trainPoints[trainPoints$year == 2010,], col='#5e3c99',add=T, cex=.8)
-plot(trainPoints[trainPoints$year == 2012,], col='#e66101',add=T, cex=.8)
+plot(koep, col=c('seashell2','wheat','honeydew'))
+plot(trainPoints[trainPoints$year == 2010,], col='#5e3c99',add=T, cex=.75, pch=19)
+plot(trainPoints[trainPoints$year == 2012,], col='#e66101',add=T, cex=.75, pch=19)
 ```
 
 ## Export training sets for GEE

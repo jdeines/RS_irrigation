@@ -163,7 +163,7 @@ plotDataRRBLong <- gather(plotDataRRB, key = variable, value = value,
 ggplot(data = plotDataRRBLong,
       aes(x = year, y = value, colour=variable)) +
   geom_line() +
-  scale_colour_manual(values=c('green3','red','blue')) + 
+  scale_colour_manual(values=c('black','red','blue')) + 
   facet_wrap(~variable, nrow=3, scales='free_y') +
   scale_x_continuous(name = '', 
                      breaks = c(2000,2002,2004,2006,2008,2010,2012), 
@@ -177,7 +177,7 @@ ggplot(data = plotDataRRBLong,
 ggplot(data = plotDataRRBLong,
       aes(x = year, y = value, colour=variable)) +
   geom_line() +
-  scale_colour_manual(values=c('green3','red','blue')) + 
+  scale_colour_manual(values=c('black','red','blue')) + 
   facet_wrap(~variable, nrow=3, scales='free_y') +
     scale_x_continuous(name = '', 
                      breaks = c(2000,2002,2004,2006,2008,2010,2012), 
