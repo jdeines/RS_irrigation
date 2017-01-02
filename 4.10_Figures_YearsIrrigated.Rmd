@@ -71,6 +71,18 @@ spplot(early, col.regions = colRamp, maxpixels = 1000000, colorkey=F)
 ```
 
 
+```{r cdf, fig.width = 6, fig.height = 5, dpi=96}
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_cart_interannualClean'
+rasAll <- 'IrrigationFrequencyMap_0and1neg_boundMask.tif'
+
+# load full raster
+freqHist <- raster(paste0(rasDir,'/',rasAll))
+freqHist[freqHist == 0] <- NA
+
+hist(freqHist, maxpixels=20000000, xlab = 'Years Irrigated', main = '')
+
+```
+
 ```{r freqMap_matlab2, fig.width = 10, fig.height = 5, dpi=96}
 library(grid)
 rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_cart_interannualClean'

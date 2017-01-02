@@ -220,7 +220,7 @@ ggplot(merged2012, aes(x=IRRIGATED,y=irrArea.km2)) +
   ggtitle('2012 RS vs NASS by County') + theme_bw()
 ```
 
-```{r multipanel,  fig.width = 6.7, fig.height = 2.6}
+```{r multipanel_bigger_usda,  fig.width = 8, fig.height = 3}
 allyears <- rbind(merged2002, merged2007, merged2012)
 
 ggplot(allyears, aes(x=IRRIGATED,y=irrArea.km2)) +
@@ -230,7 +230,7 @@ ggplot(allyears, aes(x=IRRIGATED,y=irrArea.km2)) +
   #geom_smooth(method="lm",se=FALSE) +
   facet_wrap(~year, nrow=1) +
   ylab(expression(paste("HP-AIM Area (", km^2,")"))) + 
-  xlab(expression(paste('NASS County Area (', km^2,')'))) + theme_bw() +
+  xlab(expression(paste('USDA County Area (', km^2,')'))) + theme_bw() +
        theme(text = element_text(size = 15)) #+
   #ggtitle('2012 RS vs NASS by County')   
 ```
