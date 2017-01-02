@@ -33,7 +33,7 @@ Pumping data from the RRB_Rcode project (4.3_Pumping_Data.Rmd). This file is dat
 ```{r loadPumpingData}
 # years wanted
 startYear = 1999
-endYear = 2012
+endYear = 2014 # current dataset extent
 
 # pumping data extracted from the RRCA groundwater model folks, see readme notes
 pumpDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/pumping'
@@ -78,7 +78,7 @@ cellArea <- 30*30 # m^2
 regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/regionalStats_RRB'
 
 # get filenames
-files <- list.files(regionsDir, pattern="*plusAncillary_interannual.csv")
+files <- list.files(regionsDir, pattern="*plusAncillary_interannual_to2016.csv")
 
 # read in to a single dataframe
 all1 = as.data.frame(do.call(rbind, lapply(files, function(x) {
@@ -106,7 +106,7 @@ areaStates$key <- paste0(areaStates$state,areaStates$year)
 
 ```{r stateBasinPlots}
 # merge pumping and area data
-plotData <- merge(areaStates, pumpingStates, by='key')
+plotData <- merge(areaStates, pumpingStates, by='key', all.x = T)
 plotData <- plotData[,c('year.x','state.x','irrigated_km2','volume_km3','pr_ann')]
 
 # format for ggplot
@@ -150,9 +150,12 @@ ggplot(data = plotDataLong[plotDataLong$state.x == state,],
 ```
 
 ```{r fullRRB_plots, fig.height = 5.5, fig.width = 6}
+# replace volume NA's with 0 for now
+plotData[is.na(plotData$volume_km3),'volume_km3'] <- 0
+
 # get irrigated area and pumping for full basin
 plotDataRRB <- aggregate(cbind(irrigated_km2,volume_km3) ~  year.x, 
-                         data = plotData, FUN = 'sum')
+                         data = plotData, FUN = 'sum', na.rm = T)
 # and do the mean for precip
 rrbPrecip <- aggregate(pr_ann ~  year.x, data = plotData, FUN = 'mean')
 
@@ -160,6 +163,9 @@ rrbPrecip <- aggregate(pr_ann ~  year.x, data = plotData, FUN = 'mean')
 # combine and gather
 plotDataRRB <- cbind(plotDataRRB, rrbPrecip[,'pr_ann'])
 names(plotDataRRB) <- c('year','Irrigated_Area', 'Pumping', 'zPrecipitation')
+
+# replace NA's for 2015 and 2016
+plotDataRRB[plotDataRRB$Pumping == 0,'Pumping'] <- NA
 
 # area over time lm
 area.lm <- lm(Irrigated_Area ~ year, data = plotDataRRB)
