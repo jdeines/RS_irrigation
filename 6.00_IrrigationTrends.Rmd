@@ -33,7 +33,7 @@ cellArea <- 30*30 # m^2
 regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/regionalStats_RRB'
 
 # get filenames
-files <- list.files(regionsDir, pattern="*plusAncillary_interannual.csv")
+files <- list.files(regionsDir, pattern="*plusAncillary_interannual_to2016.csv")
 
 # read in to a single dataframe
 all1 = as.data.frame(do.call(rbind, lapply(files, function(x) {

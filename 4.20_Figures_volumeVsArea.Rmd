@@ -218,7 +218,7 @@ ggplot(data = plotDataRRBLong,
   geom_line() + 
   # add linear model
   #stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
-   #                xpos = 2004, ypos = 5800) +
+  #                xpos = 2004, ypos = 5800) +
   # add trendline
   stat_smooth(method = 'lm', se=F) +
   scale_colour_manual(values=c('black','red','blue')) + 
