@@ -33,6 +33,7 @@ Geometries of interest to me are:
 * the Middle Republican NRD (clipped from RRB NRDs)
 * Well Point Datasets (?) - start with RRCA wells for MidRep NRD trials to see if it's helpful
 * additional geometries with which to tally irrigated area
+* the RRCA model bound
 
 ### Load and pre-process
 
@@ -65,6 +66,14 @@ usstates <- readOGR('S:/Users/deinesji/GIS_general',
 usstates <- spTransform(usstates, proj4string(rrbbuff))
 rrcaExtentStates <- raster::intersect(rrbbuff, usstates)
 
+# rrca model bound, and by state
+rrcaBound <- readOGR(paste0(gisDir,'/RRCA_Model_Export'), 'bound')
+rrcaBound$MasterID <- 'RRCA model boundary'
+
+usstates2 <- spTransform(usstates, proj4string(rrcaBound))
+rrcaBoundStates <- raster::intersect(rrcaBound, usstates2)
+rrcaBoundStates$masterID <- paste0(rrcaBoundStates$STATE_ABBR,'_rrcaBound')
+
 gmdDir <- 'S:/Data/GIS_Data/Downloaded/High_Plains_Aquifer/HPA_Water_Entities/Kansas'
 gmds <- readOGR(gmdDir, 'KS - GROUNDWATER_DISTRICTS', verbose=F)
 gmd4 <- gmds[gmds$ID == 4,]
@@ -81,7 +90,7 @@ toKml <- function(spdf, filename, outDir) {
   # outDir: output directory
   spdf.wgs84 <- spTransform(spdf, CRS("+proj=longlat +datum=WGS84"))
   writeOGR(spdf.wgs84, paste0(outDir, '/', filename, '.kml'),
-            layer = 'boundExtent', driver = 'KML')
+            layer = 'layer', driver = 'KML')
 }
 ```
 
@@ -101,6 +110,8 @@ toKml(rrbstates, 'RRB_basin_states', outDir)
 toKml(nrds, 'NE_NRDs_rrb_clip', outDir)
 toKml(rrcaExtentStates, 'RRB_fullExtent_states', outDir)
 toKml(gmd4, 'KS_GMD4', outDir)
+toKml(rrcaBound, 'RRCA_bound', outDir)
+toKml(rrcaBoundStates, 'RRCA_bound_states',outDir)
 
 # test <- readOGR(paste0(outDir, '/RRB_basin_states.kml'), 'boundExtent')
 ```
