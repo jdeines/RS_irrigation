@@ -233,8 +233,40 @@ ggplot(data = plotDataRRBLong,
                      text = element_text(size = 16))
 
 
-
-
 ```
 
+## Scatterplots
+
+### Area vs Precip
+
+```{r precipVarea, fig.width = 3, fig.height = 3.25}
+ggplot(data = plotDataRRB,
+       aes(x = zPrecipitation, y = Irrigated_Area)) +
+  geom_point() +
+  ylab('Irrigated Area (km^2)') + xlab('Precipitation (mm)') +
+  ggtitle('Precip vs Irrigated Area') +
+  theme_bw()
+```
+
+### Pumping vs precip
+
+```{r precipVpumping, fig.width = 3, fig.height = 3.25}
+ggplot(data = plotDataRRB,
+       aes(x = zPrecipitation, y = Pumping)) +
+  geom_point() +
+  ylab('Pumping (km^3)') + xlab('Precipitation (mm)') +
+  ggtitle('Precip vs Pumping') +
+  theme_bw()
+```
+
+### Pumping vs irrigated
+
+```{r areaVpumping, fig.width = 3, fig.height = 3.25}
+ggplot(data = plotDataRRB,
+       aes(x = Irrigated_Area, y = Pumping)) +
+  geom_point() +
+  ylab('Pumping (km^3)') + xlab('Irrigated Area (km^2)') +
+  ggtitle('Irrigated Area vs Pumping') +
+  theme_bw()
+```
 
