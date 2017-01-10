@@ -10,6 +10,8 @@ output:
 Goal: Accuracy assessment via confusion tables for test 3, CART, cleaned 3x3,
 with interannual cleaning (pixels irrigated in a single year removed)
 
+this version uses all availble points
+
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
 opts_chunk$set(cache=FALSE, cache.path='cache/5.02_confusion/',
@@ -65,7 +67,7 @@ kable(wardlow.ct.b, digits=1)
 ```
 
 ## 2007
-Jill's points for the Middle Republican 2007; I think I used 60% of the points for "validation" and am saving 40% for "test"
+Jill's points for the Middle Republican 2007
 
 ```{r midRep2007}
 # load data
@@ -101,8 +103,7 @@ kable(midrep07.ct.b, digits=1)
 
 
 ## 2010
-Jill's points for the Middle Republican 2010; I think I used 20% of the points for "validation" and the other 80% were training
-
+Jill's points for the Middle Republican 2010; 
 
 ```{r midRep2010}
 # load data

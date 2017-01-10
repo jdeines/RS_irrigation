@@ -10,6 +10,8 @@ output:
 Goal: Accuracy assessment via confusion tables for test 3, random forest, cleaned 3x3,
 with interannual cleaning (pixels irrigated in a single year removed)
 
+this version uses all available points
+
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
 opts_chunk$set(cache=FALSE, cache.path='cache/5.02_confusion/',

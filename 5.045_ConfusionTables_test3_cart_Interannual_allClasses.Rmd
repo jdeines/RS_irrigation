@@ -1,0 +1,119 @@
+---
+title: "Confusion Tables"
+author: "Jill Deines"
+date: "Monday, January 9, 2016"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Accuracy assessment via confusion tables for test 3, cart, cleaned 3x3,
+with interannual cleaning (pixels irrigated in a single year removed)
+
+This version maintains irrigated, dryland, noncrop classes.
+
+This version uses all points for 2007/2010 middle republican, no splitting for a test set
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, cache.path='cache/5.02_confusion/',
+               fig.path='figure/5.02_confusion/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+library(caret)
+
+
+# source project helper functions
+source('functions/GeeCsvToSpdf.R')
+source('functions/prettyConfusion.R')
+```
+
+## 2001
+From Brian Wardlow's Kansas dataset of validation points, clipped to the RRB and manually cleaned for bad location points.
+
+```{r Wardlow}
+# load data
+dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
+file2001 <- '2001_Wardlow_confusionData_RRB_test3_cart_interannual_maskFixed_allClasses.csv'
+wardlow01 <- read.csv(paste(dataDir, file2001, sep='/'))
+
+# lookup table for classification codes
+predictedCode = data.frame(b2001 = c(0:2),
+                       predictedClass = c('Dryland','Irrigated','Noncrop'))
+referenceCode = data.frame(ClassCats = c(0:2),
+                       referenceClass = c('Dryland','Irrigated','Noncrop'))
+
+# add category names to df via merge
+wardlow01 <- merge(wardlow01, predictedCode)
+wardlow01 <- merge(wardlow01, referenceCode)
+
+# confusion table all 3 classes
+wardlowConfusion <- confusionMatrix(data = wardlow01$predictedClass, 
+                                      reference = wardlow01$referenceClass)
+
+# make it pretty : all 3 classes
+wardlow.ct <- prettyConfusion(wardlowConfusion)
+kable(wardlow.ct, digits=1)
+```
+
+## 2007
+Jill's points for the Middle Republican 2007
+
+```{r midRep2007}
+# load data
+dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
+file2007 <- '2007_MidRep60_confusionData_RRB_test3_cart_interannual_maskFixed_allClasses.csv'
+midRep07 <- read.csv(paste(dataDir, file2007, sep='/'))
+
+# lookup table for classification codes
+predictedCode = data.frame(b2007 = c(0:2),
+                       predictedClass = c('Dryland','Irrigated','Noncrop'))
+referenceCode = data.frame(classNum = c(0:2),
+                       referenceClass = c('Dryland','Irrigated','Noncrop'))
+
+# add category names to df via merge
+midRep07 <- merge(midRep07, predictedCode)
+midRep07 <- merge(midRep07, referenceCode)
+
+# confusion table all 3 classes
+midRep07Confusion <- confusionMatrix(data = midRep07$predictedClass, 
+                                      reference = midRep07$referenceClass)
+
+# make it pretty : all 3 classes
+midRep07.ct <- prettyConfusion(midRep07Confusion)
+kable(midRep07.ct, digits=1)
+
+```
+
+
+## 2010
+Jill's points for the Middle Republican 2010
+
+```{r midRep2010}
+# load data
+dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
+file2010 <- '2010_MidRep60_confusionData_RRB_test3_cart_interannual_maskFixed_allClasses.csv'
+midRep10 <- read.csv(paste(dataDir, file2010, sep='/'))
+
+# lookup table for classification codes
+predictedCode = data.frame(b2010 = c(0:2),
+                       predictedClass = c('Dryland','Irrigated','Noncrop'))
+referenceCode = data.frame(classNum = c(0:2),
+                       referenceClass = c('Dryland','Irrigated','Noncrop'))
+
+# add category names
+midRep10 <- merge(midRep10, predictedCode)
+midRep10 <- merge(midRep10, referenceCode)
+
+# confusion table
+midRep10confusion <- confusionMatrix(data = midRep10$predictedClass, 
+                                      reference = midRep10$referenceClass)
+
+# make it pretty
+midrep10.ct <- prettyConfusion(midRep10confusion)
+kable(midrep10.ct, digits=1)
+```
