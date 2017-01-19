@@ -9,6 +9,8 @@ output:
 
 Goal: Compare irrigated acreages between remote sensing products and USDA NASS Ag Census Data. NASS data acquired through the Quick Stats API.
 
+Update Jan 10, 2017: added counties >90% within the boundary
+
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
@@ -51,15 +53,16 @@ cellArea <- 30*30 # m^2
 countyDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/county_counts_RRB_test3_cleaned'
 
 # get filenames
-countyfiles <- list.files(countyDir, pattern="*cart_interannual_innerCounties.csv")
+countyfiles <- list.files(countyDir, pattern="*cart_interannual_allCounties_allClasses.csv")
 # read in to a single dataframe
 countyAll0 = do.call(rbind, lapply(countyfiles, function(x) {
               csv <- read.csv(paste0(countyDir,'/',x), stringsAsFactors = FALSE)
               csv$year <- as.numeric(substr(x, start=1,stop=4))
-              csv$fips5 <- sprintf("%05d",csv$GEOID)
+              csv$fips5 <- sprintf("%05d",csv$fips5)
               csv$fips3 <- sprintf("%03d",csv$COUNTYFP)
               csv$state2 <- sprintf("%02d",csv$STATEFP)
-              csv <- csv[,c('fips5','state2','fips3','X0','X1','name','year')]
+              csv <- csv[,c('fips5','state2','fips3','X0','X1','X2','name','year',
+                            'ninety','proportion', 'area_km2')]
             }))
 
 # subset for the years desired
@@ -76,6 +79,10 @@ data(state.fips)  # from maps package
 state.fips$STATEFP <- sprintf("%02d",state.fips$fips) # add leading zero
 countyAll <- merge(countyAll, state.fips[,c('abb','STATEFP')], 
                    by.x = 'state2', by.y = 'STATEFP',all.y=F)
+
+# select counties with more than 90% within boundary
+countyAll <- countyAll[countyAll$proportion > 0.9,]
+
 
 # # write out csv for Anthony to use
 # anthony <- countyAll[countyAll$year == 2002,c('state2','fips5','fips3','abb')]
@@ -102,7 +109,8 @@ group <- 'FIELD CROPS'
 aggregation <- 'COUNTY'
 
 # get just 1 set of counties (so for 1 year)
-counties <- countyAll[countyAll$year == unique(countyAll$year)[1],]
+counties <- countyAll[countyAll$year == unique(countyAll$year)[3],]
+length(counties)
 
 # make empty list to populate, and loop through counties
 nass.list <- list()

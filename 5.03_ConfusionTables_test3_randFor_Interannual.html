@@ -131,6 +131,7 @@ $(document).ready(function () {
 </div>
 
 <p>Goal: Accuracy assessment via confusion tables for test 3, random forest, cleaned 3x3, with interannual cleaning (pixels irrigated in a single year removed)</p>
+<p>this version uses all available points</p>
 <p><strong>R Packages Needed</strong></p>
 <pre class="r"><code>library(rgdal)
 library(caret)
@@ -259,31 +260,31 @@ kable(midrep07.ct.b, digits=1)</code></pre>
 <tbody>
 <tr class="odd">
 <td>Irrigated</td>
-<td align="right">102.0</td>
-<td align="right">9.0</td>
-<td align="right">111</td>
-<td align="right">91.9</td>
+<td align="right">172.0</td>
+<td align="right">14</td>
+<td align="right">186</td>
+<td align="right">92.5</td>
 </tr>
 <tr class="even">
 <td>NotIrrigated</td>
-<td align="right">13.0</td>
-<td align="right">400.0</td>
-<td align="right">413</td>
-<td align="right">96.9</td>
+<td align="right">22.0</td>
+<td align="right">670</td>
+<td align="right">692</td>
+<td align="right">96.8</td>
 </tr>
 <tr class="odd">
 <td>Total</td>
-<td align="right">115.0</td>
-<td align="right">409.0</td>
-<td align="right">524</td>
+<td align="right">194.0</td>
+<td align="right">684</td>
+<td align="right">878</td>
 <td align="right">NA</td>
 </tr>
 <tr class="even">
 <td>ConsumerAccuracy</td>
 <td align="right">88.7</td>
-<td align="right">97.8</td>
+<td align="right">98</td>
 <td align="right">NA</td>
-<td align="right">95.8</td>
+<td align="right">95.9</td>
 </tr>
 </tbody>
 </table>
@@ -335,31 +336,31 @@ kable(midrep10.ct.b, digits=1)</code></pre>
 <tbody>
 <tr class="odd">
 <td>Irrigated</td>
-<td align="right">76.0</td>
-<td align="right">1.0</td>
-<td align="right">77</td>
-<td align="right">98.7</td>
+<td align="right">136</td>
+<td align="right">2.0</td>
+<td align="right">138</td>
+<td align="right">98.6</td>
 </tr>
 <tr class="even">
 <td>NotIrrigated</td>
-<td align="right">16.0</td>
-<td align="right">430.0</td>
-<td align="right">446</td>
-<td align="right">96.4</td>
+<td align="right">24</td>
+<td align="right">702.0</td>
+<td align="right">726</td>
+<td align="right">96.7</td>
 </tr>
 <tr class="odd">
 <td>Total</td>
-<td align="right">92.0</td>
-<td align="right">431.0</td>
-<td align="right">523</td>
+<td align="right">160</td>
+<td align="right">704.0</td>
+<td align="right">864</td>
 <td align="right">NA</td>
 </tr>
 <tr class="even">
 <td>ConsumerAccuracy</td>
-<td align="right">82.6</td>
-<td align="right">99.8</td>
+<td align="right">85</td>
+<td align="right">99.7</td>
 <td align="right">NA</td>
-<td align="right">96.7</td>
+<td align="right">97.0</td>
 </tr>
 </tbody>
 </table>

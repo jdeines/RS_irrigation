@@ -1,0 +1,172 @@
+---
+title: "Random Forest"
+author: "Jill Deines"
+date: "January 17, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache=TRUE, cache.path='cache/1.18_rrbRandFor/',
+               fig.path='figure/1.18_rrbRandFor/')
+```
+
+Goal: Run a variable importance test on a random forest of my training points
+
+randomForest package implementation:
+ reference implementation based on CART trees
+(Breiman, 2001; Liaw and Wiener, 2008)
+– for variables of different types: biased in favor of
+continuous variables and variables with many categories
+(Strobl, Boulesteix, Zeileis, and Hothorn, 2007)
+
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(randomForest)
+library(varSelRF)
+```
+
+## Load Data
+Load training point data used in GEE classification. These were processed in 1.16_trainingPoints_RRB.Rmd, which involved combining 2010 and 2012 points and removing extraneous columns, so that only the variables and a masterType and masterNum columns remained. I wrote out a csv version of the final kml to be used here.
+
+```{r loadData}
+# load kml of combined 2010/2012 training points
+trainingFolder <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/training'
+trainingName <- '2010_2012_COMBINED_training_12class_v2.csv'
+
+points <- read.csv(paste0(trainingFolder, '/', trainingName))
+
+# re-class the master types into 3 categories: irrigated, dryland crop, noncrop
+typeConverter <- data.frame(masterType = unique(points$masterType),
+                            classes = c('irrigated','dryland','irrigated','dryland',
+                                        'irrigated','dryland','irrigated','dryland',
+                                        'irrigated','dryland','noncrop','noncrop'))
+points2  <- merge(points, typeConverter)
+
+# remove extra columns
+points3 <- points2[ , -which(names(points2) %in% c('masterType','masterNum'))]
+
+# make a dataset without dryland soy
+pointsNoSoy <- points2[points2$masterType != 'soy_dryland',]
+pointsNoSoy2 <- pointsNoSoy[ , -which(names(pointsNoSoy) %in%
+                                        c('masterType','masterNum'))]
+
+# make an annual variable dataset without dryland soy
+columnsWanted <- c('EVI_max_14','EVI_range_14','GI_max_14','GI_range_14',
+                   'NDVI_max_14','NDVI_range_14','NDWI_max_14','NDWI_range_14',
+                   'aridity','b1','b1_1','greenArid','ndwi_gi','pdsi_ann',
+                   'pdsi_grow','pr_ann','pr_early','pr_grow','pr_paw','slope_mean',
+                   'classes')
+annualNoSoy <- pointsNoSoy2[, columnsWanted]
+```
+
+## Random Forest
+First I do a random forest that mimics my GEE test (500 trees)
+```{r rf500, fig.height = 8}
+# run a random forest on all 57 variables
+set.seed(415)
+fit500 <- randomForest(x = points3[,1:57], # all variable columns (excludes classes)
+                    y = as.factor(points2$classes),
+                    ntree = 500,
+                    importance = TRUE)
+
+# look at variable importance
+varImpPlot(fit500)
+```
+
+That was fast, let's do more trees
+
+```{r rf1000, fig.height = 8}
+# run a random forest on all 57 variables
+set.seed(415)
+fit1000 <- randomForest(x = points3[,1:57], # all variable columns (excludes classes)
+                    y = as.factor(points2$classes),
+                    ntree = 1000,
+                    importance = TRUE)
+
+# look at variable importance
+varImpPlot(fit1000)
+```
+
+```{r rf2000, fig.height = 8}
+# run a random forest on all 57 variables
+set.seed(415)
+fit2000 <- randomForest(x = points3[,1:57], # all variable columns (excludes classes)
+                    y = as.factor(points2$classes),
+                    ntree = 2000,
+                    importance = TRUE)
+
+# look at variable importance
+varImpPlot(fit2000, type=2)
+VI_F <- importance(fit2000)[,'MeanDecreaseGini']
+par(mar=c(7,4,4,2))
+barplot(VI_F/sum(VI_F), las=3)
+
+```
+
+Run one without dryland soy!
+
+```{r rf2000_NoSoy, fig.height=8}
+# run a random forest on all 57 variables
+set.seed(415)
+fit2000.ns <- randomForest(x = pointsNoSoy2[,1:57], # all variable columns 
+                    y = as.factor(pointsNoSoy2$classes),
+                    ntree = 2000,
+                    importance = TRUE)
+
+# look at variable importance
+varImpPlot(fit2000.ns)
+VI_F.ns <- importance(fit2000.ns)[,'MeanDecreaseGini']
+par(mar=c(7,4,4,2))
+barplot(VI_F.ns/sum(VI_F.ns), las=3)
+
+```
+
+Plot the error by number of trees
+```{r treeError}
+plot(fit500)
+plot(fit1000)
+plot(fit2000)
+```
+
+
+
+## Annual Random Forest
+
+This dataset doesn't include dryland soy, nor any monthly variables (extracted above in the load data chunk)
+
+```{r rf2000_annual, fig.height=6}
+# run a random forest on all 57 variables
+set.seed(415)
+fit2000.ann <- randomForest(x = annualNoSoy[,1:20], # all variable columns 
+                    y = as.factor(annualNoSoy$classes),
+                    ntree = 2000,
+                    importance = TRUE)
+
+# look at variable importance
+varImpPlot(fit2000.ann)
+VI_F.ann <- importance(fit2000.ann)[,'MeanDecreaseGini']
+par(mar=c(7,4,4,2))
+barplot(VI_F.ann/sum(VI_F.ann), las=3)
+
+```
+
+
+## Play with variable reduction
+
+```{r varReduction}
+# run a random forest on all 57 variables
+set.seed(412)
+test <- varSelRF(xdata = pointsNoSoy2[,1:57], whole.range=F,
+                    Class = as.factor(pointsNoSoy2$classes),
+                    ntree = 2000)
+test
+
+# annual
+atest <- varSelRF(xdata = annualNoSoy[,1:20], whole.range=F,
+                    Class = as.factor(annualNoSoy$classes),
+                    ntree = 2000)
+atest
+```
+

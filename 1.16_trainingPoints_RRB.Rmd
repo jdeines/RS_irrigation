@@ -101,7 +101,7 @@ writeOGR(trainExport1, paste0(exportFolder, '/2010_2012_COMBINED_training_12clas
          layer = 'layer', driver = 'KML')
 
 # write out corresponding CSV's for random forest work in R
-write.csv(as.data.frame(trainExport1), row.names = F,
+write.csv(trainExport1@data, row.names = F,
           paste0(exportFolder,
                  '/2010_2012_COMBINED_training_12class_v2.csv'))
 
