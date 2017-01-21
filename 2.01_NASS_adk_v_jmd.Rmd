@@ -1,0 +1,108 @@
+---
+title: 'NASS: Anthony vs Jill'
+author: "Jill Deines"
+date: "January 20, 2017"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Compare irrigated acres per county tabulated via Anthony's and Jill's scripts for NASS data
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, cache.path='cache/2.01_NASS_AvJ/',
+               fig.path='figure/2.01_NASS_AvJ/')
+```
+
+**R Packages Needed**
+
+
+```{r packages, message=FALSE, echo=TRUE}
+library(ggplot2)
+
+# Jill's functions
+source('functions/cleanNassCensusCounty.R')
+```
+
+
+## Load Data
+
+And process Jill's from raw downloads to informative data
+
+```{r loadData}
+# nass data dir
+nassdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass'
+
+# Antonio --------------------------------------
+adkfile <- 'county_acreages_fromADK.csv'
+adk <- read.csv(paste0(nassdir, '/', adkfile))
+
+# pad 5 digits column of geoID
+adk$fips5 <- sprintf("%05d",adk$GEOID)
+# make a year column
+adk$year <- as.numeric(substr(as.character(adk$year), start = 1, stop = 4))
+# just keep irrigated data
+adk2 <- adk[adk$production_practice == 'IRRIGATED',]
+# add dataset id
+adk2$scientist <- 'adk'
+# keep columns
+adk2 <- adk2[,c('fips5','year','acres_frac','scientist')]
+
+# Jill's data ----------------------------------
+nassfile <- 'NASS_FieldCrops_County_RRB_raw.csv'
+nass.df <- read.csv(paste0(nassdir, '/', nassfile), stringsAsFactors=F)
+
+# clean data
+rrb1997 <- cleanNassCensusCounty(nass.df, year = 1997)
+rrb2002 <- cleanNassCensusCounty(nass.df, year = 2002)
+rrb2007 <- cleanNassCensusCounty(nass.df, year = 2007)
+rrb2012 <- cleanNassCensusCounty(nass.df, year = 2012)
+
+# get irrigated acreage by county
+rrb1997.irr <- aggregate(IRRIGATED ~ fips5, data=rrb1997, FUN='sum')
+rrb2002.irr <- aggregate(IRRIGATED ~ fips5, data=rrb2002, FUN='sum')
+rrb2007.irr <- aggregate(IRRIGATED ~ fips5, data=rrb2007, FUN='sum')
+rrb2012.irr <- aggregate(IRRIGATED ~ fips5, data=rrb2012, FUN='sum')
+
+# add years
+rrb1997.irr$year <- 1997
+rrb2002.irr$year <- 2002
+rrb2007.irr$year <- 2007
+rrb2012.irr$year <- 2012
+
+# combine
+jmd <- rbind.data.frame(rrb1997.irr, rrb2002.irr, rrb2007.irr, rrb2012.irr)
+
+# convert back to acres
+jmd$acres_frac <- jmd$IRRIGATED * 247.105
+
+# add dataset id
+jmd$scientist <- 'jmd'
+
+# keep columns
+jmd <- jmd[,c('fips5','year','acres_frac','scientist')]
+```
+
+## Compare data
+
+```{r totalArea}
+# make sure working with same counties
+unique(adk$fips5) == unique(jmd$fips5)
+
+# combine
+merged <- rbind.data.frame(jmd, adk2)
+
+# sum area by year
+areaAgg <- aggregate(acres_frac ~ year + scientist, data = merged, FUN = 'sum')
+
+# plot
+ggplot(areaAgg, aes(year,acres_frac)) +
+  geom_bar(aes(fill = scientist), position = 'dodge', stat='identity') +
+  ylab('acres irrigated') + xlab('year') +
+  scale_x_continuous(name = '', breaks = c(1997, 2002,2007,2012), 
+                     labels = c(1997,2002,2007,2012)) +
+  ggtitle('Total Acres Irrigated, all (34) counties') + theme_bw()
+```
+
