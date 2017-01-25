@@ -12,8 +12,8 @@ Goal: Compare irrigated acres per county tabulated via Anthony's and Jill's scri
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
-opts_chunk$set(cache=FALSE, cache.path='cache/2.01_NASS_AvJ/',
-               fig.path='figure/2.01_NASS_AvJ/')
+opts_chunk$set(cache=FALSE, cache.path='cache/2.02_NASS_AvJ/',
+               fig.path='figure/2.02_NASS_AvJ/')
 ```
 
 **R Packages Needed**
@@ -182,8 +182,7 @@ Well, there you go. adk5 must have all overlapping counties...need to subset!
 ```{r commodityCompare, fig.width = 10.5, fig.height = 5}
 # subset adk5 counties to match jmd3
 adk6 <- adk5[adk5$fips5 %in% jmd3$fips5,]
-# rename Jill's 'other hay' to Anthony's 'hay.other'
-jmd3[jmd3$commodity_desc == 'OTHER HAY', 'commodity_desc'] <- 'HAY.OTHER'
+
 
 # combine datasets
 comm <- rbind(jmd3, adk6)
@@ -218,35 +217,7 @@ ggplot(comm2[comm2$year == 2012,], aes(commodity_desc,irr_acres)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
-## Address error
-Wheat has the biggest discrepancy, with smaller errors in sunflower and other hay. Jill is higher for wheat and sunflower, ADK generally higher for other hay except for 1997.
 
-### wheat investigation
 
-```{r wheat}
-year <- 2012
 
-# remove excess columns
-keepThese <- c('state_alpha','prodn_practice_desc','short_desc','Value',
-               'county_name','unit_desc','commodity_desc','year','state_ansi','county_code')
-wheatTest <- nass.df[,keepThese]
-
-# keep only records with 'wheat'
-wheat <- wheatTest[wheatTest$commodity_desc == 'WHEAT',]
-
-# for now, just year specified (could split into list by year in future..)
-wheat <- wheat[wheat$year == year,]
-
-# remove (D) values, remove commas (!), convert to numeric
-wheat <- wheat[!grepl('(D)',wheat$Value),]
-wheat$Value <- gsub(",", "", wheat$Value, fixed = T)
-wheat$Value <- as.numeric(wheat$Value)
-
-# keep only records with "ACRES HARVESTED"
-phrase <- 'ACRES HARVESTED'
-wheat <- wheat[grepl(phrase,wheat$short_desc),]
-```
-
-Found it: there's a wheat superset (wheat, and wheat spring, wheat winter)
-Updating 'cleanNassCensusCounty.R'
 

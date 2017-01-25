@@ -19,7 +19,7 @@
 cleanNassCensusCounty <- function(nass.df, year){
   library(tidyr)
   # remove excess columns
-  keepThese <- c('state_alpha','prodn_practice_desc','short_desc','Value',
+  keepThese <- c('state_alpha','prodn_practice_desc','short_desc','Value', 'class_desc',
                  'county_name','unit_desc','commodity_desc','year','state_ansi','county_code')
   nass.df <- nass.df[,keepThese]
   
@@ -59,7 +59,7 @@ cleanNassCensusCounty <- function(nass.df, year){
   
   
   # HAY: delete the supersets to leave just "other" classes
-  supersets <- c('HAY & HAYLAGE - ACRES HARVESTED',
+    supersets <- c('HAY & HAYLAGE - ACRES HARVESTED',
                  'HAY & HAYLAGE, IRRIGATED - ACRES HARVESTED',
                  'HAY - ACRES HARVESTED',
                  'HAY, IRRIGATED - ACRES HARVESTED',
@@ -68,13 +68,20 @@ cleanNassCensusCounty <- function(nass.df, year){
   
   nass.df3 <- nass.df2[!nass.df2$short_desc %in% supersets,]
   
-  # rename HAY and HAYLAGE to TOTAL HAY
-  nass.df3[grepl("HAY",nass.df3$commodity_desc),'commodity_desc'] <- 'OTHER HAY'
-  nass.df3[grepl("HAYLAGE",nass.df3$commodity_desc),'commodity_desc'] <- 'OTHER HAY'
+  # wheat, sunflower, cotton: remove subclasses
+  cropsToAddress <- c('WHEAT','SUNFLOWER','COTTON')
+  nass.df4 <- nass.df3[!(nass.df3$commodity_desc %in% cropsToAddress & 
+                           nass.df3$class_desc != 'ALL CLASSES'),]
+  
+  #Remove the GRASSES and LEGUMES separate types, and GRASSES & LEGUMES, OTHER
+  
+  # rename HAY and HAYLAGE 
+  nass.df4[grepl("HAY",nass.df4$commodity_desc),'commodity_desc'] <- 'HAY.OTHER'
+  nass.df4[grepl("HAYLAGE",nass.df4$commodity_desc),'commodity_desc'] <- 'HAY.OTHER'
   
   # aggregate by crop type and irrigation status
   summary <- aggregate(Value ~ commodity_desc + prodn_practice_desc + fips5,
-                       data = nass.df3, FUN='sum')
+                       data = nass.df4, FUN='sum')
   
   # convert from acres to square kilometers
   summary$Value <- summary$Value / 247.105
