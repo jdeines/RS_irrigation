@@ -445,8 +445,10 @@ nass.df <- do.call("rbind",nass.list)
 
 # write out raw data
 outdir <- 'S:/Users/deinesji/HPA/data/USDA_NASS'
-outfile <- 'NASS_FieldCrops_County_HPA_raw.csv'
+outdir2 <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass'
+outfile <- 'NASS_FieldCrops_County_HPA_raw_full_GEE_aoi_hpa_30km_rrb_buff.csv'
 write.csv(nass.df, paste0(outdir, '/', outfile), row.names=F)
+write.csv(nass.df, paste0(outdir2, '/', outfile), row.names=F)
 ```
 
 Load downloaded data and process
