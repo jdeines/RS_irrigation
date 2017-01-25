@@ -9,7 +9,7 @@ output:
 
 Goal: Compare irrigated acreages between remote sensing products and USDA NASS Ag Census Data. NASS data acquired through the Quick Stats API.
 
-Update Jan 10, 2017: added counties >90% within the boundary
+Update Jan 10, 2017: need to add counties >90% within the boundary
 
 
 ```{r knitrOpts, echo=FALSE}
@@ -82,7 +82,7 @@ countyAll <- merge(countyAll, state.fips[,c('abb','STATEFP')],
 
 # select counties with more than 90% within boundary
 countyAll <- countyAll[countyAll$proportion > 0.9,]
-
+nrow(countyAll)/3 # number of counties
 
 # # write out csv for Anthony to use
 # anthony <- countyAll[countyAll$year == 2002,c('state2','fips5','fips3','abb')]
@@ -93,6 +93,9 @@ countyAll <- countyAll[countyAll$proportion > 0.9,]
 
 ## Get and Clean NASS Data
 From the NASS Quick Stats API, using county list generated above
+
+re-run on 1/24/2017 to get all counties 90% or greater within RRB/RRCA bound.
+On this date, also retrieved data for all counties in the HPA using 2.00_NASS_countyStats.Rmd, in order to 
 
 ### Get Data 
 And write out to not rely on NASS API
@@ -110,7 +113,6 @@ aggregation <- 'COUNTY'
 
 # get just 1 set of counties (so for 1 year)
 counties <- countyAll[countyAll$year == unique(countyAll$year)[3],]
-length(counties)
 
 # make empty list to populate, and loop through counties
 nass.list <- list()
@@ -125,7 +127,7 @@ nass.df <- do.call("rbind",nass.list)
 
 # write out raw data
 outdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass'
-outfile <- 'NASS_FieldCrops_County_RRB_raw.csv'
+outfile <- 'NASS_FieldCrops_County_RRB_raw_90_47counties.csv'
 write.csv(nass.df, paste0(outdir, '/', outfile), row.names=F)
 ```
 
