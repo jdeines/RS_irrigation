@@ -21,6 +21,7 @@ opts_chunk$set(cache=FALSE, cache.path='cache/2.01_NASS_AvJ/',
 
 ```{r packages, message=FALSE, echo=TRUE}
 library(ggplot2)
+library(tidyr)
 
 # Jill's functions
 source('functions/cleanNassCensusCounty.R')
@@ -104,5 +105,87 @@ ggplot(areaAgg, aes(year,acres_frac)) +
   scale_x_continuous(name = '', breaks = c(1997, 2002,2007,2012), 
                      labels = c(1997,2002,2007,2012)) +
   ggtitle('Total Acres Irrigated, all (34) counties') + theme_bw()
+```
+
+
+## Error finding
+
+### Compare by Commodity
+I had Anthony re-export his results at the commodity level to better identify the discrepancy.
+
+```{r commoditycompareLoad}
+# nass data dir
+nassdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass'
+year <- 2002
+
+# Antonio --------------------------------------
+adkfile2 <- 'county_acreages_by_commodity_and_practice_fromADK.csv'
+adk3 <- read.csv(paste0(nassdir, '/', adkfile2))
+
+# pad 5 digits column of geoID
+adk3$fips5 <- sprintf("%05d",adk$GEOID)
+# make a year column
+adk3$year <- as.numeric(substr(as.character(adk$year), start = 1, stop = 4))
+# subset to a single year
+adk4 <- adk3[adk3$year == year,]
+# just keep irrigated data
+adk4 <- adk4[adk4$production_practice == 'IRRIGATED',]
+# convert commodities to long data format
+adkLong <- gather(adk4, key = 'commodity_desc', value = 'irr_acres', ALFALFA:HAY.OTHER)
+# remove all rows with NA
+adkLong2 <- adkLong[!is.na(adkLong$irr_acres),]
+# add dataset id
+adkLong2$scientist <- 'adk'
+# keep columns
+adk5 <- adkLong2[,c('fips5','year','commodity_desc','irr_acres','scientist')]
+
+# Jill's data ----------------------------------
+nassfile <- 'NASS_FieldCrops_County_RRB_raw.csv'
+nass.df <- read.csv(paste0(nassdir, '/', nassfile), stringsAsFactors=F)
+
+# summarize by commodity and irrigation status for 2007
+rrb2007 <- cleanNassCensusCounty(nass.df, year = year)
+
+# just keep irrigated data and convert back to acres
+# convert back to acres
+rrb2007$irr_acres <- rrb2007$IRRIGATED * 247.105
+rrb2007$scientist <- 'jmd'
+rrb2007$year <- year
+# columns to keep
+jmd2 <- rrb2007[,c('fips5','year','commodity_desc','irr_acres','scientist')]
+```
+
+### compare adk1 vs adk2
+My first look by commodities has higher values for adk than jmd, which is opposite of above. So, check anthony's two datasets against each other
+
+Here, checking adk2 and adk5
+
+```{r adkcheck}
+# check number of counties
+length(unique(adk2$fips5))
+length(unique(adk5$fips5))
+```
+
+Well, there you go. adk5 must have all overlapping counties...need to subset!
+
+```{r commodityCompare}
+# subset adk5 counties to match jmd2
+adk6 <- adk5[adk5$fips5 %in% jmd2$fips5,]
+# rename Jill's 'other hay' to Anthony's 'hay.other'
+jmd2[jmd2$commodity_desc == 'OTHER HAY', 'commodity_desc'] <- 'HAY.OTHER'
+
+# combine datasets
+comm <- rbind(jmd2, adk6)
+
+# sum acres by commodity type across counties
+comm2 <- aggregate(irr_acres ~ commodity_desc + scientist, data = comm, FUN = 'sum')
+
+# plot
+ggplot(comm2, aes(commodity_desc,irr_acres)) +
+  geom_bar(aes(fill = scientist), position = 'dodge', stat='identity') +
+  ylab('acres irrigated') + xlab('crop') +
+  ggtitle('Total Acres Irrigated, all (34) counties') + theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
 ```
 
