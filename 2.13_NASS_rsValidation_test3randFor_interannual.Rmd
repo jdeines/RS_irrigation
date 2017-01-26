@@ -9,15 +9,13 @@ output:
 
 Goal: Compare irrigated acreages between remote sensing products and USDA NASS Ag Census Data. NASS data acquired through the Quick Stats API.
 
-Update Jan 10, 2017: need to add counties >90% within the boundary
-
 Re-run on 1/25/17 with updated NASS cleaning function (removing double counting in wheat, cotton, and sunflower). Grass/legumes and hay still a bit off. 
 
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
-opts_chunk$set(cache=FALSE, cache.path='cache/2.12_NASS_v/',
-               fig.path='figure/2.12_NASS_v/')
+opts_chunk$set(cache=FALSE, cache.path='cache/2.13_NASS_rf/',
+               fig.path='figure/2.13_NASS_rf/')
 ```
 
 **R Packages Needed**
@@ -58,9 +56,14 @@ cellArea <- 30*30 # m^2
 countyDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/county_counts_RRB_test3_cleaned'
 
 # get filenames
-countyfiles <- list.files(countyDir, pattern="*cart_interannual_allCounties_allClasses.csv")
+countyfiles <- list.files(countyDir, pattern="*randFor_interannual_allCounties_allClasses.csv")
+
+# 2004 doesn't have any irrigated!...wait. what? wrong.
+countysub <- countyfiles[c(4,9,14)]
+
 # read in to a single dataframe
-countyAll0 = do.call(rbind, lapply(countyfiles, function(x) {
+countyAll0 = do.call(rbind, lapply(countysub, function(x) {
+             # print(x)
               csv <- read.csv(paste0(countyDir,'/',x), stringsAsFactors = FALSE)
               csv$year <- as.numeric(substr(x, start=1,stop=4))
               csv$fips5 <- sprintf("%05d",csv$fips5)

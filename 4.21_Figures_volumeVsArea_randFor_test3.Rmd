@@ -1,0 +1,272 @@
+---
+title: "Figures Irrigated volume v area"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: plot times series of irrigated areas vs pumping volumes
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, cache.path='cache/4.21_VolumeAreaFigs_rf/',
+               fig.path='figure/4.21_VolumeAreaFreqFigs_rf/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE, eval=TRUE}
+library(rgdal)
+library(raster)
+library(grid)
+library(colorRamps)
+library(ggplot2)
+library(tidyr)
+source('functions/stat_smooth_func_all.R')
+```
+
+## load and process data
+
+Pumping data from the RRB_Rcode project (4.3_Pumping_Data.Rmd). This file is data for the Republican Basin, by state.
+
+```{r loadPumpingData}
+# years wanted
+startYear = 1999
+endYear = 2014 # current dataset extent
+
+# pumping data extracted from the RRCA groundwater model folks, see readme notes
+pumpDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/pumping'
+stateWells <- read.csv(paste0(pumpDir,'/RRCA_RRB_clip_pumping_1918-2014_m3.csv'))
+
+# drop useless columns
+stateWells <- stateWells[, -which(names(stateWells) %in% c('ID','MODEL_ROW',
+                          'MODEL_COLU', 'row', 'col','node'))]
+
+# convert data to long format for 1999 - 2012
+pumpingLong0 <- gather(stateWells, key = year_char, value = volume_m3,
+                       irr1918:irr2014)
+# make a numeric year columns
+pumpingLong0$year <- as.numeric(substr(pumpingLong0$year_char, start=4, stop = 8))
+
+# subset years
+yearsWanted = startYear:endYear
+pumpingLong <- pumpingLong0[pumpingLong0$year %in% yearsWanted,]
+
+# convert pumping to km^3
+pumpingLong$volume_km3 <- pumpingLong$volume_m3 * 1e-9
+
+# sum areas by state
+pumpingStates <- aggregate(volume_km3 ~ state + year, data = pumpingLong, 
+                           FUN = 'sum')
+
+# add a year-state key to join data with irrigated area
+pumpingStates$key <- paste0(pumpingStates$state, pumpingStates$year)
+
+# plot for fun
+ggplot(data = pumpingStates,
+       aes(x = year, y = volume_km3, colour=state)) +
+  geom_line() + theme_bw() +
+  ggtitle('Pumping by State Basin')
+```
+
+
+
+```{r loadAreaData}
+cellArea <- 30*30 # m^2
+
+regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/regionalStats_RRB'
+
+# get filenames
+files <- list.files(regionsDir, pattern="*randFor_cleaned_plusAncillary_interannual_to2016_moreRegions.csv")
+
+# read in to a single dataframe
+all1 = as.data.frame(do.call(rbind, lapply(files, function(x) {
+              csv1 <- read.csv(paste0(regionsDir,'/',x))
+              csv1$year <- as.numeric(substr(x, start=1,stop=4))
+              return(csv1)
+            })))
+
+# convert cell count to area
+all1$irrigated_m2 <- all1$X1 * cellArea
+all1$irrigated_km2 <- all1$irrigated_m2 / 1000000
+
+# state basin data only
+areaStates <- all1[grepl('basin', all1$masterID) & !grepl('NRD', all1$masterID),]
+
+# keep fewer columns (location, year, irrigated area, annual (Dec-Aug) precip)
+areaStates <- areaStates[,c('masterID','year','irrigated_km2','pr_ann')]
+
+# add a year column and an id column to merge with pumping
+areaStates$state <- substr(areaStates$masterID, start=1, stop=2)
+areaStates$key <- paste0(areaStates$state,areaStates$year)
+```
+
+## plots
+
+```{r stateBasinPlots}
+# merge pumping and area data
+plotData <- merge(areaStates, pumpingStates, by='key', all.x = T)
+plotData <- plotData[,c('year.x','state.x','irrigated_km2','volume_km3','pr_ann')]
+
+# format for ggplot
+plotDataLong <- gather(plotData, key = variable, value = value,
+                       irrigated_km2:pr_ann)
+
+# plot times series of pumping, area, and precip
+state <- 'NE'
+
+# check a linear model of irrigated area to precip
+yarg = lm(irrigated_km2 ~ pr_ann, 
+          data = plotData[plotData$state.x == state,])
+summary(yarg)
+
+
+
+ggplot(data = plotDataLong[plotDataLong$state.x == state,],
+      aes(x = year.x, y = value)) +
+  geom_line() +
+  facet_wrap(~variable, nrow=3, scales='free_y') +
+  theme_bw() + ggtitle('Nebraska Republican River Basin')
+
+# plot times series of pumping, area, and precip
+state <- 'KS'
+
+ggplot(data = plotDataLong[plotDataLong$state.x == state,],
+      aes(x = year.x, y = value)) +
+  geom_line() +
+  facet_wrap(~variable, nrow=3, scales='free_y') +
+  theme_bw() + ggtitle('Kansas Republican River Basin')
+
+# plot times series of pumping, area, and precip
+state <- 'CO'
+
+ggplot(data = plotDataLong[plotDataLong$state.x == state,],
+      aes(x = year.x, y = value)) +
+  geom_line() +
+  facet_wrap(~variable, nrow=3, scales='free_y') +
+  theme_bw() + ggtitle('Colorado Republican River Basin')
+
+```
+
+```{r fullRRB_plots, fig.height = 5.5, fig.width = 6}
+# replace volume NA's with 0 for now
+plotData[is.na(plotData$volume_km3),'volume_km3'] <- 0
+
+# get irrigated area and pumping for full basin
+plotDataRRB <- aggregate(cbind(irrigated_km2,volume_km3) ~  year.x, 
+                         data = plotData, FUN = 'sum', na.rm = T)
+# and do the mean for precip
+rrbPrecip <- aggregate(pr_ann ~  year.x, data = plotData, FUN = 'mean')
+
+
+# combine and gather
+plotDataRRB <- cbind(plotDataRRB, rrbPrecip[,'pr_ann'])
+names(plotDataRRB) <- c('year','Irrigated_Area', 'Pumping', 'zPrecipitation')
+
+# replace NA's for 2015 and 2016
+plotDataRRB[plotDataRRB$Pumping == 0,'Pumping'] <- NA
+
+# area over time lm
+area.lm <- lm(Irrigated_Area ~ year, data = plotDataRRB)
+summary(area.lm)
+
+# pumping over time lm
+pump.lm <- lm(Pumping ~ year, data = plotDataRRB)
+summary(pump.lm)
+
+# gather
+plotDataRRBLong <- gather(plotDataRRB, key = variable, value = value,
+                          Irrigated_Area:zPrecipitation)
+
+# plots with no facet labels
+ggplot(data = plotDataRRBLong,
+      aes(x = year, y = value, colour=variable)) +
+  geom_line() +
+  scale_colour_manual(values=c('black','red','blue')) + 
+  facet_wrap(~variable, nrow=3, scales='free_y') +
+  scale_x_continuous(name = '', 
+                     breaks = c(2000,2002,2004,2006,2008,2010,2012), 
+                     labels = c(2000,2002,2004,2006,2008,2010,2012)) +
+  ylab('') +
+  theme_bw() + theme(legend.position = 'none',
+                     strip.background=element_blank(),
+                     strip.text.x = element_blank(),
+                     text = element_text(size = 16))
+
+# plots with facet labels
+ggplot(data = plotDataRRBLong,
+      aes(x = year, y = value, colour=variable)) +
+  geom_line() +
+  scale_colour_manual(values=c('black','red','blue')) + 
+  facet_wrap(~variable, nrow=3, scales='free_y') +
+    scale_x_continuous(name = '', 
+                     breaks = c(2000,2002,2004,2006,2008,2010,2012), 
+                     labels = c(2000,2002,2004,2006,2008,2010,2012)) +
+  ylab('') +
+  ylab('') +
+  theme_bw() + theme(legend.position = 'none',
+                     text = element_text(size = 16))
+```
+
+```{r fullRRB_plots_lm, fig.height = 5.5, fig.width = 6}
+
+
+# plots with no facet labels
+ggplot(data = plotDataRRBLong,
+      aes(x = year, y = value, colour=variable)) +
+  geom_line() + 
+  # add linear model
+  #stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
+  #                xpos = 2004, ypos = 5800) +
+  # add trendline
+  stat_smooth(method = 'lm', se=F) +
+  scale_colour_manual(values=c('black','red','blue')) + 
+  facet_wrap(~variable, nrow=3, scales='free_y') +
+  scale_x_continuous(name = '', 
+                     breaks = c(2000,2002,2004,2006,2008,2010,2012), 
+                     labels = c(2000,2002,2004,2006,2008,2010,2012)) +
+  ylab('') +
+  theme_bw() + theme(legend.position = 'none',
+                     strip.background=element_blank(),
+                     strip.text.x = element_blank(),
+                     text = element_text(size = 16))
+
+
+```
+
+## Scatterplots
+
+### Area vs Precip
+
+```{r precipVarea, fig.width = 3, fig.height = 3.25}
+ggplot(data = plotDataRRB,
+       aes(x = zPrecipitation, y = Irrigated_Area)) +
+  geom_point() +
+  ylab('Irrigated Area (km^2)') + xlab('Precipitation (mm)') +
+  ggtitle('Precip vs Irrigated Area') +
+  theme_bw()
+```
+
+### Pumping vs precip
+
+```{r precipVpumping, fig.width = 3, fig.height = 3.25}
+ggplot(data = plotDataRRB,
+       aes(x = zPrecipitation, y = Pumping)) +
+  geom_point() +
+  ylab('Pumping (km^3)') + xlab('Precipitation (mm)') +
+  ggtitle('Precip vs Pumping') +
+  theme_bw()
+```
+
+### Pumping vs irrigated
+
+```{r areaVpumping, fig.width = 3, fig.height = 3.25}
+ggplot(data = plotDataRRB,
+       aes(x = Irrigated_Area, y = Pumping)) +
+  geom_point() +
+  ylab('Pumping (km^3)') + xlab('Irrigated Area (km^2)') +
+  ggtitle('Irrigated Area vs Pumping') +
+  theme_bw()
+```
+
