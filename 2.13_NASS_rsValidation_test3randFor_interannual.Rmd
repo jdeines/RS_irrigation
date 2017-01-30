@@ -80,6 +80,14 @@ countyAll <- countyAll0[countyAll0$year %in% yearsDesired,]
 countyAll$irrigated_m2 <- countyAll$X1 * cellArea
 countyAll$irrArea.km2 <- countyAll$irrigated_m2 / 1000000
 
+# convert dryland cell count to area
+countyAll$dryland_m2 <- countyAll$X0 * cellArea
+countyAll$dryland_km2 <- countyAll$dryland_m2 / 1000000
+
+# convert cropland area to km^2 for RS
+# convert cell count to area
+countyAll$cropland_m2 <- (countyAll$X1+countyAll$X0) * cellArea
+countyAll$cropland_km2 <- countyAll$cropland_m2 / 1000000
 
 # add a state 2-letter abbrev column
 # fill in state abbrevs column based on FIPS
@@ -347,3 +355,125 @@ spplot(cntydiffall, c('percErr_2002','percErr_2007','percErr_2012'),
 ```
 
 
+## All cropland
+Random forest seems to perform much better in distinguishing noncrop from dryland ag, so I'm going to see how the numbers for total ag land look.
+
+```{r allCropland_munge}
+# get total cropland by NASS county
+# get irrigated acreage by county
+#rrb1997.tot <- aggregate(TOTAL ~ fips5, data=rrb1997, FUN='sum')
+rrb2002.tot <- aggregate(TOTAL ~ fips5, data=rrb2002, FUN='sum')
+rrb2007.tot <- aggregate(TOTAL ~ fips5, data=rrb2007, FUN='sum')
+rrb2012.tot <- aggregate(TOTAL ~ fips5, data=rrb2012, FUN='sum')
+
+# add years
+#rrb1997.tot$year <- 1997
+rrb2002.tot$year <- 2002
+rrb2007.tot$year <- 2007
+rrb2012.tot$year <- 2012
+
+# combine datasets
+merged2002.tot <- merge(rrb2002.tot, countyAll.2002[,c('fips5','cropland_km2')])
+
+merged2007.tot <- merge(rrb2007.tot, countyAll.2007[,c('fips5','cropland_km2')])
+
+merged2012.tot <- merge(rrb2012.tot, countyAll.2012[,c('fips5','cropland_km2')])
+
+allyears.tot <- rbind(merged2002.tot, merged2007.tot, merged2012.tot)
+```
+
+```{r multipanel_bigger_usda_total,  fig.width = 8, fig.height = 3}
+ggplot(allyears.tot, aes(x=TOTAL,y=cropland_km2)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) + 
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 100, ypos = 800) +
+  #geom_smooth(method="lm",se=FALSE) +
+  facet_wrap(~year, nrow=1) +
+  ylab(expression(paste("HP-AIM Area (", km^2,")"))) + 
+  xlab(expression(paste('USDA County Area (', km^2,')'))) + theme_bw() +
+       theme(text = element_text(size = 15)) +
+  ggtitle('Total Cropland, RS vs NASS by 47 County')   
+```
+
+```{r totalAreaBar_LEGEND_total, fig.height = 3, fig.width = 3}
+areadata.tot <- allyears.tot
+names(areadata.tot) <- c('fips5', 'NASS','Year','HP_AIM')
+
+# sum area by year
+areaAgg.tot <- aggregate(cbind(NASS, HP_AIM) ~ Year, data = areadata.tot, FUN = 'sum')
+
+# long format
+area.gg <- gather(areaAgg.tot, key = dataset, value = sq_km, NASS:HP_AIM)
+
+ggplot(data = area.gg, aes(Year, sq_km)) +
+  geom_bar(aes(fill = dataset), position = 'dodge', stat='identity') +
+   ylab(expression(paste("Total Cropland (", km^2,")"))) + 
+  scale_x_continuous(name = '', breaks = c(2002,2007,2012), 
+                     labels = c(2002,2007,2012)) +
+  scale_fill_discrete("", labels=c('HP-AIM','NASS')) +
+  theme_bw() + theme(legend.position = 'top',
+                     text = element_text(size = 15))
+
+```
+
+
+## Dryland
+Random forest seems to perform much better in distinguishing noncrop from dryland ag, so I'm going to see how the numbers for total ag land look.
+
+```{r dryland_munge}
+# get total cropland by NASS county
+# get irrigated acreage by county
+#rrb1997.tot <- aggregate(TOTAL ~ fips5, data=rrb1997, FUN='sum')
+rrb2002.dry <- aggregate(NON_IRR ~ fips5, data=rrb2002, FUN='sum')
+rrb2007.dry <- aggregate(NON_IRR ~ fips5, data=rrb2007, FUN='sum')
+rrb2012.dry <- aggregate(NON_IRR ~ fips5, data=rrb2012, FUN='sum')
+
+# add years
+#rrb1997.tot$year <- 1997
+rrb2002.dry$year <- 2002
+rrb2007.dry$year <- 2007
+rrb2012.dry$year <- 2012
+
+# combine datasets
+merged2002.dry <- merge(rrb2002.dry, countyAll.2002[,c('fips5','dryland_km2')])
+
+merged2007.dry <- merge(rrb2007.dry, countyAll.2007[,c('fips5','dryland_km2')])
+
+merged2012.dry <- merge(rrb2012.dry, countyAll.2012[,c('fips5','dryland_km2')])
+
+allyears.dry <- rbind(merged2002.dry, merged2007.dry, merged2012.dry)
+```
+
+```{r multipanel_bigger_usda_dryland,  fig.width = 8, fig.height = 3}
+ggplot(allyears.dry, aes(x=NON_IRR,y=dryland_km2)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) + 
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 100, ypos = 800) +
+  #geom_smooth(method="lm",se=FALSE) +
+  facet_wrap(~year, nrow=1) +
+  ylab(expression(paste("HP-AIM Area (", km^2,")"))) + 
+  xlab(expression(paste('USDA County Area (', km^2,')'))) + theme_bw() +
+       theme(text = element_text(size = 15)) +
+  ggtitle('dryland, RS vs NASS by 47 County')   
+```
+
+```{r totalAreaBar_LEGEND_dry, fig.height = 3, fig.width = 3}
+areadata.dry <- allyears.dry
+names(areadata.dry) <- c('fips5', 'NASS','Year','HP_AIM')
+
+# sum area by year
+areaAgg.dry <- aggregate(cbind(NASS, HP_AIM) ~ Year, data = areadata.dry, FUN = 'sum')
+
+# long format
+area.gg <- gather(areaAgg.dry, key = dataset, value = sq_km, NASS:HP_AIM)
+
+ggplot(data = area.gg, aes(Year, sq_km)) +
+  geom_bar(aes(fill = dataset), position = 'dodge', stat='identity') +
+   ylab(expression(paste("Dryland Area (", km^2,")"))) + 
+  scale_x_continuous(name = '', breaks = c(2002,2007,2012), 
+                     labels = c(2002,2007,2012)) +
+  scale_fill_discrete("", labels=c('HP-AIM','NASS')) +
+  theme_bw() + theme(legend.position = 'top',
+                     text = element_text(size = 15))
+
+```
