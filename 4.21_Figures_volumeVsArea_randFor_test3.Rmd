@@ -30,47 +30,100 @@ source('functions/stat_smooth_func_all.R')
 
 Pumping data from the RRB_Rcode project (4.3_Pumping_Data.Rmd). This file is data for the Republican Basin, by state.
 
+UPDATE 2/20/17: big change to use combined gw/sw dataset
+
 ```{r loadPumpingData}
 # years wanted
 startYear = 1999
-endYear = 2014 # current dataset extent
+endYear = 2015 # current dataset extent
 
-# pumping data extracted from the RRCA groundwater model folks, see readme notes
+# # pumping data extracted from the RRCA groundwater model folks, see readme notes
+# pumpDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/pumping'
+# allIrr0 <- read.csv(paste0(pumpDir,'/RRCA_irrAllByCell_1918-2015_longFormat_gw_sw_co.csv'))
+# 
+# # subset years
+# allIrr <- allIrr0[allIrr0$year >= startYear & allIrr0$year <= endYear,]
+# 
+# # write out subset for future easier use
+# write.csv(allIrr, row.names=F,
+#           paste0(pumpDir,'/RRCA_irrAllByCell_1999-2015_longFormat_gw_sw_co.csv'))
+
+#load year-restricted dataset
 pumpDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/pumping'
-stateWells <- read.csv(paste0(pumpDir,'/RRCA_RRB_clip_pumping_1918-2014_m3.csv'))
+allIrr <- read.csv(paste0(pumpDir,'/RRCA_irrAllByCell_1999-2015_longFormat_gw_sw_co.csv'))
 
-# drop useless columns
-stateWells <- stateWells[, -which(names(stateWells) %in% c('ID','MODEL_ROW',
-                          'MODEL_COLU', 'row', 'col','node'))]
+# replace NA's with zeros
+allIrr[,18:23][is.na(allIrr[,18:23])] <- 0 
 
-# convert data to long format for 1999 - 2012
-pumpingLong0 <- gather(stateWells, key = year_char, value = volume_m3,
-                       irr1918:irr2014)
-# make a numeric year columns
-pumpingLong0$year <- as.numeric(substr(pumpingLong0$year_char, start=4, stop = 8))
+# sum total water use
+allIrr$total_km3 <- allIrr$gwirr_km3 + allIrr$swirr_km3 + allIrr$coirr_km3
+allIrr$total_m3 <- allIrr$gwirr_m3 + allIrr$swirr_m3 + allIrr$coirr_m3
 
-# subset years
-yearsWanted = startYear:endYear
-pumpingLong <- pumpingLong0[pumpingLong0$year %in% yearsWanted,]
+### sum areas by state RRCA --------------------------------------
+## dplyr exmple
+# irrStates.RRCA.km3 <- allIrr %>%
+#                     group_by(state, year) %>%
+#                     summarise(total = sum(total_km3),
+#                               gw = sum(gwirr_km3),
+#                               sw = sum(swirr_km3),
+#                               co = sum(coirr_km3))
 
-# convert pumping to km^3
-pumpingLong$volume_km3 <- pumpingLong$volume_m3 * 1e-9
-
-# sum areas by state
-pumpingStates <- aggregate(volume_km3 ~ state + year, data = pumpingLong, 
+irrStates.RRCA.km3 <- aggregate(cbind(total_km3, gwirr_km3, swirr_km3, coirr_km3)
+                            ~ state + year, data = allIrr, 
                            FUN = 'sum')
 
 # add a year-state key to join data with irrigated area
-pumpingStates$key <- paste0(pumpingStates$state, pumpingStates$year)
+irrStates.RRCA.km3$key <- paste0(irrStates.RRCA.km3$state, irrStates.RRCA.km3$year)
 
 # plot for fun
-ggplot(data = pumpingStates,
-       aes(x = year, y = volume_km3, colour=state)) +
+ggplot(data = irrStates.RRCA.km3,
+       aes(x = year, y = total_km3, colour=state)) +
   geom_line() + theme_bw() +
-  ggtitle('Pumping by State Basin')
+  ggtitle('Pumping by State RRCA')
+
+### sum areas by state RRB basin --------------------------------------
+# extract only RRB cells
+irrRRB <- allIrr[!is.na(allIrr$inRRB),]
+
+irrStates.RRB.km3 <- aggregate(cbind(total_km3, gwirr_km3, swirr_km3, coirr_km3)
+                            ~ state + year, data = irrRRB, 
+                           FUN = 'sum')
+
+# add a year-state key to join data with irrigated area
+irrStates.RRB.km3$key <- paste0(irrStates.RRB.km3$state, irrStates.RRB.km3$year)
+
+# plot for fun
+ggplot(data = irrStates.RRB.km3,
+       aes(x = year, y = total_km3, colour=state)) +
+  geom_line() + theme_bw() +
+  ggtitle('Pumping by State RRB')
+
+# total pumping by type for full RRCA -----------------------------------
+# sum pumping types by year
+allIrr.years.km3 <- aggregate(cbind(total_km3, gwirr_km3, swirr_km3, coirr_km3)
+                              ~ year, data = allIrr, FUN = 'sum')
+
+# longify for ggplot
+allIrr.years.long <- gather(allIrr.years.km3, key = 'type', value = 'km3',
+                            gwirr_km3:coirr_km3)
+allIrr.years.long$type2 <- substr(allIrr.years.long$type, 1,2)
+
+# reorder to stack gw on bottom
+changer <- data.frame(old = c('co','sw','gw'),
+                      source = c('2_co','3_sw','1_gw'))
+allIrr.years.long <- merge(allIrr.years.long, changer, by.x = 'type2',
+                           by.y = 'old')
+
+# plot stacked area
+ggplot(data=allIrr.years.long,
+       aes(x=year, y = km3, fill = source)) +
+  geom_area(alpha = .7) +
+  scale_fill_brewer(palette='Paired') +
+  theme_bw() +
+  ggtitle('Total Irrigation by Type, RRCA')
 ```
 
-
+I now need to propagate these changes through the plots.
 
 ```{r loadAreaData}
 cellArea <- 30*30 # m^2
