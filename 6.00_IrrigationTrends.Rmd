@@ -7,7 +7,7 @@ output:
     toc: yes
 ---
 
-Goal: Investigate trends in irrigated area over time
+Goal: Investigate trends in irrigated area over time - total area, areas gained, areas lost.
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
@@ -25,6 +25,8 @@ library(tidyr)
 ```
 
 ## Load Data
+
+### RS estimates of irrigated area
 Counts of each class type were tallied for several administrative boundaries in GEE
 
 ```{r loadGee}
@@ -33,7 +35,7 @@ cellArea <- 30*30 # m^2
 regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/regionalStats_RRB'
 
 # get filenames
-files <- list.files(regionsDir, pattern="*plusAncillary_interannual_to2016.csv")
+files <- list.files(regionsDir, pattern="*_randFor_cleaned_plusAncillary_interannual_to2016_moreRegions.csv")
 
 # read in to a single dataframe
 all1 = as.data.frame(do.call(rbind, lapply(files, function(x) {
@@ -47,11 +49,112 @@ all1$irrigated_m2 <- all1$X1 * cellArea
 all1$irrigated_km2 <- all1$irrigated_m2 / 1000000
 
 # find total #cells in the rrcaExtent
-all1$totalCells <- all1$X0 + all1$X1 + all1$null
-all1[all1$masterID == 'rrcaRrbBuffExtent','totalCells'][1]
+#all1$totalCells <- all1$X0 + all1$X1 + all1$null
+#all1[all1$masterID == 'rrcaRrbBuffExtent','totalCells'][1]
 ```
 
-## Plot Data
+### Novel/Retired Irrigated Area by year
+
+```{r loadYearly}
+cellArea <- 30*30 # m^2
+
+yearsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/earliestLatestTable'
+
+# load 
+early <- read.csv(paste0(yearsDir, '/', 'test3_randFor_earliest_regionCounts.csv'))
+late <- read.csv(paste0(yearsDir, '/', 'test3_randFor_latest_regionCounts.csv'))
+
+# remove county data
+early <- early[!grepl('county', early$masterID),]
+late <- late[!grepl('county', late$masterID),]
+
+# gather year-county columns into 1 column
+early.long <- gather(early, key = year, value = count, X1999:X2015)
+late.long <- gather(late, key = year, value = count, X2000:X2016)
+
+# remove junk columns
+early.long <- early.long[,c('masterID','year','count')]
+late.long <- late.long[,c('masterID','year','count')]
+
+# convert year column to numeric
+early.long$year <- as.numeric(substr(early.long$year, 2,5))
+late.long$year <- as.numeric(substr(late.long$year, 2,5))
+
+# convert cell count to area
+early.long$area_m2 <- early.long$count * cellArea
+early.long$area_km2 <- early.long$area_m2 / 1000000
+
+late.long$area_m2 <- late.long$count * cellArea
+late.long$area_km2 <- late.long$area_m2 / 1000000
+```
+
+### Combine datasets
+Make a long format data frame with total irrigated area, novel area each year, lost area each year
+
+```{r combine}
+# reformat total area data ------------------
+all <- all1[,c('masterID','year','irrigated_m2','irrigated_km2')]
+names(all)[3:4] <- c('area_m2', 'area_km2')
+all$dataset <- 'total'
+
+# reformat novel/retired data ----------------
+# add dataset ID column
+early.long$dataset <- 'novel'
+late.long$dataset <- 'retired'
+
+columnsWanted <- c('masterID', 'year', 'area_m2', 'area_km2', 'dataset')
+# early, drop first years
+early2 <- early.long[!(early.long$year %in% c(1999,2000,2001)),
+                       columnsWanted]
+
+# late: drop last years
+late2 <- late.long[!(late.long$year %in% c(2014,2015,2016)),
+                       columnsWanted]
+
+combined <- rbind(all, early2, late2)
+```
+
+
+
+## Plot Novel/Retired over time
+
+### full study extent
+RRB + RRCA + buffer
+
+```{r fullExtent_novelRetired}
+ggplot(data = combined[combined$masterID == 'rrcaRrbBuffExtent',],
+       aes(x = year, y = area_km2, colour = dataset)) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2," )"))) +
+    xlab('Year') + ggtitle('Full Region') + 
+    theme_bw()
+
+ggplot(data = combined[grepl('full', combined$masterID),],
+       aes(x = year, y = area_km2, colour = dataset)) + 
+    facet_wrap( ~ masterID) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2," )"))) +
+    xlab('Year') + ggtitle('Full Region by State') +
+    theme_bw()
+```
+
+
+### basin only
+rrb basin bound
+
+```{r basin_novelRetired}
+
+
+ggplot(data = combined[grepl('basin', combined$masterID) &
+                     !grepl('NRD', combined$masterID),],
+       aes(x = year, y = area_km2, colour = dataset)) + 
+    facet_wrap( ~ masterID) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2," )"))) +
+    xlab('Year') + ggtitle('RRB Basin by State') +
+    theme_bw()
+```
+## Plot Area Data (plots prior to novel/retired analysis)
 
 ### Full RRCA RRB Extent
 
