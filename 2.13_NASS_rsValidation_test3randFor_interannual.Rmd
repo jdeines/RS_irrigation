@@ -11,6 +11,8 @@ Goal: Compare irrigated acreages between remote sensing products and USDA NASS A
 
 Re-run on 1/25/17 with updated NASS cleaning function (removing double counting in wheat, cotton, and sunflower). Grass/legumes and hay still a bit off. 
 
+update 2/21/2017: adding USGS Waterdata county acreage for years 2000, 2005, 2010; used only counties 100% within boundary
+
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
@@ -50,7 +52,7 @@ Here, I load this dataset from yearly files, add a year attribute, and convertin
 
 
 ```{r loadGee}
-yearsDesired <- c(2002, 2007, 2012)
+yearsDesired <- c(2000, 2002, 2005, 2007, 2010, 2012)
 cellArea <- 30*30 # m^2
 
 countyDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/county_counts_RRB_test3_cleaned'
@@ -58,11 +60,12 @@ countyDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/county_counts_RRB_
 # get filenames
 countyfiles <- list.files(countyDir, pattern="*randFor_interannual_allCounties_allClasses.csv")
 
-# 2004 doesn't have any irrigated!...wait. what? wrong.
-countysub <- countyfiles[c(4,9,14)]
+# 2004 doesn't have any irrigated!...wait. what? wrong. GEE histogram error.
+# load just census years.
+countysub <- countyfiles[c(2,4,7,9,12,14)]
 
 # read in to a single dataframe
-countyAll0 = do.call(rbind, lapply(countysub, function(x) {
+countyAll = do.call(rbind, lapply(countysub, function(x) {
              # print(x)
               csv <- read.csv(paste0(countyDir,'/',x), stringsAsFactors = FALSE)
               csv$year <- as.numeric(substr(x, start=1,stop=4))
@@ -73,8 +76,6 @@ countyAll0 = do.call(rbind, lapply(countysub, function(x) {
                             'ninety','proportion', 'area_km2')]
             }))
 
-# subset for the years desired
-countyAll <- countyAll0[countyAll0$year %in% yearsDesired,]
 
 # convert cell count to area
 countyAll$irrigated_m2 <- countyAll$X1 * cellArea
@@ -96,9 +97,13 @@ state.fips$STATEFP <- sprintf("%02d",state.fips$fips) # add leading zero
 countyAll <- merge(countyAll, state.fips[,c('abb','STATEFP')], 
                    by.x = 'state2', by.y = 'STATEFP',all.y=F)
 
-# select counties with more than 90% within boundary
-countyAll <- countyAll[countyAll$proportion > 0.9,]
-nrow(countyAll)/3 # number of counties
+# # select counties with more than 90% within boundary
+# countyAll <- countyAll[countyAll$proportion > 0.9,]
+# nrow(countyAll)/3 # number of counties
+
+# select counties 100% within bounds
+countyAll <- countyAll[countyAll$proportion == 1,]
+length(unique(countyAll$fips5))
 
 # # write out csv for Anthony to use
 # anthony <- countyAll[countyAll$year == 2002,c('state2','fips5','fips3','abb')]
@@ -111,7 +116,7 @@ nrow(countyAll)/3 # number of counties
 From the NASS Quick Stats API, using county list generated above
 
 re-run on 1/24/2017 to get all counties 90% or greater within RRB/RRCA bound.
-On this date, also retrieved data for all counties in the HPA using 2.00_NASS_countyStats.Rmd, in order to 
+On this date, also retrieved data for all counties in the HPA using 2.00_NASS_countyStats.Rmd, in order to safeguard data.
 
 ### Get Data 
 And write out to not rely on NASS API
@@ -246,6 +251,8 @@ ggplot(merged2012, aes(x=IRRIGATED,y=irrArea.km2)) +
   ggtitle('2012 RS vs NASS by County') + theme_bw()
 ```
 
+### Multipanel NASS
+
 ```{r multipanel_bigger_usda,  fig.width = 8, fig.height = 3}
 allyears <- rbind(merged2002, merged2007, merged2012)
 
@@ -257,11 +264,96 @@ ggplot(allyears, aes(x=IRRIGATED,y=irrArea.km2)) +
   facet_wrap(~year, nrow=1) +
   ylab(expression(paste("HP-AIM Area (", km^2,")"))) + 
   xlab(expression(paste('USDA County Area (', km^2,')'))) + theme_bw() +
-       theme(text = element_text(size = 15)) #+
-  #ggtitle('2012 RS vs NASS by County')   
+       theme(text = element_text(size = 15))  
 ```
 
-```{r totalAreaBar, fig.height = 2.5, fig.width = 3}
+
+### USGS Waterdata
+just USGS data
+
+```{r usgs, fig.height = 6}
+# load data (compiled by Anthony)
+usgsdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass/USGS_waterdata_county'
+usgsname <- 'irrigation_water_use_by_county_1985_2010_w_acreage.csv'
+usgsAll <- read.csv(paste0(usgsdir,'/',usgsname))
+
+# make a fips column
+usgsAll$fips5 <- paste0(sprintf("%02d",usgsAll$State_Code),
+                        sprintf("%03d",usgsAll$Area_Code))
+
+# subset to the 35 county fips
+goodFips <- unique(countyAll$fips5)
+usgsIn <- usgsAll[usgsAll$fips5 %in% goodFips,]
+
+# convert "thousand acres" to irrArea.km2
+usgsIn$IRRIGATED <- usgsIn$IR.IrTot * 1000 * 0.00404686
+
+# subset to relevant years
+usgsYears <- usgsIn[usgsIn$Year %in% c(2000,2005,2010),]
+
+# subset columns
+usgs <- usgsYears[,c('fips5', 'IRRIGATED','Year')]
+names(usgs)[3] <- 'year'
+
+# merge with remote sensing data -------------
+usgs$yearfips <- paste0(usgs$year, '-', usgs$fips5)
+
+countyUSGS <- countyAll[countyAll$year %in% c(2000,2005,2010),]
+countyUSGS$yearfips <- paste0(countyUSGS$year, '-', countyUSGS$fips5)
+
+mergedUSGS <- merge(usgs, countyUSGS[,c('yearfips','irrArea.km2')])
+mergedUSGS <- mergedUSGS[,c('fips5','IRRIGATED', 'year', 'irrArea.km2')]
+
+# add source
+mergedUSGS$source <- 'usgs'
+
+# gutcheck plot: usgs data over time
+ggplot(mergedUSGS, aes(year,IRRIGATED, colour = fips5)) +
+  geom_line() +
+  geom_point() + theme_bw() +
+  ggtitle('USGS Waterdata by county') + ylab('irrigated area (km^2)')
+```
+
+plot usgs data vs remote sensing, by year 
+
+```{r usgs_panel,fig.width = 8, fig.height = 3}
+# plot
+ggplot(mergedUSGS, aes(x=IRRIGATED,y=irrArea.km2)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) + 
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 100, ypos = 800) +
+  #geom_smooth(method="lm",se=FALSE) +
+  facet_wrap(~year, nrow=1) +
+  ylab(expression(paste("HP-AIM Area (", km^2,")"))) + 
+  xlab(expression(paste('USGS County Area (', km^2,')'))) + theme_bw() +
+       theme(text = element_text(size = 15))  
+```
+
+multipanel with nass data
+
+```{r nassusgs, fig.width = 8, fig.height = 6}
+# combine with NASS data
+allyears$source <- 'NASS'
+
+countyValid <- rbind(allyears, mergedUSGS)
+     
+# plot
+ggplot(countyValid, aes(x=IRRIGATED,y=irrArea.km2)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) + 
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 100, ypos = 800) +
+  #geom_smooth(method="lm",se=FALSE) +
+  facet_wrap(~year, nrow=2) +
+  ylab(expression(paste("HP-AIM Area (", km^2,")"))) + 
+  xlab(expression(paste('County Statistics (', km^2,')'))) + theme_bw() +
+       theme(text = element_text(size = 15))
+```
+
+### Area Bar Charts
+
+NASS only
+
+```{r totalAreaBar_NASS, fig.height = 2.5, fig.width = 3}
 areadata <- allyears
 names(areadata) <- c('fips5', 'NASS','Year','HP_AIM')
 
@@ -280,7 +372,7 @@ ggplot(data = area.gg, aes(Year, sq_km)) +
 
 ```
 
-```{r totalAreaBar_LEGEND, fig.height = 3, fig.width = 3}
+```{r totalAreaBar_LEGEND_NASS, fig.height = 3, fig.width = 3}
 areadata <- allyears
 names(areadata) <- c('fips5', 'NASS','Year','HP_AIM')
 
@@ -300,6 +392,32 @@ ggplot(data = area.gg, aes(Year, sq_km)) +
                      text = element_text(size = 15))
 
 ```
+
+USGS and NASS
+
+```{r totalAreaBar_USGSNASS}
+areadata2 <- countyValid
+names(areadata2) <- c('fips5', 'Stats','Year','HP_AIM','source')
+
+# sum area by year
+areaAgg2 <- aggregate(cbind(Stats, HP_AIM) ~ Year, data = areadata2, FUN = 'sum')
+
+# long format
+area.gg2 <- gather(areaAgg2, key = dataset, value = sq_km, Stats:HP_AIM)
+
+ggplot(data = area.gg2, aes(Year, sq_km)) +
+  geom_bar(aes(fill = dataset), position = 'dodge', stat='identity') +
+   ylab(expression(paste("Irrigated Area (", km^2,")"))) + 
+  scale_x_continuous(name = '', breaks = c(2000,2002,2005,2007,2010,2012), 
+                     labels = c(2000,2002,2005,2007,2010,2012)) +
+  scale_fill_discrete("", labels=c('HP-AIM','NASS/USGS')) +
+  theme_bw() + theme(legend.position = 'top',
+                     text = element_text(size = 15))
+
+
+
+```
+
 
 ## error in space
 
