@@ -12,6 +12,8 @@ knitr::opts_chunk$set(echo = TRUE, cache=TRUE, cache.path='cache/1.18_rrbRandFor
 
 Goal: Run a variable importance test on a random forest of my training points
 
+Update: 2/26/2017 - Classify the MidRep validation points with R's random forest tree and compare with GEE's classification
+
 randomForest package implementation:
  reference implementation based on CART trees
 (Breiman, 2001; Liaw and Wiener, 2008)
@@ -62,6 +64,8 @@ annualNoSoy <- pointsNoSoy2[, columnsWanted]
 ```
 
 ## Random Forest
+
+### Monthly random forest
 First I do a random forest that mimics my GEE test (500 trees)
 ```{r rf500, fig.height = 8}
 # run a random forest on all 57 variables
@@ -132,7 +136,7 @@ plot(fit2000)
 
 
 
-## Annual Random Forest
+### Annual Random Forest
 
 This dataset doesn't include dryland soy, nor any monthly variables (extracted above in the load data chunk)
 
@@ -153,7 +157,7 @@ barplot(VI_F.ann/sum(VI_F.ann), las=3)
 ```
 
 
-## Play with variable reduction
+### Play with variable reduction
 
 ```{r varReduction}
 # run a random forest on all 57 variables
@@ -168,5 +172,117 @@ atest <- varSelRF(xdata = annualNoSoy[,1:20], whole.range=F,
                     Class = as.factor(annualNoSoy$classes),
                     ntree = 2000)
 atest
+```
+
+## Make Predictions
+Use the R-generated random forest to make predictions on the Middle Republican validation points. Mimic the GEE rf classification, so 500 trees? 
+
+This is for the monthly classifier.
+
+### predict
+Use the validation points that have sampled the 57 input variables from the 01.1_ValidationPointsSample script in my GEE 'validation' folder
+
+```{r predict}
+# load points and variable data
+vpointFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/validationSets'
+p2007 <- read.csv(paste0(vpointFolder,'/2007_test3_variables_midRep_all.csv'))
+p2010 <- read.csv(paste0(vpointFolder,'/2010_test3_variables_midRep_all.csv'))
+
+# par down dfs
+unique(p2007$certainty)
+p2007 <- p2007[ , -which(names(p2007) %in% c('.geo'))]
+p2010 <- p2010[ , -which(names(p2010) %in% c('.geo'))]
+
+
+# run the random forest (monthly, no soy, all 57 variables)
+# run a random forest on all 57 variables
+set.seed(415)
+fit500.ns <- randomForest(x = pointsNoSoy2[,1:57], # all variable columns 
+                    y = as.factor(pointsNoSoy2$classes),
+                    ntree = 500,
+                    importance = TRUE)
+
+# look at variable importance
+varImpPlot(fit500.ns)
+
+# run predictions/classification
+p2007$randFor <- predict(fit500.ns, newdata = p2007, type='response')
+p2010$randFor <- predict(fit500.ns, newdata = p2010, type='response')
+```
+
+### assess
+Use the accuracy assessment exports from GEE validation to compare results between GEE and Rrrr
+
+```{r compare}
+# load GEE accuracy tables
+accuDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
+g2007 <- read.csv(paste0(accuDir,
+        '/2007_MidRep60_confusionData_RRB_test3_randFor_interannual_maskFixed_allClasses.csv'))
+g2010 <- read.csv(paste0(accuDir,
+        '/2010_MidRep60_confusionData_RRB_test3_randFor_interannual_maskFixed_allClasses.csv'))
+
+g2007 <- g2007[ , -which(names(g2007) %in% c('.geo'))]
+g2010 <- g2010[ , -which(names(g2010) %in% c('.geo'))]
+
+# extract important columns from r dataset
+rColNamesWanted <- c('system.index','class','classNum','randFor')
+p2007.less <- p2007[,rColNamesWanted]
+p2010.less <- p2010[,rColNamesWanted]
+
+# combine
+geeR.2007 <- merge(g2007, p2007.less, by = 'system.index',all=F)
+geeR.2010 <- merge(g2010, p2010.less, by = 'system.index',all=F)
+# make sure the system index is an ok column to merge on
+sum(!(geeR.2007$classNum.x == geeR.2007$classNum.y))
+
+# convert GEE's classifications from numbers to words
+key7 <- data.frame(b2007 = c(0,1,2),
+                  gee_rf = c('dryland','irrigated','noncrop'))
+
+key10 <- data.frame(b2010 = c(0,1,2),
+                  gee_rf = c('dryland','irrigated','noncrop'))
+
+geeR.2007 <- merge(geeR.2007, key7)
+geeR.2010 <- merge(geeR.2010, key10)
+
+# quick check for matches between gee and R
+sum(!(geeR.2007$gee_rf == geeR.2007$randFor))
+sum(!(geeR.2010$gee_rf == geeR.2010$randFor))
+
+# give percentages
+(nrow(geeR.2007) - sum(!(geeR.2007$gee_rf == geeR.2007$randFor))) / nrow(geeR.2007)
+(nrow(geeR.2010) - sum(!(geeR.2010$gee_rf == geeR.2010$randFor))) / nrow(geeR.2010)
+```
+
+Not awful, but check to see if most of the confusion is between noncrop/dryland
+
+```{r compare2class}
+# make keys to convert classifications from 2 classes to 1
+key2class.1 = data.frame(gee_rf = c('dryland','irrigated','noncrop'),
+                         gee_rf2 = c('nonirr','irrigated','nonirr'))
+key2class.2 = data.frame(randFor = c('dryland','irrigated','noncrop'),
+                         randFor2 = c('nonirr','irrigated','nonirr'))
+
+geeR.2007 <- merge(geeR.2007, key2class.1)
+geeR.2007 <- merge(geeR.2007, key2class.2)
+
+geeR.2010 <- merge(geeR.2010, key2class.1)
+geeR.2010 <- merge(geeR.2010, key2class.2)
+
+# quick check for matches between gee and R
+sum(!(geeR.2007$gee_rf2 == geeR.2007$randFor2))
+sum(!(geeR.2010$gee_rf2 == geeR.2010$randFor2))
+
+# give percentages
+(nrow(geeR.2007) - sum(!(geeR.2007$gee_rf2 == geeR.2007$randFor2))) / nrow(geeR.2007)
+(nrow(geeR.2010) - sum(!(geeR.2010$gee_rf2 == geeR.2010$randFor2))) / nrow(geeR.2010)
+```
+
+That does improve the "consistency" between programs. Or likely, random seeds.
+
+Check to see which is more accurate?
+
+```{r compareAccuracy}
+
 ```
 
