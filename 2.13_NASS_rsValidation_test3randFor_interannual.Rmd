@@ -13,6 +13,8 @@ Re-run on 1/25/17 with updated NASS cleaning function (removing double counting 
 
 update 2/21/2017: adding USGS Waterdata county acreage for years 2000, 2005, 2010; used only counties 100% within boundary
 
+update 2/24/2017 - uses the regional stats files instead of the county files
+
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
@@ -49,46 +51,53 @@ In GEE, I calculated the number of cells of each classification type in each cou
 
 Here, I load this dataset from yearly files, add a year attribute, and converting cell counts to areas (both retained).
 
-
+** current task: use regional stats csvs, not county stats, to avoid missed classes **
 
 ```{r loadGee}
 yearsDesired <- c(2000, 2002, 2005, 2007, 2010, 2012)
 cellArea <- 30*30 # m^2
 
-countyDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/county_counts_RRB_test3_cleaned'
+countyDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/regionalStats_RRB'
 
 # get filenames
-countyfiles <- list.files(countyDir, pattern="*randFor_interannual_allCounties_allClasses.csv")
-
-# 2004 doesn't have any irrigated!...wait. what? wrong. GEE histogram error.
-# load just census years.
-countysub <- countyfiles[c(2,4,7,9,12,14)]
+countyfiles <- list.files(countyDir, pattern="*randFor_cleaned_plusAncillary_interannual_to2016_moreRegions.csv")
 
 # read in to a single dataframe
-countyAll = do.call(rbind, lapply(countysub, function(x) {
+countyAll = do.call(rbind, lapply(countyfiles, function(x) {
              # print(x)
-              csv <- read.csv(paste0(countyDir,'/',x), stringsAsFactors = FALSE)
+              csv0 <- read.csv(paste0(countyDir,'/',x), stringsAsFactors = FALSE)
+              # extract county regions only
+              csv <- csv0[grepl('county',csv0$masterID),]
+              # make columns
               csv$year <- as.numeric(substr(x, start=1,stop=4))
-              csv$fips5 <- sprintf("%05d",csv$fips5)
-              csv$fips3 <- sprintf("%03d",csv$COUNTYFP)
-              csv$state2 <- sprintf("%02d",csv$STATEFP)
-              csv <- csv[,c('fips5','state2','fips3','X0','X1','X2','name','year',
-                            'ninety','proportion', 'area_km2')]
+              csv$fips5 <- substr(csv$masterID, start=11,stop=15)
+              csv$fips3 <- substr(csv$masterID, start=13,stop=15)
+              csv$state2 <- substr(csv$masterID, start=11,stop=12)
+              csv <- csv[,c('fips5','state2','fips3','X0','X1','masterID','year')]
             }))
 
+# subset counties -------------------
+# get kml with county proportion in bounds
+countyShape <- readOGR('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile',
+            'Counties_RRCAextent_Clip', verbose=F)
+# retrieve list of fips within bounds
+fips.in <- as.character(countyShape[countyShape$proportion == 1,]$fips5)
+
+# keep counties 100% within the rrca
+countyAll <- countyAll[countyAll$fips5 %in% fips.in,]
 
 # convert cell count to area
 countyAll$irrigated_m2 <- countyAll$X1 * cellArea
 countyAll$irrArea.km2 <- countyAll$irrigated_m2 / 1000000
 
-# convert dryland cell count to area
-countyAll$dryland_m2 <- countyAll$X0 * cellArea
-countyAll$dryland_km2 <- countyAll$dryland_m2 / 1000000
-
-# convert cropland area to km^2 for RS
-# convert cell count to area
-countyAll$cropland_m2 <- (countyAll$X1+countyAll$X0) * cellArea
-countyAll$cropland_km2 <- countyAll$cropland_m2 / 1000000
+# # convert dryland cell count to area
+# countyAll$dryland_m2 <- countyAll$X0 * cellArea
+# countyAll$dryland_km2 <- countyAll$dryland_m2 / 1000000
+# 
+# # convert cropland area to km^2 for RS
+# # convert cell count to area
+# countyAll$cropland_m2 <- (countyAll$X1+countyAll$X0) * cellArea
+# countyAll$cropland_km2 <- countyAll$cropland_m2 / 1000000
 
 # add a state 2-letter abbrev column
 # fill in state abbrevs column based on FIPS
@@ -96,14 +105,6 @@ data(state.fips)  # from maps package
 state.fips$STATEFP <- sprintf("%02d",state.fips$fips) # add leading zero
 countyAll <- merge(countyAll, state.fips[,c('abb','STATEFP')], 
                    by.x = 'state2', by.y = 'STATEFP',all.y=F)
-
-# # select counties with more than 90% within boundary
-# countyAll <- countyAll[countyAll$proportion > 0.9,]
-# nrow(countyAll)/3 # number of counties
-
-# select counties 100% within bounds
-countyAll <- countyAll[countyAll$proportion == 1,]
-length(unique(countyAll$fips5))
 
 # # write out csv for Anthony to use
 # anthony <- countyAll[countyAll$year == 2002,c('state2','fips5','fips3','abb')]
@@ -206,7 +207,7 @@ abline(b=1, a=0)
 
 Here we go: compare irrigated areas by county
 
-```{r compare}
+```{r NASS_singleState}
 # merge data
 # countyAll.1997 <- countyAll[countyAll$year == 1997,]
 # merged1997 <- merge(rrb1997.irr, countyAll.1997[,c('fips5','irrArea.km2')])
@@ -272,7 +273,7 @@ ggplot(allyears, aes(x=IRRIGATED,y=irrArea.km2)) +
 just USGS data
 
 ```{r usgs, fig.height = 6}
-# load data (compiled by Anthony)
+# load usgs water data (compiled by Anthony)
 usgsdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass/USGS_waterdata_county'
 usgsname <- 'irrigation_water_use_by_county_1985_2010_w_acreage.csv'
 usgsAll <- read.csv(paste0(usgsdir,'/',usgsname))
@@ -282,8 +283,7 @@ usgsAll$fips5 <- paste0(sprintf("%02d",usgsAll$State_Code),
                         sprintf("%03d",usgsAll$Area_Code))
 
 # subset to the 35 county fips
-goodFips <- unique(countyAll$fips5)
-usgsIn <- usgsAll[usgsAll$fips5 %in% goodFips,]
+usgsIn <- usgsAll[usgsAll$fips5 %in% fips.in,]
 
 # convert "thousand acres" to irrArea.km2
 usgsIn$IRRIGATED <- usgsIn$IR.IrTot * 1000 * 0.00404686
@@ -414,10 +414,33 @@ ggplot(data = area.gg2, aes(Year, sq_km)) +
   theme_bw() + theme(legend.position = 'top',
                      text = element_text(size = 15))
 
-
-
 ```
 
+### RS vs County Stats Area (line and bar)
+Make a plot showing county areas over time, with county stats when available
+
+```{r totalArea_lineBar}
+# sum irrigated area by county
+annualCounty <- aggregate(irrArea.km2 ~ year, data = countyAll, FUN = 'sum')
+
+# stats datasets
+stats <- area.gg2[area.gg2$dataset == 'Stats',]
+stats$type <- NA
+stats[stats$Year %in% c(2000,2005,2010),'type'] <- 'USGS'
+stats[stats$Year %in% c(2002,2007,2012),'type'] <- 'USDA'
+
+# plot it yo
+ggplot(data=annualCounty, aes(x=year, y = irrArea.km2)) +
+  geom_bar(data = stats, aes(x=Year, y = sq_km, fill = type), stat='identity') +
+  geom_line() + geom_point() + theme_bw() +
+  ylab(expression(paste("Irrigated Area (", km^2,")"))) + 
+  scale_x_continuous(name = '', breaks = c(2000,2002,2005,2007,2010,2012,2015), 
+                     labels = c(2000,2002,2005,2007,2010,2012,2015)) + 
+  scale_fill_discrete("", labels=c('USDA','USGS')) 
+
+        
+
+```
 
 ## error in space
 
@@ -476,7 +499,9 @@ spplot(cntydiffall, c('percErr_2002','percErr_2007','percErr_2012'),
 ## All cropland
 Random forest seems to perform much better in distinguishing noncrop from dryland ag, so I'm going to see how the numbers for total ag land look.
 
-```{r allCropland_munge}
+update 2/25/2017 - turned these chunks off since the 'regional stats' cell count summary just does irrigated and not
+
+```{r allCropland_munge, eval=FALSE}
 # get total cropland by NASS county
 # get irrigated acreage by county
 #rrb1997.tot <- aggregate(TOTAL ~ fips5, data=rrb1997, FUN='sum')
@@ -500,7 +525,7 @@ merged2012.tot <- merge(rrb2012.tot, countyAll.2012[,c('fips5','cropland_km2')])
 allyears.tot <- rbind(merged2002.tot, merged2007.tot, merged2012.tot)
 ```
 
-```{r multipanel_bigger_usda_total,  fig.width = 8, fig.height = 3}
+```{r multipanel_bigger_usda_total,  fig.width = 8, fig.height = 3, eval=FALSE}
 ggplot(allyears.tot, aes(x=TOTAL,y=cropland_km2)) +
   geom_point() +
   geom_abline(slope = 1, intercept = 0) + 
@@ -513,7 +538,7 @@ ggplot(allyears.tot, aes(x=TOTAL,y=cropland_km2)) +
   ggtitle('Total Cropland, RS vs NASS by 47 County')   
 ```
 
-```{r totalAreaBar_LEGEND_total, fig.height = 3, fig.width = 3}
+```{r totalAreaBar_LEGEND_total, fig.height = 3, fig.width = 3, eval=FALSE}
 areadata.tot <- allyears.tot
 names(areadata.tot) <- c('fips5', 'NASS','Year','HP_AIM')
 
@@ -538,7 +563,7 @@ ggplot(data = area.gg, aes(Year, sq_km)) +
 ## Dryland
 Random forest seems to perform much better in distinguishing noncrop from dryland ag, so I'm going to see how the numbers for total ag land look.
 
-```{r dryland_munge}
+```{r dryland_munge, eval = FALSE}
 # get total cropland by NASS county
 # get irrigated acreage by county
 #rrb1997.tot <- aggregate(TOTAL ~ fips5, data=rrb1997, FUN='sum')
@@ -562,7 +587,7 @@ merged2012.dry <- merge(rrb2012.dry, countyAll.2012[,c('fips5','dryland_km2')])
 allyears.dry <- rbind(merged2002.dry, merged2007.dry, merged2012.dry)
 ```
 
-```{r multipanel_bigger_usda_dryland,  fig.width = 8, fig.height = 3}
+```{r multipanel_bigger_usda_dryland,  fig.width = 8, fig.height = 3, eval=FALSE}
 ggplot(allyears.dry, aes(x=NON_IRR,y=dryland_km2)) +
   geom_point() +
   geom_abline(slope = 1, intercept = 0) + 
@@ -575,7 +600,7 @@ ggplot(allyears.dry, aes(x=NON_IRR,y=dryland_km2)) +
   ggtitle('dryland, RS vs NASS by 47 County')   
 ```
 
-```{r totalAreaBar_LEGEND_dry, fig.height = 3, fig.width = 3}
+```{r totalAreaBar_LEGEND_dry, fig.height = 3, fig.width = 3, eval=FALSE}
 areadata.dry <- allyears.dry
 names(areadata.dry) <- c('fips5', 'NASS','Year','HP_AIM')
 
