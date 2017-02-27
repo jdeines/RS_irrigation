@@ -1,0 +1,107 @@
+---
+title: "Statistical Model"
+author: "Jill Deines"
+date: "February 27, 2017"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Investigate relationship among irrigated area, precip, pumping volume, and crop prices over time 
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, 
+               fig.path='figure/6.05_statModels/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(ggplot2)
+```
+
+## Data wrangling
+
+### NASS crop price data
+
+First, make a table of inflation adjustments relative to 2015, the final year available in my NASS price dataset. Write out so this is static and not dependent on external download
+
+```{r inflationTable, eval=FALSE}
+# adjust for inflation
+library(lubridate) 
+library(dplyr) 
+
+# download the consumer price index and get adjustments 
+monthly_cpi <- read.csv("http://research.stlouisfed.org/fred2/data/CPIAUCSL.csv",
+                        header = TRUE)
+monthly_cpi$cpi_year <- year(monthly_cpi$DATE)
+yearly_cpi <- monthly_cpi %>% group_by(cpi_year) %>% summarize(cpi = mean(VALUE))
+yearly_cpi$adj_factor_2015 <- yearly_cpi$cpi/yearly_cpi$cpi[yearly_cpi$cpi_year == 2015]
+# for posterity
+yearly_cpi$adj_factor_2016 <- yearly_cpi$cpi/yearly_cpi$cpi[yearly_cpi$cpi_year == 2016]
+yearly_cpi$adj_factor_2017 <- yearly_cpi$cpi/yearly_cpi$cpi[yearly_cpi$cpi_year == 2017]
+
+# write out
+nassdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass/price'
+write.csv(yearly_cpi, paste0(nassdir, '/cpi_priceAdjustments.csv'), 
+          row.names=F)
+```
+
+Price data was downloaded manually from the NASS quickstats tool (https://quickstats.nass.usda.gov/) for the following query: SURVEY - CROPS - FIELD CROPS - CORN/SOYBEANS/WHEAT/HAY/SORGHUM - PRICE RECEIVED - 
+
+* CORN, GRAIN - PRICE RECEIVED, MEASURED IN $ / BU
+* HAY, PRICE RECEIVED, MEASURED IN $ / TON (short ton)
+* SORGHUM, GRAIN - PRICE RECEIVED, MEASURED IN $ / CWT (hundredweight)
+* SOYBEANS - PRICE RECEIVED, MEASURED IN $ / BU
+* WHEAT - PRICE RECEIVED, MEASUTED IN $ / BU
+
+- TOTAL - NATIONAL - US TOTAL - 1996:2015 - ANNUAL - YEAR
+
+
+Here, I load the data and clean it to have consistent pricing across crops and years
+
+```{r nassPrice}
+# load nass
+nassdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass/price'
+price0 <- read.csv(paste0(nassdir, '/nass_prices_5crops_national_1996-2015.csv'))
+
+# load consumer price index adjustments
+cpi <- read.csv(paste0(nassdir, '/cpi_priceAdjustments.csv'))
+
+# make a units columns
+unitkey <- data.frame(Commodity = c('CORN','HAY','SORGHUM','SOYBEANS','WHEAT'),
+                      unit = c('BU','TON','CWT','BU','BU'))
+price0 <- merge(price0,unitkey)
+
+# remove silly columns
+price0 <- price0[,c('Commodity','Year','Value','unit')]
+
+# add the adjustment factor
+price <- merge(price0, cpi[,c('cpi_year','adj_factor_2015')], by.x = 'Year', 
+               by.y = 'cpi_year')
+
+# adjust prices
+price$price_2015 <- price$Value / price$adj_factor_2015
+
+# plot it - unadjusted
+ggplot(data = price, aes(x=Year, y = Value)) +
+  geom_line() +
+  facet_wrap(~Commodity, scales='free_y') + theme_bw() +
+  ggtitle('Nomial (unadjusted) Crop Prices') 
+
+
+# plot it
+ggplot(data = price, aes(x=Year, y = price_2015)) +
+  geom_line() +
+  facet_wrap(~Commodity, scales='free_y') + theme_bw() +
+  ggtitle('Inflation-adjusted Crop Prices')
+
+# extract only corn
+cornprice <- price[price$Commodity == 'CORN',]
+
+ggplot(data = cornprice, aes(x=Year, y = price_2015)) +
+  geom_line() + theme_bw() +
+  ggtitle('Inflation-adjusted Corn Prices')
+```
+
