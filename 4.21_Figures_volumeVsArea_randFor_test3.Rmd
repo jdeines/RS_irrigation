@@ -79,7 +79,7 @@ irrStates.RRCA.km3$key <- paste0(irrStates.RRCA.km3$state, irrStates.RRCA.km3$ye
 ggplot(data = irrStates.RRCA.km3,
        aes(x = year, y = total_km3, colour=state)) +
   geom_line() + theme_bw() +
-  ggtitle('Pumping by State RRCA')
+  ggtitle('Irrigation Volume by State RRCA')
 
 ### sum areas by state RRB basin --------------------------------------
 # extract only RRB cells
@@ -96,7 +96,7 @@ irrStates.RRB.km3$key <- paste0(irrStates.RRB.km3$state, irrStates.RRB.km3$year)
 ggplot(data = irrStates.RRB.km3,
        aes(x = year, y = total_km3, colour=state)) +
   geom_line() + theme_bw() +
-  ggtitle('Pumping by State RRB')
+  ggtitle('Total Irrigation by State RRB')
 
 # total pumping by type for full RRCA -----------------------------------
 # sum pumping types by year
@@ -121,6 +121,11 @@ ggplot(data=allIrr.years.long,
   scale_fill_brewer(palette='Paired') +
   theme_bw() +
   ggtitle('Total Irrigation by Type, RRCA')
+
+# export the cleaned dataset that retains state and type
+derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
+write.csv(irrStates.RRCA.km3, row.names=F,
+          paste0(derivedDir, '/RRCA_fullModel_irrigation_volume.csv'))
 ```
 
 I now need to propagate these changes through the plots.
@@ -145,6 +150,40 @@ all1$irrigated_m2 <- all1$X1 * cellArea
 all1$irrigated_km2 <- all1$irrigated_m2 / 1000000
 
 # state basin data only
+areaRRCA.states <- all1[grepl('_rrcaBound', all1$masterID),]
+
+# keep fewer columns (location, year, irrigated area, annual (Dec-Aug) precip)
+areaRRCA.states <- areaRRCA.states[,c('masterID','year','irrigated_km2','pr_ann')]
+
+# add a year column and an id column to merge with pumping
+areaRRCA.states$state <- substr(areaRRCA.states$masterID, start=1, stop=2)
+areaRRCA.states$key <- paste0(areaRRCA.states$state,areaRRCA.states$year)
+
+# export to derived dataset folder
+derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
+#write.csv(areaRRCA.states, paste0(derivedDir, '/RRCA_fullModel_area-rfTest3_ppt-dec-aug.csv'), 
+#          row.names=F)
+```
+
+## RRCA groundwater model boundary analyses
+started 3/1/2017
+
+```{r rrcaPlots}
+# merge pumping and area data
+plotData2 <- merge(areaRRCA.states, irrStates.RRCA.km3, by='key', all.x = T)
+plotData2 <- plotData2[,c('year.x','state.x','irrigated_km2','total_km3','pr_ann')]
+
+# format for ggplot
+plotDataLong2 <- gather(plotData2, key = variable, value = value,
+                       irrigated_km2:pr_ann)
+```
+
+---- end 3/1 edits - still needs updated for RRCA model bounds
+
+## Republican Basin Boundary analyses
+
+```{r stateBasinPlots}
+# state basin data only
 areaStates <- all1[grepl('basin', all1$masterID) & !grepl('NRD', all1$masterID),]
 
 # keep fewer columns (location, year, irrigated area, annual (Dec-Aug) precip)
@@ -153,14 +192,10 @@ areaStates <- areaStates[,c('masterID','year','irrigated_km2','pr_ann')]
 # add a year column and an id column to merge with pumping
 areaStates$state <- substr(areaStates$masterID, start=1, stop=2)
 areaStates$key <- paste0(areaStates$state,areaStates$year)
-```
 
-## plots
-
-```{r stateBasinPlots}
 # merge pumping and area data
-plotData <- merge(areaStates, pumpingStates, by='key', all.x = T)
-plotData <- plotData[,c('year.x','state.x','irrigated_km2','volume_km3','pr_ann')]
+plotData <- merge(areaStates, irrStates.RRB.km3, by='key', all.x = T)
+plotData <- plotData[,c('year.x','state.x','irrigated_km2','total_km3','pr_ann')]
 
 # format for ggplot
 plotDataLong <- gather(plotData, key = variable, value = value,
@@ -204,10 +239,10 @@ ggplot(data = plotDataLong[plotDataLong$state.x == state,],
 
 ```{r fullRRB_plots, fig.height = 5.5, fig.width = 6}
 # replace volume NA's with 0 for now
-plotData[is.na(plotData$volume_km3),'volume_km3'] <- 0
+plotData[is.na(plotData$total_km3),'total_km3'] <- 0
 
 # get irrigated area and pumping for full basin
-plotDataRRB <- aggregate(cbind(irrigated_km2,volume_km3) ~  year.x, 
+plotDataRRB <- aggregate(cbind(irrigated_km2,total_km3) ~  year.x, 
                          data = plotData, FUN = 'sum', na.rm = T)
 # and do the mean for precip
 rrbPrecip <- aggregate(pr_ann ~  year.x, data = plotData, FUN = 'mean')
