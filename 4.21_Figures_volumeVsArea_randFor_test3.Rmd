@@ -124,8 +124,8 @@ ggplot(data=allIrr.years.long,
 
 # export the cleaned dataset that retains state and type
 derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
-write.csv(irrStates.RRCA.km3, row.names=F,
-          paste0(derivedDir, '/RRCA_fullModel_irrigation_volume.csv'))
+#write.csv(irrStates.RRCA.km3, row.names=F,
+#          paste0(derivedDir, '/RRCA_fullModel_irrigation_volume.csv'))
 ```
 
 I now need to propagate these changes through the plots.
@@ -136,7 +136,7 @@ cellArea <- 30*30 # m^2
 regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/regionalStats_RRB'
 
 # get filenames
-files <- list.files(regionsDir, pattern="*randFor_cleaned_plusAncillary_interannual_to2016_moreRegions.csv")
+files <- list.files(regionsDir, pattern="*randFor_cleaned_plusAncillary_interannual_to2016_moreRegions_rrcaBoundNamesFixed.csv")
 
 # read in to a single dataframe
 all1 = as.data.frame(do.call(rbind, lapply(files, function(x) {
@@ -161,8 +161,8 @@ areaRRCA.states$key <- paste0(areaRRCA.states$state,areaRRCA.states$year)
 
 # export to derived dataset folder
 derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
-#write.csv(areaRRCA.states, paste0(derivedDir, '/RRCA_fullModel_area-rfTest3_ppt-dec-aug.csv'), 
-#          row.names=F)
+write.csv(areaRRCA.states, paste0(derivedDir, '/RRCA_fullModel_area-rfTest3_ppt-dec-aug.csv'), 
+          row.names=F)
 ```
 
 ## RRCA groundwater model boundary analyses

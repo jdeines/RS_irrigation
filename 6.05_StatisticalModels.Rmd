@@ -19,6 +19,10 @@ opts_chunk$set(cache=FALSE,
 
 ```{r packages, message=FALSE, echo=TRUE}
 library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(corrplot)
+library(Hmisc)
 ```
 
 ## Data wrangling
@@ -81,7 +85,7 @@ price0 <- price0[,c('Commodity','Year','Value','unit')]
 price <- merge(price0, cpi[,c('cpi_year','adj_factor_2015')], by.x = 'Year', 
                by.y = 'cpi_year')
 
-# adjust prices
+# adjust prices (note: matched trials at https://data.bls.gov/cgi-bin/cpicalc.pl)
 price$price_2015 <- price$Value / price$adj_factor_2015
 
 # plot it - unadjusted
@@ -103,5 +107,115 @@ cornprice <- price[price$Commodity == 'CORN',]
 ggplot(data = cornprice, aes(x=Year, y = price_2015)) +
   geom_line() + theme_bw() +
   ggtitle('Inflation-adjusted Corn Prices')
+
+# write out dataset
+derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
+write.csv(cornprice, paste0(derivedDir, '/price_nass_corn_1996-2015.csv'), 
+          row.names=F)
 ```
+
+## Analyses
+
+### Load Data
+loads datasets produced/cleaned from other scripts
+
+```{r loadData}
+derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
+
+# usda nass annual corn price, $ / bushel
+cornprice <- read.csv(paste0(derivedDir, '/price_nass_corn_1996-2015.csv'))
+
+# irrigation area and precipitation
+area.state <- read.csv(paste0(derivedDir, '/RRCA_fullModel_area-rfTest3_ppt-dec-aug.csv'))
+
+# irrigation volume
+volume.state <- read.csv(paste0(derivedDir, '/RRCA_fullModel_irrigation_volume.csv'))
+
+# merge pumping, area, precip data
+byState <- merge(area.state, volume.state, by='key', all.x = T)
+dropCols <- c('key','masterID','state.y','year.y')
+byState <- byState %>% select(-one_of(dropCols))
+names(byState)[c(1,4)] <- c('year','state')
+
+# aggregate to full RRCA model region
+rrcairrigation <- aggregate(cbind(irrigated_km2, total_km3, gwirr_km3, swirr_km3, coirr_km3)
+                            ~ year,
+                            data = byState, FUN = 'sum', na.rm=T)
+# that loses 2016 irrigation data
+get2016area <- aggregate(irrigated_km2 ~ year, data = byState, FUN = 'sum')
+# and average precip
+precip <- aggregate(pr_ann ~ year, data = byState, FUN = 'mean')
+
+# merge precip into dataset
+rrca0 <- merge(precip,rrcairrigation)
+
+# merge price
+rrca <- merge(rrca0, cornprice[,c('Year','price_2015')], by.x = 'year', by.y = 'Year')
+
+# just use total irrigation volume
+rrca <- rrca %>% select(-one_of(c('gwirr_km3','swirr_km3','coirr_km3')))
+names(rrca) <- c('Year','Precip','Area_km2','Volume_km3','Price')
+```
+
+### Exploratory analyses
+
+Average application depth: Divide irrigated pumping by area (average application depth); plot vs precip expressed in mm 
+
+what proportion of water demand they are satisfying?
+
+```{r applicationDepth, fig.height=3, fig.width=3}
+rrca$depth_m <- (rrca$Volume_km3/rrca$Area_km2)*1e3
+
+ggplot(rrca, aes(Precip, depth_m)) +
+  geom_point() + theme_bw() +
+  ggtitle('Precip vs Application Depth')
+```
+
+And plot all time series
+
+```{r timeSeriesPlots, fig.height = 5.5, fig.width = 6}
+# adjust names for plot order
+rrcaPlot <- rrca
+names(rrcaPlot) <- c('Year','zPrecipitation','cArea','dVolume','aPrice','tDepth')
+# gather
+plotdata <- gather(rrcaPlot, key = variable, value = value,
+                          zPrecipitation:tDepth)
+
+# plots with no facet labels
+ggplot(data = plotdata,
+      aes(x = Year, y = value, colour=variable)) +
+  geom_line() + geom_point() +
+  scale_colour_manual(values=c('orange','black','red','forestgreen','blue')) + 
+  facet_wrap(~variable, nrow=5, scales='free_y') +
+  scale_x_continuous(name = '', 
+                     breaks = c(2000,2002,2004,2006,2008,2010,2012,2014), 
+                     labels = c(2000,2002,2004,2006,2008,2010,2012,2014)) +
+  ylab('') +
+  theme_bw() + theme(legend.position = 'none',
+                     strip.background=element_blank(), # comment to add labels
+                     strip.text.x = element_blank(),   # comment to add labels
+                     text = element_text(size = 16))
+
+```
+
+
+Let's look at some preliminary correlations
+
+```{r corrPlots}
+# cor plots
+varcor <- cor(rrca)
+corrplot(varcor, method='color', addCoef.col='black', tl.col='black',
+         type = 'lower',
+         col = colorRampPalette(c("darkmagenta", "white", "darkgreen"))(200))
+
+# sig levels
+corsig <- rcorr(as.matrix(rrca), type = 'pearson')
+corsig$P
+```
+
+Interpretation:
+
+* precip has inverse correlations with irrigation volume and irrigation area
+* volume and area are negatively correlated
+*price not significantly correlated with area or volume
 
