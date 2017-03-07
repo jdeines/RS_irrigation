@@ -2,7 +2,9 @@
 title: "Random Forest"
 author: "Jill Deines"
 date: "January 17, 2017"
-output: html_document
+output: 
+  html_document:
+    toc: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -12,7 +14,9 @@ knitr::opts_chunk$set(echo = TRUE, cache=TRUE, cache.path='cache/1.18_rrbRandFor
 
 Goal: Run a variable importance test on a random forest of my training points
 
-Update: 2/26/2017 - Classify the MidRep validation points with R's random forest tree and compare with GEE's classification
+Update: 2/26/2017 - Classify the MidRep validation points with R's random forest tree and compare with GEE's classification. Use GEE accuracy for 'test3_randomForets_500' for this, prior to any cleaning
+
+Update 3/7/2017 - apply variable importance reduction to optimize classification on midrep validatin points
 
 randomForest package implementation:
  reference implementation based on CART trees
@@ -27,6 +31,9 @@ continuous variables and variables with many categories
 ```{r packages, message=FALSE, echo=TRUE}
 library(randomForest)
 library(varSelRF)
+library(caret)
+library(knitr) # for 'kable' table display
+source('functions/prettyConfusion.R')
 ```
 
 ## Load Data
@@ -67,6 +74,7 @@ annualNoSoy <- pointsNoSoy2[, columnsWanted]
 
 ### Monthly random forest
 First I do a random forest that mimics my GEE test (500 trees)
+
 ```{r rf500, fig.height = 8}
 # run a random forest on all 57 variables
 set.seed(415)
@@ -77,21 +85,22 @@ fit500 <- randomForest(x = points3[,1:57], # all variable columns (excludes clas
 
 # look at variable importance
 varImpPlot(fit500)
-```
 
-That was fast, let's do more trees
-
-```{r rf1000, fig.height = 8}
-# run a random forest on all 57 variables
+# and one without dryland soy, like GEE
 set.seed(415)
-fit1000 <- randomForest(x = points3[,1:57], # all variable columns (excludes classes)
-                    y = as.factor(points2$classes),
-                    ntree = 1000,
+fit500.ns <- randomForest(x = pointsNoSoy2[,1:57], # all variable columns 
+                    y = as.factor(pointsNoSoy2$classes),
+                    ntree = 500,
                     importance = TRUE)
 
 # look at variable importance
-varImpPlot(fit1000)
+varImpPlot(fit500.ns)
+VI_F.ns <- importance(fit500.ns)[,'MeanDecreaseGini']
+par(mar=c(7,4,4,2))
+barplot(VI_F.ns/sum(VI_F.ns), las=3)
 ```
+
+That was fast, let's do more trees
 
 ```{r rf2000, fig.height = 8}
 # run a random forest on all 57 variables
@@ -102,55 +111,92 @@ fit2000 <- randomForest(x = points3[,1:57], # all variable columns (excludes cla
                     importance = TRUE)
 
 # look at variable importance
-varImpPlot(fit2000, type=2)
-VI_F <- importance(fit2000)[,'MeanDecreaseGini']
-par(mar=c(7,4,4,2))
-barplot(VI_F/sum(VI_F), las=3)
+varImpPlot(fit2000)
 
-```
-
-Run one without dryland soy!
-
-```{r rf2000_NoSoy, fig.height=8}
-# run a random forest on all 57 variables
+# without dryland soy
 set.seed(415)
-fit2000.ns <- randomForest(x = pointsNoSoy2[,1:57], # all variable columns 
+fit2000.ns <- randomForest(x = pointsNoSoy2[,1:57], # all variable columns (excludes classes)
                     y = as.factor(pointsNoSoy2$classes),
                     ntree = 2000,
                     importance = TRUE)
 
 # look at variable importance
 varImpPlot(fit2000.ns)
-VI_F.ns <- importance(fit2000.ns)[,'MeanDecreaseGini']
-par(mar=c(7,4,4,2))
-barplot(VI_F.ns/sum(VI_F.ns), las=3)
-
 ```
+
 
 Plot the error by number of trees
 ```{r treeError}
 plot(fit500)
-plot(fit1000)
+plot(fit500.ns)
 plot(fit2000)
+plot(fit2000.ns)
 ```
 
+Evaluate effect of dryland soy using 500 trees using the MidRep validation data set for 2007 and 2010. Retain 3 classes at this point
 
+```{r soyEffect}
+# load points and variable data
+vpointFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/validationSets'
+p2007 <- read.csv(paste0(vpointFolder,'/2007_test3_variables_midRep_all.csv'))
+p2010 <- read.csv(paste0(vpointFolder,'/2010_test3_variables_midRep_all.csv'))
+
+# par down dfs
+#unique(p2007$certainty)
+p2007 <- p2007[ , -which(names(p2007) %in% c('.geo'))]
+p2010 <- p2010[ , -which(names(p2010) %in% c('.geo'))]
+
+
+# run predictions/classification without dryland soy in classifier
+p2007$randFor <- predict(fit500.ns, newdata = p2007, type='response')
+p2010$randFor <- predict(fit500.ns, newdata = p2010, type='response')
+
+# run predictions/classification with dryland soy in classifier
+p2007$randForWithSoy <- predict(fit500, newdata = p2007, type='response')
+p2010$randForWithSoy <- predict(fit500, newdata = p2010, type='response')
+
+# quick function to run a confusion matrix then format confusion table
+makeConfusion <- function(prediction, reference) {
+  cmatrix <- confusionMatrix(data = prediction, reference = reference)
+  ctable <- prettyConfusion(cmatrix)
+}
+
+# 2007 R no soy
+r2007_3_ns <- makeConfusion(p2007$randFor, p2007$class)
+kable(r2007_3_ns, digits=1)
+
+# 2007 R with dryland soy
+r2007_3_ws <- makeConfusion(p2007$randForWithSoy, p2007$class)
+kable(r2007_3_ws, digits=1)
+
+# 2010 R no soy
+r2010_3_ns <- makeConfusion(p2010$randFor, p2010$class)
+kable(r2010_3_ns, digits=1)
+
+# 2010 R with dryland soy
+r2010_3_ws <- makeConfusion(p2010$randForWithSoy, p2010$class)
+kable(r2010_3_ws, digits=1)
+```
+
+Removing dryland soy does improve accuracies in 2007, but has no effect on irrigated or overall accuracies in 2010.
+
+Interesting.
 
 ### Annual Random Forest
 
 This dataset doesn't include dryland soy, nor any monthly variables (extracted above in the load data chunk)
 
-```{r rf2000_annual, fig.height=6}
+```{r rf500_annual, fig.height=6}
 # run a random forest on all 57 variables
 set.seed(415)
-fit2000.ann <- randomForest(x = annualNoSoy[,1:20], # all variable columns 
+fit500.ann <- randomForest(x = annualNoSoy[,1:20], # all variable columns 
                     y = as.factor(annualNoSoy$classes),
-                    ntree = 2000,
+                    ntree = 500,
                     importance = TRUE)
 
 # look at variable importance
-varImpPlot(fit2000.ann)
-VI_F.ann <- importance(fit2000.ann)[,'MeanDecreaseGini']
+varImpPlot(fit500.ann)
+VI_F.ann <- importance(fit500.ann)[,'MeanDecreaseGini']
 par(mar=c(7,4,4,2))
 barplot(VI_F.ann/sum(VI_F.ann), las=3)
 
@@ -158,21 +204,114 @@ barplot(VI_F.ann/sum(VI_F.ann), las=3)
 
 
 ### Play with variable reduction
+without dryland soy
 
-```{r varReduction}
+```{r varReduction_noDsoy}
 # run a random forest on all 57 variables
 set.seed(412)
 test <- varSelRF(xdata = pointsNoSoy2[,1:57], whole.range=F,
                     Class = as.factor(pointsNoSoy2$classes),
-                    ntree = 2000)
+                    ntree = 500)
 test
 
 # annual
 atest <- varSelRF(xdata = annualNoSoy[,1:20], whole.range=F,
                     Class = as.factor(annualNoSoy$classes),
-                    ntree = 2000)
+                    ntree = 500)
 atest
 ```
+
+With dryland soy
+
+```{r varReduction_wDsoy}
+# run a random forest on all 57 variables
+set.seed(412)
+test.ws <- varSelRF(xdata = points2[,1:57], whole.range=F,
+                    Class = as.factor(points2$classes),
+                    ntree = 500)
+test.ws
+
+```
+
+Make a reduced variable classifier and evaluate - for no dryland soy. From 57 to 30 variables
+
+```{r reducedClassifier, fig.height=6}
+# selection out important variables
+reducedColumns <- c(test$selected.vars, 'classes')
+pts.ns.reduced <- pointsNoSoy2[,reducedColumns]
+
+# and one without dryland soy, like GEE
+set.seed(415)
+fit500.ns.reduced <- randomForest(x = pts.ns.reduced[,1:30], # all variable columns 
+                    y = as.factor(pts.ns.reduced$classes),
+                    ntree = 500,
+                    importance = TRUE)
+
+# look at variable importance
+varImpPlot(fit500.ns.reduced)
+VI_F.ns <- importance(fit500.ns.reduced)[,'MeanDecreaseGini']
+par(mar=c(7,4,4,2))
+barplot(VI_F.ns/sum(VI_F.ns), las=3)
+
+# add predictions
+p2007$randFor_30_ns <- predict(fit500.ns.reduced, newdata = p2007, type='response')
+p2010$randFor_30_ns <- predict(fit500.ns.reduced, newdata = p2010, type='response')
+
+# 2007 R no soy, REDUCED
+r2007_3_ns_reduced <- makeConfusion(p2007$randFor_30_ns, p2007$class)
+kable(r2007_3_ns_reduced, digits=1)
+
+# 2010 R no soy, REDUCED
+r2010_3_ns_reduced <- makeConfusion(p2010$randFor_30_ns, p2010$class)
+kable(r2010_3_ns_reduced, digits=1)
+
+# further reductions?
+# run a 2nd reduction on 30 variables
+set.seed(415)
+test30 <- varSelRF(xdata = pts.ns.reduced[,1:30], whole.range=F,
+                    Class = as.factor(pts.ns.reduced$classes),
+                    ntree = 500)
+test30
+```
+
+Reducing variables makes no change to 2010 midrep points, and causes a small ~1-2% reduction for 2007. Trying a second reduction goes from 30 to 24 variables, loses aridity
+
+### Extremely reduced classifier
+A handful of 9 annual variables stand out among the rest; try just them
+
+```{r extremeReduce}
+# selection out important variables
+reducedColumns2 <- c('EVI_max_14', 'EVI_range_14','GI_max_14','GI_range_14',
+                     'greenArid','NDVI_max_14','NDVI_range_14','NDWI_max_14',
+                     'ndwi_gi','classes')
+pts.ns.reduced2 <- pointsNoSoy2[,reducedColumns2]
+
+# and one without dryland soy, like GEE
+set.seed(415)
+fit500.ns.reduced2 <- randomForest(x = pts.ns.reduced2[,1:9], # all variable columns 
+                    y = as.factor(pts.ns.reduced2$classes),
+                    ntree = 500,
+                    importance = TRUE)
+
+# look at variable importance
+varImpPlot(fit500.ns.reduced2)
+VI_F.ns <- importance(fit500.ns.reduced2)[,'MeanDecreaseGini']
+par(mar=c(7,4,4,2))
+barplot(VI_F.ns/sum(VI_F.ns), las=3)
+
+# add predictions
+p2007$randFor_9_ns <- predict(fit500.ns.reduced2, newdata = p2007, type='response')
+p2010$randFor_9_ns <- predict(fit500.ns.reduced2, newdata = p2010, type='response')
+
+# 2007 R no soy, REDUCED
+r2007_3_ns_reduced2 <- makeConfusion(p2007$randFor_9_ns, p2007$class)
+kable(r2007_3_ns_reduced2, digits=1)
+
+# 2010 R no soy, REDUCED
+r2010_3_ns_reduced2 <- makeConfusion(p2010$randFor_9_ns, p2010$class)
+kable(r2010_3_ns_reduced2, digits=1)
+```
+
 
 ## Make Predictions
 Use the R-generated random forest to make predictions on the Middle Republican validation points. Mimic the GEE rf classification, so 500 trees? 
@@ -182,33 +321,7 @@ This is for the monthly classifier.
 ### predict
 Use the validation points that have sampled the 57 input variables from the 01.1_ValidationPointsSample script in my GEE 'validation' folder
 
-```{r predict}
-# load points and variable data
-vpointFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/validationSets'
-p2007 <- read.csv(paste0(vpointFolder,'/2007_test3_variables_midRep_all.csv'))
-p2010 <- read.csv(paste0(vpointFolder,'/2010_test3_variables_midRep_all.csv'))
-
-# par down dfs
-unique(p2007$certainty)
-p2007 <- p2007[ , -which(names(p2007) %in% c('.geo'))]
-p2010 <- p2010[ , -which(names(p2010) %in% c('.geo'))]
-
-
-# run the random forest (monthly, no soy, all 57 variables)
-# run a random forest on all 57 variables
-set.seed(415)
-fit500.ns <- randomForest(x = pointsNoSoy2[,1:57], # all variable columns 
-                    y = as.factor(pointsNoSoy2$classes),
-                    ntree = 500,
-                    importance = TRUE)
-
-# look at variable importance
-varImpPlot(fit500.ns)
-
-# run predictions/classification
-p2007$randFor <- predict(fit500.ns, newdata = p2007, type='response')
-p2010$randFor <- predict(fit500.ns, newdata = p2010, type='response')
-```
+Predictions for the midRep points using the R rf 500 classifiers done in the 'soyEffect' chunk above
 
 ### assess
 Use the accuracy assessment exports from GEE validation to compare results between GEE and Rrrr
@@ -254,20 +367,53 @@ sum(!(geeR.2010$gee_rf == geeR.2010$randFor))
 (nrow(geeR.2010) - sum(!(geeR.2010$gee_rf == geeR.2010$randFor))) / nrow(geeR.2010)
 ```
 
+Break it into a confusion table to better compare accuracies
+
+```{r confusion3}
+# quick function to run a confusion matrix then format confusion table
+makeConfusion <- function(prediction, reference) {
+  cmatrix <- confusionMatrix(data = prediction, reference = reference)
+  ctable <- prettyConfusion(cmatrix)
+}
+
+
+# 2007 GEE: make and display confusion table
+gee2007_3 <- makeConfusion(geeR.2007$gee_rf, geeR.2007$class.x)
+kable(gee2007_3, digits=1)
+
+# 2007 R: make and display confusion table
+r2007_3 <- makeConfusion(geeR.2007$randFor, geeR.2007$class.x)
+kable(r2007_3, digits=1)
+
+# 2010 GEE
+gee2010_3 <- makeConfusion(geeR.2010$gee_rf, geeR.2010$class.x)
+kable(gee2010_3, digits=1)
+
+# 2010 R: make and display confusion table
+r2010_3 <- makeConfusion(geeR.2010$randFor, geeR.2010$class.x)
+kable(r2010_3, digits=1)
+```
+
+
+#### Two Classes (binary classification)
 Not awful, but check to see if most of the confusion is between noncrop/dryland
 
 ```{r compare2class}
 # make keys to convert classifications from 2 classes to 1
 key2class.1 = data.frame(gee_rf = c('dryland','irrigated','noncrop'),
-                         gee_rf2 = c('nonirr','irrigated','nonirr'))
+                         gee_rf2 = c('notirrigated','irrigated','notirrigated'))
 key2class.2 = data.frame(randFor = c('dryland','irrigated','noncrop'),
-                         randFor2 = c('nonirr','irrigated','nonirr'))
+                         randFor2 = c('notirrigated','irrigated','notirrigated'))
+key2class.3 = data.frame(class.x = c('dryland','irrigated','noncrop'),
+                         class2 = c('notirrigated','irrigated','notirrigated'))
 
 geeR.2007 <- merge(geeR.2007, key2class.1)
 geeR.2007 <- merge(geeR.2007, key2class.2)
+geeR.2007 <- merge(geeR.2007, key2class.3)
 
 geeR.2010 <- merge(geeR.2010, key2class.1)
 geeR.2010 <- merge(geeR.2010, key2class.2)
+geeR.2010 <- merge(geeR.2010, key2class.3)
 
 # quick check for matches between gee and R
 sum(!(geeR.2007$gee_rf2 == geeR.2007$randFor2))
@@ -280,9 +426,63 @@ sum(!(geeR.2010$gee_rf2 == geeR.2010$randFor2))
 
 That does improve the "consistency" between programs. Or likely, random seeds.
 
-Check to see which is more accurate?
+Check to see which is more accurate via confusion table
 
-```{r compareAccuracy}
+```{r confusion2}
+# quick function to run a confusion matrix then format confusion table
+makeConfusion2 <- function(prediction, reference) {
+  cmatrix <- confusionMatrix(data = prediction, reference = reference)
+  ctable <- prettyConfusionBinary(cmatrix)
+}
 
+
+# 2007 GEE: make and display confusion table
+gee2007_2 <- makeConfusion2(geeR.2007$gee_rf2, geeR.2007$class2)
+kable(gee2007_2, digits=1)
+
+# 2007 R: make and display confusion table
+r2007_2 <- makeConfusion2(geeR.2007$randFor2, geeR.2007$class2)
+kable(r2007_2, digits=1)
+
+# 2010 GEE
+gee2010_2 <- makeConfusion2(geeR.2010$gee_rf2, geeR.2010$class2)
+kable(gee2010_2, digits=1)
+
+# 2010 R: make and display confusion table
+r2010_2 <- makeConfusion2(geeR.2010$randFor2, geeR.2010$class2)
+kable(r2010_2, digits=1)
+```
+
+## Test Datasets
+
+```{r testPoints}
+# load points and variable data
+vpointFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/validationSets'
+p2015 <- read.csv(paste0(vpointFolder, '/2015_data_randAll_1250_jmd.csv'))
+
+# clean up data
+p2015 <- p2015[ , -which(names(p2015) %in% c('.geo'))]
+p2015$class <- as.character(p2015$class)
+
+# collapse classes to 3 class, 2 class versions
+keyTo3 <- data.frame(class = c('irrigated','dryland','noncrop','fallow'),
+                     class3 = c('irrigated','dryland','noncrop','noncrop'),
+                     class2 = c('irrigated','notirrigated','notirrigated','notirrigated'))
+p2015 <- merge(p2015, keyTo3)
+
+# subset certainty levels
+p2015.certain <- p2015[p2015$certainty == 1,]
+p2015.all <- p2015[p2015$certainty %in% c(1,2),]  # removes completely uncertain points
+
+# run predictions/classification
+p2015.certain$randFor <- predict(fit500.ns, newdata = p2015.certain, type='response')
+p2015.all$randFor <- predict(fit500.ns, newdata = p2015.all, type='response')
+
+# confusion tables
+r2015.certain_3 <- makeConfusion(p2015.certain$randFor, p2015.certain$class3)
+kable(r2015.certain_3, digits=1)
+
+r2015.all_3 <- makeConfusion(p2015.all$randFor, p2015.all$class3)
+kable(r2015.all_3, digits=1)
 ```
 
