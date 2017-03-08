@@ -19,6 +19,7 @@ opts_chunk$set(cache=FALSE,
 
 ```{r packages, message=FALSE, echo=TRUE}
 library(ggplot2)
+library(GGally)
 library(dplyr)
 library(tidyr)
 library(corrplot)
@@ -155,6 +156,10 @@ rrca <- merge(rrca0, cornprice[,c('Year','price_2015')], by.x = 'year', by.y = '
 # just use total irrigation volume
 rrca <- rrca %>% select(-one_of(c('gwirr_km3','swirr_km3','coirr_km3')))
 names(rrca) <- c('Year','Precip','Area_km2','Volume_km3','Price')
+
+# add a price lag
+rrca$priceLag1 <- cornprice$price_2015[3:19]
+
 ```
 
 ### Exploratory analyses
@@ -208,6 +213,8 @@ corrplot(varcor, method='color', addCoef.col='black', tl.col='black',
          type = 'lower',
          col = colorRampPalette(c("darkmagenta", "white", "darkgreen"))(200))
 
+ggcorr(rrca, palette = "RdBu", label = TRUE)
+
 # sig levels
 corsig <- rcorr(as.matrix(rrca), type = 'pearson')
 options(scipen = 999)
@@ -216,18 +223,97 @@ corsig$P
 
 Interpretation:
 
-* precip has inverse correlations with irrigation volume and irrigation area
-* volume and area are negatively correlated
-*price not significantly correlated with area or volume
+* Precip has inverse correlations with irrigation volume and irrigation area
+* Volume and area are negatively correlated
+* Price Lag 1 correlated with area
+* Depth negatively corrected with area, precip; positive with volume
 
-### Regressions
+```{r scatterplots, fig.height=5.5, fig.width=8.5}
+# an extra function to add trendlines
+my_fn <- function(data, mapping, ...){
+  p <- ggplot(data = data, mapping = mapping) + 
+    geom_point() + 
+    geom_smooth(method=loess, fill="red", color="red", ...) +
+    geom_smooth(method=lm, fill="blue", color="blue", ...)
+  p
+}
 
-```{r regressions}
-# area as a function of precip and price
-precipPrice <- lm(Area_km2 ~ Precip + Price, data = rrca)
-summary(precipPrice)
-
-pumpPrecipPrice <- lm(Volume_km3 ~ Precip + Price, data = rrca)
-summary(pumpPrecipPrice)
+# scatterplot matrix
+ggpairs(rrca, lower=list(continuous = my_fn)) 
 ```
+
+Hm. A two step model? Predict application depth from precip; predict irrigated area from depth and price? Or a hierarchical model where depth comes from precip...
+
+
+### Auto-correlation
+
+```{r autocorrelation, fig.height = 5.5, fig.width=8}
+# test for autocorrelation in time series
+vars <- names(rrca)
+
+# test all vars
+par(mfrow=c(3,3))
+acfList <- list()
+#names(acfList) <- vars
+for (var in vars){
+  acf(rrca[,var], main = var)
+}
+```
+
+```{r autocor2, fig.height = 5.5, fig.width = 6}
+# plot first differences: calculate
+rrca.firstdiff <- as.data.frame(matrix(, nrow = nrow(rrca)-1, ncol=length(vars)))
+names(rrca.firstdiff) <- vars
+for (var in vars) {
+ rrca.firstdiff[,var] <- diff(ts(rrca[,var]), differences=1)
+}
+
+rrca.firstdiff$year <- 2000:2015
+rrca.firstdiff <- rrca.firstdiff[ , -which(names(rrca.firstdiff) %in% c('Price'))]
+
+# longify
+names(rrca.firstdiff) <- c('Year','zPrecipitation','cArea','dVolume','aPrice','tDepth', 'year')
+firstdiff <- gather(rrca.firstdiff, key = variable, value = value, zPrecipitation:tDepth)
+
+ggplot(data = firstdiff,
+      aes(x = year, y = value, colour=variable)) +
+  geom_line() + geom_point() +
+  scale_colour_manual(values=c('orange','black','red','forestgreen','blue')) + 
+  facet_wrap(~variable, nrow=5, scales='free_y') +
+  scale_x_continuous(name = '', 
+                     breaks = c(2000,2002,2004,2006,2008,2010,2012,2014), 
+                     labels = c(2000,2002,2004,2006,2008,2010,2012,2014)) +
+  ylab('') +
+  theme_bw() + theme(legend.position = 'none',
+                     strip.background=element_blank(), # comment to add labels
+                     strip.text.x = element_blank(),   # comment to add labels
+                     text = element_text(size = 16))
+```
+
+### CaRT
+I picked 'ctree' function the party package because of the nice-ish output on an R Blogger's post, but Andy subsequently suggested it as well. Look at that!
+
+```{r cart, fig.height = 5.5, fig.width = 7.5}
+library(party)
+
+# control tree
+controls <- ctree_control(minsplit = 2, minbucket = 3, mincriterion = .7)
+
+# run tree
+ct <- ctree(Area_km2 ~ Precip + Volume_km3 + priceLag1, data = rrca, 
+            controls = controls)
+plot(ct, main="Conditional Inference Tree")
+ 
+
+# control tree
+controls <- ctree_control(minsplit = 2, minbucket = 2, mincriterion = .7)
+
+# run tree
+ct <- ctree(Area_km2 ~ Precip + Volume_km3 + priceLag1, data = rrca, 
+            controls = controls)
+plot(ct, main="Conditional Inference Tree")
+
+
+```
+
 

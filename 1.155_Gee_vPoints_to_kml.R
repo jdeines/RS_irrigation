@@ -9,10 +9,10 @@
 library(rgdal)
 
 filedir <- 'C:/Users/deinesji/Google Drive/GEE_validation/validationSets'
-fileName <- '2015_locations_randAll_1250'
+fileName <- '2002_locations_NE_randAll_1050'
 
 outDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/generatedPointsForUpload'
-outName <- '2015_locations_randAll_1250.kml'
+outName <- '2002_locations_NE_randAll_1050.kml'
 
 # -------------------------------------------------------------------
 

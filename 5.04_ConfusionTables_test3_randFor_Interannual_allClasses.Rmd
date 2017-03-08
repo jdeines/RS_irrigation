@@ -38,7 +38,7 @@ From Brian Wardlow's Kansas dataset of validation points, clipped to the RRB and
 ```{r Wardlow}
 # load data
 dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
-file2001 <- '2001_Wardlow_confusionData_RRB_test3_randFor_interannual_maskFixed_allClasses.csv'
+file2001 <- '2001_Wardlow_confusionData_RRB_test3_randFor_interannual_maskFixed_allClasses_1x.csv'
 wardlow01 <- read.csv(paste(dataDir, file2001, sep='/'))
 
 # lookup table for classification codes
@@ -66,7 +66,7 @@ Jill's points for the Middle Republican 2007;
 ```{r midRep2007}
 # load data
 dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
-file2007 <- '2007_MidRep60_confusionData_RRB_test3_randFor_interannual_maskFixed_allClasses.csv'
+file2007 <- '2007_MidRep_confusionData_RRB_test3_randFor_interannual_maskFixed_allClasses_1x.csv'
 midRep07 <- read.csv(paste(dataDir, file2007, sep='/'))
 
 # lookup table for classification codes
@@ -97,7 +97,7 @@ Jill's points for the Middle Republican 2010
 ```{r midRep2010}
 # load data
 dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
-file2010 <- '2010_MidRep60_confusionData_RRB_test3_randFor_interannual_maskFixed_allClasses.csv'
+file2010 <- '2010_MidRep_confusionData_RRB_test3_randFor_interannual_maskFixed_allClasses_1x.csv'
 midRep10 <- read.csv(paste(dataDir, file2010, sep='/'))
 
 # lookup table for classification codes

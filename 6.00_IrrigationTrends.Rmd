@@ -20,8 +20,10 @@ opts_chunk$set(cache=FALSE,
 ```{r packages, message=FALSE, echo=TRUE}
 library(rgdal)
 library(latticeExtra)
-library(ggplot2)
-library(tidyr)
+library(tidyverse) # for ggplot2, tidyr, dplyr, broom...
+library(broom)
+library(rgdal)
+library(colorRamps)
 ```
 
 ## Load Data
@@ -52,6 +54,77 @@ all1$irrigated_km2 <- all1$irrigated_m2 / 1000000
 #all1$totalCells <- all1$X0 + all1$X1 + all1$null
 #all1[all1$masterID == 'rrcaRrbBuffExtent','totalCells'][1]
 ```
+
+### County Trends
+run regressions to get change in area over time (slope) per county
+
+```{r countyRegress}
+# extract county data
+counties0 <- all1[grepl('county', all1$masterID),]
+counties0$fips5 <- substr(counties0$masterID, start = 11, stop = 15)
+
+# drop columns
+counties <- counties0[,c('masterID','fips5','year','irrigated_m2','irrigated_km2')]
+
+# Co county 08041 has NA's; remove
+counties <- counties[complete.cases(counties),]
+
+# run regressions by county
+countylms <- counties %>% 
+  group_by(fips5) %>% 
+  do(model = lm(irrigated_km2 ~ year, data = .))
+
+# tidy up with broom
+coeffs <- countylms %>% tidy(model)
+coeffs <- coeffs[coeffs$term == 'year',]
+
+# map the year coefficient
+# get county bounds
+gisDir <- "C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile"
+cnty <- readOGR(gisDir, 'Counties_RRCAextent_Clip', verbose=F)
+
+# get state bounds
+gisDir2 <- "C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml"
+states <- readOGR(paste0(gisDir2,'/RRB_fullExtent_states.kml'))
+states <- spTransform(states, CRS(proj4string(cnty)))
+
+# join the regression slopes
+countymap <- merge(cnty, coeffs[,c('fips5','estimate','p.value')])
+
+# or just significant trends
+countymap[is.na(countymap$p.value),'p.value'] <- 1 # dummy p value no data county
+countymap$sigCoeffs <- countymap$estimate
+countymap[countymap$p.value >= 0.05, 'sigCoeffs'] <- NA
+
+# plot!
+pal <- matlab.like(16)
+spplot(countymap, 'sigCoeffs', col.regions=pal) +
+  latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
+
+# give a starkly different color for declining counties
+origPal <- pal
+origPal[1] <- 'black'
+spplot(countymap, 'sigCoeffs', col.regions=origPal) +
+  latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
+
+# a map with all counties regardless of significance
+origPal2 <- origPal
+origPal2[2] <- 'black'
+spplot(countymap, 'estimate', col.regions=origPal2) +
+  latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
+```
+
+Which counties have greatest variance over time?
+
+```{r countyVar}
+# which counties are most stable?
+
+
+
+
+
+```
+
 
 ### Novel/Retired Irrigated Area by year
 

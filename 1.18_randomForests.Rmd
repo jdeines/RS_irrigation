@@ -135,6 +135,9 @@ plot(fit2000.ns)
 
 Evaluate effect of dryland soy using 500 trees using the MidRep validation data set for 2007 and 2010. Retain 3 classes at this point
 
+Use the validation points that have sampled the 57 input variables from the 01.1_ValidationPointsSample script in my GEE 'validation' folder
+
+
 ```{r soyEffect}
 # load points and variable data
 vpointFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/validationSets'
@@ -312,27 +315,20 @@ r2010_3_ns_reduced2 <- makeConfusion(p2010$randFor_9_ns, p2010$class)
 kable(r2010_3_ns_reduced2, digits=1)
 ```
 
+The accuracies drop off quite a bit here
 
-## Make Predictions
-Use the R-generated random forest to make predictions on the Middle Republican validation points. Mimic the GEE rf classification, so 500 trees? 
-
-This is for the monthly classifier.
-
-### predict
-Use the validation points that have sampled the 57 input variables from the 01.1_ValidationPointsSample script in my GEE 'validation' folder
-
-Predictions for the midRep points using the R rf 500 classifiers done in the 'soyEffect' chunk above
+## Compare accuracy: GEE & R 
 
 ### assess
-Use the accuracy assessment exports from GEE validation to compare results between GEE and Rrrr
+Use the accuracy assessment exports from GEE validation to compare results between GEE and Rrrr. These currently use the uncleaned classifications, but a merge of monthly/annual GEE classifiers.
 
 ```{r compare}
 # load GEE accuracy tables
 accuDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
 g2007 <- read.csv(paste0(accuDir,
-        '/2007_MidRep60_confusionData_RRB_test3_randFor_interannual_maskFixed_allClasses.csv'))
+        '/2007_MidRep_confusionData_RRB_test3_randFor_uncleaned_monthAnnualCombo_allClasses.csv'))
 g2010 <- read.csv(paste0(accuDir,
-        '/2010_MidRep60_confusionData_RRB_test3_randFor_interannual_maskFixed_allClasses.csv'))
+        '/2010_MidRep_confusionData_RRB_test3_randFor_uncleaned_monthAnnualCombo_allClasses.csv'))
 
 g2007 <- g2007[ , -which(names(g2007) %in% c('.geo'))]
 g2010 <- g2010[ , -which(names(g2010) %in% c('.geo'))]
