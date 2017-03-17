@@ -309,7 +309,7 @@ plot(ct, main="Conditional Inference Tree")
 controls <- ctree_control(minsplit = 2, minbucket = 2, mincriterion = .7)
 
 # run tree
-ct <- ctree(Area_km2 ~ Precip + Volume_km3 + priceLag1, data = rrca, 
+ct <- ctree(Area_km2 ~ Precip + priceLag1, data = rrca, 
             controls = controls)
 plot(ct, main="Conditional Inference Tree")
 

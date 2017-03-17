@@ -8,7 +8,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache=TRUE, cache.path='cache/1.18_rrbRandFor/',
+knitr::opts_chunk$set(echo = TRUE, cache=FALSE, cache.path='cache/1.18_rrbRandFor/',
                fig.path='figure/1.18_rrbRandFor/')
 ```
 
@@ -326,9 +326,9 @@ Use the accuracy assessment exports from GEE validation to compare results betwe
 # load GEE accuracy tables
 accuDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
 g2007 <- read.csv(paste0(accuDir,
-        '/2007_MidRep_confusionData_RRB_test3_randFor_uncleaned_monthAnnualCombo_allClasses.csv'))
+        '/2007_MidRep_confusionData_RRB_test3_randFor_uncleaned_500_allClasses_MONTHLY.csv'))
 g2010 <- read.csv(paste0(accuDir,
-        '/2010_MidRep_confusionData_RRB_test3_randFor_uncleaned_monthAnnualCombo_allClasses.csv'))
+        '/2010_MidRep_confusionData_RRB_test3_randFor_uncleaned_500_allClasses_MONTHLY.csv'))
 
 g2007 <- g2007[ , -which(names(g2007) %in% c('.geo'))]
 g2010 <- g2010[ , -which(names(g2010) %in% c('.geo'))]
@@ -339,20 +339,24 @@ p2007.less <- p2007[,rColNamesWanted]
 p2010.less <- p2010[,rColNamesWanted]
 
 # combine
+p2007.less$system.index <- as.character(p2007.less$system.index)
+p2010.less$system.index <- as.character(p2010.less$system.index)
+
+g2007$system.index <- as.character(g2007$system.index)
+g2010$system.index <- as.character(g2010$system.index)
+
 geeR.2007 <- merge(g2007, p2007.less, by = 'system.index',all=F)
 geeR.2010 <- merge(g2010, p2010.less, by = 'system.index',all=F)
+
 # make sure the system index is an ok column to merge on
 sum(!(geeR.2007$classNum.x == geeR.2007$classNum.y))
 
 # convert GEE's classifications from numbers to words
-key7 <- data.frame(b2007 = c(0,1,2),
+key <- data.frame(classification = c(0,1,2),
                   gee_rf = c('dryland','irrigated','noncrop'))
 
-key10 <- data.frame(b2010 = c(0,1,2),
-                  gee_rf = c('dryland','irrigated','noncrop'))
-
-geeR.2007 <- merge(geeR.2007, key7)
-geeR.2010 <- merge(geeR.2010, key10)
+geeR.2007 <- merge(geeR.2007, key)
+geeR.2010 <- merge(geeR.2010, key)
 
 # quick check for matches between gee and R
 sum(!(geeR.2007$gee_rf == geeR.2007$randFor))
@@ -450,25 +454,38 @@ kable(r2010_2, digits=1)
 ```
 
 ## Test Datasets
+Checked after settling on the random forest, 500 tree, all 57 variables variable method, run without soy training points. This gives accuracy from the R classification; accuracies will also be carried out on the GEE outputs (including 1x and interannual cleaning).
 
 ```{r testPoints}
 # load points and variable data
 vpointFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/validationSets'
 p2015 <- read.csv(paste0(vpointFolder, '/2015_data_randAll_1250_jmd.csv'))
+p2002 <- read.csv(paste0(vpointFolder, '/2002_data_NE_randAll_1050_jmd.csv'))
 
 # clean up data
 p2015 <- p2015[ , -which(names(p2015) %in% c('.geo'))]
 p2015$class <- as.character(p2015$class)
 
+p2002 <- p2002[ , -which(names(p2002) %in% c('.geo'))]
+p2002$class <- as.character(p2002$class)
+
 # collapse classes to 3 class, 2 class versions
 keyTo3 <- data.frame(class = c('irrigated','dryland','noncrop','fallow'),
                      class3 = c('irrigated','dryland','noncrop','noncrop'),
                      class2 = c('irrigated','notirrigated','notirrigated','notirrigated'))
+# incidentally, this also removes certainty level 3 as class 'Uncertain'
 p2015 <- merge(p2015, keyTo3)
+p2002 <- merge(p2002, keyTo3)
 
 # subset certainty levels
 p2015.certain <- p2015[p2015$certainty == 1,]
+sum(p2015$certainty == 3)
 p2015.all <- p2015[p2015$certainty %in% c(1,2),]  # removes completely uncertain points
+
+p2002.certain <- p2015[p2015$certainty == 1,]
+p2002.all <- p2015[p2015$certainty %in% c(1,2),]  # removes completely uncertain points
+
+
 
 # run predictions/classification
 p2015.certain$randFor <- predict(fit500.ns, newdata = p2015.certain, type='response')

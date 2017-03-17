@@ -9,11 +9,13 @@ output:
 
 Goal: Make figures of irrigation frequency over the region
 
+see some nice updates in S:\Users\xutianfa\Irrigation\poster_files\code code
+
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
 opts_chunk$set(cache=TRUE, cache.path='cache/4.1_FreqFigs/',
-               fig.path='figure/4.1_FreqFigs/')
+               fig.path='figure/4.1_FreqFigs_randFor/')
 ```
 
 **R Packages Needed**
@@ -28,33 +30,40 @@ library(RColorBrewer)
 ```
 
 ## Irrigation frequency
-Exported raster of years irrigated from 06.6_summaryMaps in GEE
+Exported raster of years irrigated from 06.0_summaryMaps in GEE.
+
+First, load raster domain raster and mask, and write out masked version to save time in the future.
 
 ```{r frequencyPrep, eval=FALSE}
 # dirs and names
-rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_cart_interannualClean'
-rasVis <- 'IrrigationFrequencyMap_masked.tif'
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_randFor_interannualClean'
+rasVis <- 'IrrigationFrequencyMap_visualization.tif'
 rasAll <- 'IrrigationFrequencyMap_0and1neg.tif'
+rasSmall <- 'IrrigationFrequencyMap_0and1neg_inset.tif'
 
-rasEarly <- 'EarliestYearIrrigated_0and1neg.tif'
+#rasEarly <- 'EarliestYearIrrigated_0and1neg.tif'
 
 # load pre-masked, pre-color scaled image
-vis <- raster(paste0(rasDir,'/',rasVis))
+vis <- stack(paste0(rasDir,'/',rasVis))
+plotRGB(vis)
+# neat, but I'd rather work with actual data and play with scales
 
-# load full raster
+# load full raster and set -1 to NA (basically mask areas outside of Extent)
 freq <- raster(paste0(rasDir,'/',rasAll))
 freq[freq == -1] <- NA
 # write out masked raster
 writeRaster(freq, paste0(rasDir,'/IrrigationFrequencyMap_0and1neg_boundMask.tif'))
 
-# load early raster
-early <- raster(paste0(rasDir,'/',rasEarly))
-early[early == -1] <- NA
-early[early == 0] <- 1998
-
-# write out masked raster
-writeRaster(early, paste0(rasDir,'/EarliestYearIrrigated_0and1neg_boundMask.tif'))
+# # load early raster
+# early <- raster(paste0(rasDir,'/',rasEarly))
+# early[early == -1] <- NA
+# early[early == 0] <- 1998
+# 
+# # write out masked raster
+# writeRaster(early, paste0(rasDir,'/EarliestYearIrrigated_0and1neg_boundMask.tif'))
 ```
+
+Earliest year irrigated map - This needs updating for random forest if you ever use it
 
 ```{r earliestMap_PiYG, fig.width = 6, fig.height=3.5, dpi=96}
 rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_cart_interannualClean'
@@ -70,9 +79,10 @@ spplot(early, col.regions = colRamp, maxpixels = 1000000, colorkey=F)
 
 ```
 
+Frequency histogram of number of years irrigated for pixels
 
-```{r cdf, fig.width = 6, fig.height = 5, dpi=96}
-rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_cart_interannualClean'
+```{r hist, fig.width = 6, fig.height = 5, dpi=96, eval=FALSE}
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_randFor_interannualClean'
 rasAll <- 'IrrigationFrequencyMap_0and1neg_boundMask.tif'
 
 # load full raster
@@ -83,9 +93,12 @@ hist(freqHist, maxpixels=20000000, xlab = 'Years Irrigated', main = '')
 
 ```
 
-```{r freqMap_matlab2, fig.width = 10, fig.height = 5, dpi=96}
-library(grid)
-rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_cart_interannualClean'
+### Number of Years Irrigated Maps
+
+Number of years irrigated figure
+
+```{r freqMap_matlab2_bottom, fig.width = 10, fig.height = 5, dpi=96}
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_randFor_interannualClean'
 rasAll <- 'IrrigationFrequencyMap_0and1neg_boundMask.tif'
 
 # load full raster
@@ -98,69 +111,82 @@ text1 = list("sp.text", c(-220000,1750000), "0")
 text2 = list("sp.text", c(-125000,1750000), "100 km")
 
 # color ramp 
-matlab <- matlab.like2(15)
+matlab <- matlab.like2(19)
 spplot(freq, col.regions = c('black',matlab), maxpixels = 2000000,
-       par.settings = list(layout.widths=list(right.padding=4.5)),
-       sp.layout=list(scale, text1, text2),
-       colorkey=list(labels=list(cex=1.2,
-                  labels = c(0,2,4,6,8,10,12,14),
-                  at = c(-.5,1.5,3.5,5.5,7.5,9.5,11.5,13.5))))
+       sp.layout=list(scale, text1, text2), 
+       par.settings=list(axis.line=list(col=NA)), 
+       colorkey=F)#list(labels=list(cex=1.2),
+                  #at = c(0:18))
+
+image.plot(z=0:18,add=F,legend.only=T,  col=c('black',matlab), 
+           horizontal = T,
+          smallplot=c(0.05,.95,.15,.2), 
+         axis.args=list(at=c(0,3,6,9,12,15,18), 
+                          labels=as.character(c(0,3,6,9,12,15,18))))
 
 
 # scale bar legend title
-grid.text('Years Irrigated',x=unit(0.975, "npc"),y=unit(0.5, 'npc'), rot=-90, gp=gpar(fontsize=18))
+#grid.text('Years Irrigated',x=unit(0.975, "npc"),y=unit(0.5, 'npc'), rot=-90, gp=gpar(fontsize=18))
 ```
 
-```{r freqMap_byr, fig.width = 10, fig.height = 5, dpi=96}
-library(grid)
-rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_cart_interannualClean'
-rasAll <- 'IrrigationFrequencyMap_0and1neg_boundMask.tif'
+blue-yellow-red Number of years irrigated
 
-# load full raster
-freq <- raster(paste0(rasDir,'/',rasAll))
-
+```{r freqMap_matlab2_right, fig.width = 10, fig.height = 5, dpi=96}
 # plot scale
 scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
   offset = c(-225000,1760000), scale = 100000, fill=c("transparent","black"))
 text1 = list("sp.text", c(-220000,1750000), "0")
 text2 = list("sp.text", c(-125000,1750000), "100 km")
 
-# color ramp with black for 0, blue:yellow:red for 1-14
-palette <- colorRampPalette(c('blue','yellow','red'))(15)
-spplot(freq, col.regions = c('black',palette), maxpixels = 2000000,
+spplot(freq, col.regions = c('black',matlab), maxpixels = 2000000,
        par.settings = list(layout.widths=list(right.padding=4.5)),
        sp.layout=list(scale, text1, text2),
-       colorkey=list(labels=list(cex=1.2,
-                  labels = c(0,2,4,6,8,10,12,14),
-                  at = c(-.5,1.5,3.5,5.5,7.5,9.5,11.5,13.5))))
+       colorkey=list(labels=list(cex=1.2),
+                     at = c(0:18)))
 
 
 # scale bar legend title
 grid.text('Years Irrigated',x=unit(0.975, "npc"),y=unit(0.5, 'npc'), rot=-90, gp=gpar(fontsize=18))
 ```
 
-```{r byr, fig.width = 8, fig.height = 4}
-colRamp <- c('black',colorRampPalette(c('blue','yellow','red'))(15))
+#### inset
 
-plot(1:10)
-image.plot(z=0:15,add=F,legend.only=T, nlevel=16,  col=colRamp, 
-           horizontal = T,
-           smallplot=c(0.1,.9,.93,.98), 
-           axis.args=list(at=c(0,2,4,6,8,10,12,14), 
-                          labels=as.character(c(0,2,4,6,8,10,12,14))))
+```{r freqMap_matlab2_inset, fig.width = 4, fig.height = 4, dpi=96}
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_randFor_interannualClean'
+rasInset <- 'IrrigationFrequencyMap_0and1neg_inset.tif'
+
+# load full raster
+freq_inset <- raster(paste0(rasDir,'/',rasInset))
+
+# # plot scale
+# scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
+#   offset = c(-225000,1760000), scale = 100000, fill=c("transparent","black"))
+# text1 = list("sp.text", c(-220000,1750000), "0")
+# text2 = list("sp.text", c(-125000,1750000), "100 km")
+
+# color ramp 
+spplot(freq_inset, col.regions = c('black',matlab), maxpixels = 200000,
+       par.settings = list(layout.widths=list(right.padding=4.5)),
+       #sp.layout=list(scale, text1, text2),
+       colorkey=F)
 
 ```
+
+
+
+### Stand alone color ramps
 
 ```{r colorbar_matlab,fig.width = 8, fig.height = 4}
-colRamp <- c('black',matlab.like2(15))
+colRamp <- c('black',matlab.like2(19))
 
 plot(1:10)
-image.plot(z=0:15,add=F,legend.only=T, nlevel=16,  col=colRamp, 
+image.plot(z=0:18,add=F,legend.only=T, nlevel=16,  col=colRamp, 
            horizontal = T,
            smallplot=c(0.1,.9,.93,.98), 
-           axis.args=list(at=c(0,2,4,6,8,10,12,14), 
-                          labels=as.character(c(0,2,4,6,8,10,12,14))))
+         axis.args=list(at=c(0,3,6,9,12,15,18), 
+                          labels=as.character(c(0,3,6,9,12,15,18))))
 ```
+
 
 ```{r colorbar_PiYG,fig.width = 5, fig.height = 4}
 colRamp <- rev(colorRampPalette(brewer.pal(11,'PiYG'))(14))
