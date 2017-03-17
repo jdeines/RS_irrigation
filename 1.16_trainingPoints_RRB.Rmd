@@ -209,9 +209,15 @@ plotIndexByCrop_quartiles <- function(dfPlot, title, index){
        geom_ribbon(aes(ymin = Q1, 
                        ymax = Q3, 
                        fill = class), alpha = 0.2, colour=NA) +
-      scale_color_manual(values=c('gold2','slateblue2','saddlebrown')) +
-      scale_fill_manual(values=c('gold2','slateblue2','saddlebrown')) + 
-       geom_line() +
+      scale_color_manual(values=c('gray50','darkgreen','saddlebrown'),
+                         labels=c('Rainfed','Irrigated','Non-crop')) +
+      scale_fill_manual(values=c('gray50','darkgreen','saddlebrown'),
+                        labels=c('Rainfed','Irrigated','Non-crop')) +
+        geom_line() +
+        geom_line(aes(x=month, y = Q1, colour = class, group = class),
+                  size=.1, alpha=.8) +
+         geom_line(aes(x=month, y = Q3, colour = class, group = class),
+                  size=.1, alpha=.8) +
        facet_wrap(~crop) +
        ylab(paste0(index, ' Index')) + 
        xlab('Month (April - November)') + theme_bw() +
@@ -289,6 +295,16 @@ ggplot(data = giPlot,
        ylab('Greenness Index') + xlab('month') + theme_bw() +
        ggtitle("2010 + 2012 Combined GI (Green/NIR), full RRB")
 ```
+
+### Greenness Index Plots by Year - poster fig
+updated March 17 2017 for INFEWS meeting
+
+```{r greenIndexPlotByCrop_poster, fig.width = 6.75, fig.height = 4.75, dev='png'}
+# Greenness Index, 2010: Quartiles for talk 
+dfagg <- aggregateIndexByCrop_quartiles(index = 'GI', year = 2010, df=trainAllLong)
+plotIndexByCrop_quartiles(dfPlot = dfagg, title = '2010 Greenness Index (GI)', index = 'Greenness')
+```
+
 
 ### Index Plots by Year - talk fig
 ```{r indexPlotsByCrop, fig.width = 6.75, fig.height = 4.75}
