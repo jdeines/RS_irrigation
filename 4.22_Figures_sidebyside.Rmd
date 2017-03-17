@@ -1,0 +1,43 @@
+---
+title: "side by side"
+author: "Jill Deines"
+date: "March 16 2017"
+output: 
+  html_document:
+    toc: yes
+---
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, 
+               fig.path='S:/Users/xutianfa/Irrigation/poster_files/figures/RRB/sideBySide/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(raster)
+```
+
+## load and plot
+
+```{r sideBySide, fig.height=6.5, fig.width = 10}
+# file names
+imageDir <- 'S:/Users/xutianfa/Irrigation/poster_files/data/RRB'
+eviName <- 'sideBySide_EVI.tif'
+className <- 'sideBySide_classifiedmap.tif'
+
+evi <- raster(paste0(imageDir, '/',eviName))
+class <- raster(paste0(imageDir, '/', className))
+
+# make an EVI palette
+EviPal = colorRampPalette(c('#ffffff', '#CE7E45', '#F1B555', '#FCD163', '#99B718',
+  '#74A901', '#66A000', '#529400', '#3E8601', '#207401', '#056201',
+  '#004C00', '#023B01', '#012E01', '#011D01', '#011301'))  
+
+par(bty = 'n', mfrow=c(1,2), mar=c(.1,0,.1,0)) 
+plot(evi, col=EviPal(18), axes=F, legend=F, breaks=c(seq(0,1,length.out=17),4))
+plot(class, col = c('gray80','darkgreen'), axes=F, legend = F)
+```
+
