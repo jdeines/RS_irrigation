@@ -14,9 +14,13 @@ knitr::opts_chunk$set(echo = TRUE, cache=FALSE, cache.path='cache/1.18_rrbRandFo
 
 Goal: Run a variable importance test on a random forest of my training points
 
+Secondary goal unlikely to be obtained: use more functions below, less copy/pasting. Oh well, we can't all be beautiful.
+
 Update: 2/26/2017 - Classify the MidRep validation points with R's random forest tree and compare with GEE's classification. Use GEE accuracy for 'test3_randomForets_500' for this, prior to any cleaning
 
 Update 3/7/2017 - apply variable importance reduction to optimize classification on midrep validatin points
+
+Update 3/21/2017 - run the R random forest on the test dataset points
 
 randomForest package implementation:
  reference implementation based on CART trees
@@ -34,6 +38,7 @@ library(varSelRF)
 library(caret)
 library(knitr) # for 'kable' table display
 source('functions/prettyConfusion.R')
+source('functions/testToConfusion.R')
 ```
 
 ## Load Data
@@ -102,7 +107,7 @@ barplot(VI_F.ns/sum(VI_F.ns), las=3)
 
 That was fast, let's do more trees
 
-```{r rf2000, fig.height = 8}
+```{r rf2000, fig.height = 8, cache=TRUE}
 # run a random forest on all 57 variables
 set.seed(415)
 fit2000 <- randomForest(x = points3[,1:57], # all variable columns (excludes classes)
@@ -126,7 +131,7 @@ varImpPlot(fit2000.ns)
 
 
 Plot the error by number of trees
-```{r treeError}
+```{r treeError, cache=TRUE}
 plot(fit500)
 plot(fit500.ns)
 plot(fit2000)
@@ -138,7 +143,7 @@ Evaluate effect of dryland soy using 500 trees using the MidRep validation data 
 Use the validation points that have sampled the 57 input variables from the 01.1_ValidationPointsSample script in my GEE 'validation' folder
 
 
-```{r soyEffect}
+```{r soyEffect, cache = TRUE}
 # load points and variable data
 vpointFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/validationSets'
 p2007 <- read.csv(paste0(vpointFolder,'/2007_test3_variables_midRep_all.csv'))
@@ -158,12 +163,6 @@ p2010$randFor <- predict(fit500.ns, newdata = p2010, type='response')
 p2007$randForWithSoy <- predict(fit500, newdata = p2007, type='response')
 p2010$randForWithSoy <- predict(fit500, newdata = p2010, type='response')
 
-# quick function to run a confusion matrix then format confusion table
-makeConfusion <- function(prediction, reference) {
-  cmatrix <- confusionMatrix(data = prediction, reference = reference)
-  ctable <- prettyConfusion(cmatrix)
-}
-
 # 2007 R no soy
 r2007_3_ns <- makeConfusion(p2007$randFor, p2007$class)
 kable(r2007_3_ns, digits=1)
@@ -181,7 +180,7 @@ r2010_3_ws <- makeConfusion(p2010$randForWithSoy, p2010$class)
 kable(r2010_3_ws, digits=1)
 ```
 
-Removing dryland soy does improve accuracies in 2007, but has no effect on irrigated or overall accuracies in 2010.
+Removing dryland soy does improve accuracies in 2007, but has no effect on irrigated or overall accuracies in 2010. Note that 2007 is a particularly wet year so likely the most difficult.
 
 Interesting.
 
@@ -209,7 +208,7 @@ barplot(VI_F.ann/sum(VI_F.ann), las=3)
 ### Play with variable reduction
 without dryland soy
 
-```{r varReduction_noDsoy}
+```{r varReduction_noDsoy, cache=TRUE}
 # run a random forest on all 57 variables
 set.seed(412)
 test <- varSelRF(xdata = pointsNoSoy2[,1:57], whole.range=F,
@@ -226,7 +225,7 @@ atest
 
 With dryland soy
 
-```{r varReduction_wDsoy}
+```{r varReduction_wDsoy, cache=TRUE}
 # run a random forest on all 57 variables
 set.seed(412)
 test.ws <- varSelRF(xdata = points2[,1:57], whole.range=F,
@@ -238,7 +237,7 @@ test.ws
 
 Make a reduced variable classifier and evaluate - for no dryland soy. From 57 to 30 variables
 
-```{r reducedClassifier, fig.height=6}
+```{r reducedClassifier, fig.height=6, cache=TRUE}
 # selection out important variables
 reducedColumns <- c(test$selected.vars, 'classes')
 pts.ns.reduced <- pointsNoSoy2[,reducedColumns]
@@ -282,7 +281,7 @@ Reducing variables makes no change to 2010 midrep points, and causes a small ~1-
 ### Extremely reduced classifier
 A handful of 9 annual variables stand out among the rest; try just them
 
-```{r extremeReduce}
+```{r extremeReduce, cache=TRUE}
 # selection out important variables
 reducedColumns2 <- c('EVI_max_14', 'EVI_range_14','GI_max_14','GI_range_14',
                      'greenArid','NDVI_max_14','NDVI_range_14','NDWI_max_14',
@@ -319,10 +318,10 @@ The accuracies drop off quite a bit here
 
 ## Compare accuracy: GEE & R 
 
-### assess
+### assess validation points (middle republican)
 Use the accuracy assessment exports from GEE validation to compare results between GEE and Rrrr. These currently use the uncleaned classifications, but a merge of monthly/annual GEE classifiers.
 
-```{r compare}
+```{r compare, cache=TRUE}
 # load GEE accuracy tables
 accuDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test1_clean'
 g2007 <- read.csv(paste0(accuDir,
@@ -369,14 +368,7 @@ sum(!(geeR.2010$gee_rf == geeR.2010$randFor))
 
 Break it into a confusion table to better compare accuracies
 
-```{r confusion3}
-# quick function to run a confusion matrix then format confusion table
-makeConfusion <- function(prediction, reference) {
-  cmatrix <- confusionMatrix(data = prediction, reference = reference)
-  ctable <- prettyConfusion(cmatrix)
-}
-
-
+```{r confusion3, cache=TRUE}
 # 2007 GEE: make and display confusion table
 gee2007_3 <- makeConfusion(geeR.2007$gee_rf, geeR.2007$class.x)
 kable(gee2007_3, digits=1)
@@ -398,7 +390,7 @@ kable(r2010_3, digits=1)
 #### Two Classes (binary classification)
 Not awful, but check to see if most of the confusion is between noncrop/dryland
 
-```{r compare2class}
+```{r compare2class, cache=TRUE}
 # make keys to convert classifications from 2 classes to 1
 key2class.1 = data.frame(gee_rf = c('dryland','irrigated','noncrop'),
                          gee_rf2 = c('notirrigated','irrigated','notirrigated'))
@@ -428,14 +420,7 @@ That does improve the "consistency" between programs. Or likely, random seeds.
 
 Check to see which is more accurate via confusion table
 
-```{r confusion2}
-# quick function to run a confusion matrix then format confusion table
-makeConfusion2 <- function(prediction, reference) {
-  cmatrix <- confusionMatrix(data = prediction, reference = reference)
-  ctable <- prettyConfusionBinary(cmatrix)
-}
-
-
+```{r confusion2, cache=TRUE}
 # 2007 GEE: make and display confusion table
 gee2007_2 <- makeConfusion2(geeR.2007$gee_rf2, geeR.2007$class2)
 kable(gee2007_2, digits=1)
@@ -454,48 +439,113 @@ kable(r2010_2, digits=1)
 ```
 
 ## Test Datasets
-Checked after settling on the random forest, 500 tree, all 57 variables variable method, run without soy training points. This gives accuracy from the R classification; accuracies will also be carried out on the GEE outputs (including 1x and interannual cleaning).
+Checked after settling on the random forest, 500 tree, all 57 variables variable method, run without soy training points. This gives accuracy from the R classification; accuracies will also be carried out on the GEE outputs (including 1x majority filter and interannual cleaning).
 
-```{r testPoints}
+### Monthly classifier
+When exporting from GEE, points without data values in all 57 bands are auto-dropped. These points represent locations with data in all bands.
+
+```{r testPoints_monthly3}
 # load points and variable data
 vpointFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/validationSets'
 p2015 <- read.csv(paste0(vpointFolder, '/2015_data_randAll_1250_jmd.csv'))
 p2002 <- read.csv(paste0(vpointFolder, '/2002_data_NE_randAll_1050_jmd.csv'))
 
-# clean up data
-p2015 <- p2015[ , -which(names(p2015) %in% c('.geo'))]
-p2015$class <- as.character(p2015$class)
+# 2015, certainty level 1, 3 classes, monthly
+c2015_cert_3_mon <- testToConfusion(dataset = p2015, numClasses = 3, 
+                                    certainty = 1, classifier = fit500.ns)
+kable(c2015_cert_3_mon, digits=1)
 
-p2002 <- p2002[ , -which(names(p2002) %in% c('.geo'))]
-p2002$class <- as.character(p2002$class)
+# 2015, certainty level 1 & 2, 3 classes, monthly
+c2015_all_3_mon <- testToConfusion(dataset = p2015, numClasses = 3, 
+                                    certainty = 2, classifier = fit500.ns)
+kable(c2015_all_3_mon, digits=1)
 
-# collapse classes to 3 class, 2 class versions
-keyTo3 <- data.frame(class = c('irrigated','dryland','noncrop','fallow'),
-                     class3 = c('irrigated','dryland','noncrop','noncrop'),
-                     class2 = c('irrigated','notirrigated','notirrigated','notirrigated'))
-# incidentally, this also removes certainty level 3 as class 'Uncertain'
-p2015 <- merge(p2015, keyTo3)
-p2002 <- merge(p2002, keyTo3)
+# 2002, certainty level 1, 3 classes, monthly
+c2002_cert_3_mon <- testToConfusion(dataset = p2002, numClasses = 3, 
+                                    certainty = 1, classifier = fit500.ns)
+kable(c2002_cert_3_mon, digits=1)
 
-# subset certainty levels
-p2015.certain <- p2015[p2015$certainty == 1,]
-sum(p2015$certainty == 3)
-p2015.all <- p2015[p2015$certainty %in% c(1,2),]  # removes completely uncertain points
-
-p2002.certain <- p2015[p2015$certainty == 1,]
-p2002.all <- p2015[p2015$certainty %in% c(1,2),]  # removes completely uncertain points
-
-
-
-# run predictions/classification
-p2015.certain$randFor <- predict(fit500.ns, newdata = p2015.certain, type='response')
-p2015.all$randFor <- predict(fit500.ns, newdata = p2015.all, type='response')
-
-# confusion tables
-r2015.certain_3 <- makeConfusion(p2015.certain$randFor, p2015.certain$class3)
-kable(r2015.certain_3, digits=1)
-
-r2015.all_3 <- makeConfusion(p2015.all$randFor, p2015.all$class3)
-kable(r2015.all_3, digits=1)
+# 2002, certainty level 1 & 2, 3 classes, monthly
+c2002_all_3_mon <- testToConfusion(dataset = p2002, numClasses = 3, 
+                                    certainty = 2, classifier = fit500.ns)
+kable(c2002_all_3_mon, digits=1)
 ```
 
+And binary confusion tables for the monthly classifer test datasets
+
+```{r testPoints_monthly2}
+# 2015, certainty level 1, 2 classes, monthly
+c2015_cert_2_mon <- testToConfusion(dataset = p2015, numClasses = 2, 
+                                    certainty = 1, classifier = fit500.ns)
+kable(c2015_cert_2_mon, digits=1)
+
+# 2015, certainty level 1 & 2, 2 classes, monthly
+c2015_all_2_mon <- testToConfusion(dataset = p2015, numClasses = 2, 
+                                    certainty = 2, classifier = fit500.ns)
+kable(c2015_all_2_mon, digits=1)
+
+# 2002, certainty level 1, 2 classes, monthly
+c2002_cert_2_mon <- testToConfusion(dataset = p2002, numClasses = 2, 
+                                    certainty = 1, classifier = fit500.ns)
+kable(c2002_cert_2_mon, digits=1)
+
+# 2002, certainty level 1 & 2, 2 classes, monthly
+c2002_all_2_mon <- testToConfusion(dataset = p2002, numClasses = 2, 
+                                    certainty = 2, classifier = fit500.ns)
+kable(c2002_all_2_mon, digits=1)
+```
+
+
+### Annual classifier
+Right now, this is all available points (so not just points which are forced to use the annual classifer because they are missing a band)
+
+```{r testPoints_annual3}
+# load points and variable data
+vpointFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/validationSets'
+p2015 <- read.csv(paste0(vpointFolder, '/2015_data_randAll_1250_jmd.csv'))
+p2002 <- read.csv(paste0(vpointFolder, '/2002_data_NE_randAll_1050_jmd.csv'))
+
+# 2015, certainty level 1, 3 classes, monthly
+c2015_cert_3_ann <- testToConfusion(dataset = p2015, numClasses = 3, 
+                                    certainty = 1, classifier = fit500.ann)
+kable(c2015_cert_3_ann, digits=1)
+
+# 2015, certainty level 1 & 2, 3 classes, monthly
+c2015_all_3_ann <- testToConfusion(dataset = p2015, numClasses = 3, 
+                                    certainty = 2, classifier = fit500.ann)
+kable(c2015_all_3_ann, digits=1)
+
+# 2002, certainty level 1, 3 classes, monthly
+c2002_cert_3_ann <- testToConfusion(dataset = p2002, numClasses = 3, 
+                                    certainty = 1, classifier = fit500.ann)
+kable(c2002_cert_3_ann, digits=1)
+
+# 2002, certainty level 1 & 2, 3 classes, monthly
+c2002_all_3_ann <- testToConfusion(dataset = p2002, numClasses = 3, 
+                                    certainty = 2, classifier = fit500.ann)
+kable(c2002_all_3_ann, digits=1)
+```
+
+And binary confusion tables for the monthly classifer test datasets
+
+```{r testPoints_annual2}
+# 2015, certainty level 1, 2 classes, monthly
+c2015_cert_2_ann <- testToConfusion(dataset = p2015, numClasses = 2, 
+                                    certainty = 1, classifier = fit500.ann)
+kable(c2015_cert_2_ann, digits=1)
+
+# 2015, certainty level 1 & 2, 2 classes, monthly
+c2015_all_2_ann <- testToConfusion(dataset = p2015, numClasses = 2, 
+                                    certainty = 2, classifier = fit500.ann)
+kable(c2015_all_2_ann, digits=1)
+
+# 2002, certainty level 1, 2 classes, monthly
+c2002_cert_2_ann <- testToConfusion(dataset = p2002, numClasses = 2, 
+                                    certainty = 1, classifier = fit500.ann)
+kable(c2002_cert_2_ann, digits=1)
+
+# 2002, certainty level 1 & 2, 2 classes, monthly
+c2002_all_2_ann <- testToConfusion(dataset = p2002, numClasses = 2, 
+                                    certainty = 2, classifier = fit500.ann)
+kable(c2002_all_2_ann, digits=1)
+```
