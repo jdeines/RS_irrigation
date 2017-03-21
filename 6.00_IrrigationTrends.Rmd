@@ -24,6 +24,7 @@ library(tidyverse) # for ggplot2, tidyr, dplyr, broom...
 library(broom)
 library(rgdal)
 library(colorRamps)
+source('functions/stat_smooth_func_all.R')
 ```
 
 ## Load Data
@@ -264,6 +265,37 @@ ggplot(data = all1[grepl('full', all1$masterID),],
     xlab('Year') + ggtitle('Full Region by State') +
     theme_bw()
 ```
+
+```{r rrcaStateTrends}
+stateRRCA <- all1[grepl('full', all1$masterID),]
+stateRRCA$masterID <- as.character(stateRRCA$masterID)
+
+# run regressions by state 
+statelms <- stateRRCA %>% 
+  group_by(masterID) %>% 
+  do(model = lm(irrigated_km2 ~ year, data = .))
+
+# tidy up with broom
+coeffs2 <- statelms %>% tidy(model)
+coeffs2 <- coeffs2[coeffs2$term == 'year',]
+
+# plots with no facet labels
+ggplot(data = stateRRCA,
+      aes(x = year, y = irrigated_km2, colour=masterID)) +
+  geom_line() + 
+  # add linear model
+  #stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
+  #                xpos = 2000, ypos = 14000) +
+  # add trendline
+  stat_smooth(method = 'lm', se=T) +
+  ylab('') +
+  theme_bw() + theme(legend.position = 'none',
+                     strip.background=element_blank(),
+                     strip.text.x = element_blank(),
+                     text = element_text(size = 16))
+
+```
+
 
 ### RRB Basin plots
 
