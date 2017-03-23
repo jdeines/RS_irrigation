@@ -9,13 +9,11 @@ output:
 
 Goal: Make figures of irrigation frequency over the region
 
-see some nice updates in S:\Users\xutianfa\Irrigation\poster_files\code code
-
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
 opts_chunk$set(cache=TRUE, cache.path='cache/4.1_FreqFigs/',
-               fig.path='figure/4.1_FreqFigs_randFor/')
+               fig.path='figure/4.1_FreqFigs_randFor/to2016/')
 ```
 
 **R Packages Needed**
@@ -32,21 +30,22 @@ library(RColorBrewer)
 ## Irrigation frequency
 Exported raster of years irrigated from 06.0_summaryMaps in GEE.
 
+### map data pre-processing - only need to run 1x
 First, load raster domain raster and mask, and write out masked version to save time in the future.
 
 ```{r frequencyPrep, eval=FALSE}
 # dirs and names
 rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_randFor_interannualClean'
-rasVis <- 'IrrigationFrequencyMap_visualization.tif'
 rasAll <- 'IrrigationFrequencyMap_0and1neg.tif'
 rasSmall <- 'IrrigationFrequencyMap_0and1neg_inset.tif'
 
 #rasEarly <- 'EarliestYearIrrigated_0and1neg.tif'
 
-# load pre-masked, pre-color scaled image
-vis <- stack(paste0(rasDir,'/',rasVis))
-plotRGB(vis)
-# neat, but I'd rather work with actual data and play with scales
+# # load pre-masked, pre-color scaled image
+# rasVis <- 'IrrigationFrequencyMap_visualization.tif'
+# vis <- stack(paste0(rasDir,'/',rasVis))
+# plotRGB(vis)
+# # neat, but I'd rather work with actual data and play with scales
 
 # load full raster and set -1 to NA (basically mask areas outside of Extent)
 freq <- raster(paste0(rasDir,'/',rasAll))
@@ -63,9 +62,11 @@ writeRaster(freq, paste0(rasDir,'/IrrigationFrequencyMap_0and1neg_boundMask.tif'
 # writeRaster(early, paste0(rasDir,'/EarliestYearIrrigated_0and1neg_boundMask.tif'))
 ```
 
+### Plots
+
 Earliest year irrigated map - This needs updating for random forest if you ever use it
 
-```{r earliestMap_PiYG, fig.width = 6, fig.height=3.5, dpi=96}
+```{r earliestMap_PiYG, fig.width = 6, fig.height=3.5, dpi=96, eval=FALSE}
 rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_cart_interannualClean'
 rasEarly <- 'EarliestYearIrrigated_0and1neg_boundMask.tif'
 
@@ -79,28 +80,98 @@ spplot(early, col.regions = colRamp, maxpixels = 1000000, colorkey=F)
 
 ```
 
-Frequency histogram of number of years irrigated for pixels
+Set some common color scales, etc, among figures
 
-```{r hist, fig.width = 6, fig.height = 5, dpi=96, eval=FALSE}
+```{r commonPlotVars}
+# load map
 rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_randFor_interannualClean'
 rasAll <- 'IrrigationFrequencyMap_0and1neg_boundMask.tif'
 
-# load full raster
-freqHist <- raster(paste0(rasDir,'/',rasAll))
-freqHist[freqHist == 0] <- NA
-
-hist(freqHist, maxpixels=20000000, xlab = 'Years Irrigated', main = '')
+# number of years color ramps
+numYears <- 18
+backgroundcolor <- 'gray32'
+matlab <- matlab.like2(numYears+1)
 
 ```
+
+
+
+Frequency histogram of number of years irrigated for pixels: get frequency of values
+
+```{r histPrep, eval=FALSE}
+# load full raster
+freqHist <- raster(paste0(rasDir,'/',rasAll))
+# count by classes
+yearCounts <- freq(freqHist)
+# takes a while, save output
+write.csv(yearCounts, paste0(rasDir,'/test3_randFor_yearMapCounts.csv'),
+          row.names=F) 
+```
+
+plot it
+
+
+```{r hist, fig.width = 6, fig.height = 5, eval=TRUE}
+# load yearmap counts
+yearCounts <- read.csv(paste0(rasDir,'/test3_randFor_yearMapCounts.csv'))
+# sort
+yearCounts <- yearCounts[order(yearCounts$value),]
+
+# remove NA row
+yearCounts <- yearCounts[!is.na(yearCounts$value),]
+
+# get a percentage column: of total study area
+yearCounts$percentOfTotal <- yearCounts$count/sum(yearCounts$count) * 100
+
+# get a percentage column: of area ever irrigated
+yearCounts2 <- yearCounts[yearCounts$value != 0,]
+yearCounts2$percentOfIrr <- yearCounts2$count/sum(yearCounts2$count) * 100
+
+# side note: what percentage for 16-18 years?
+(2352698+3314884+4664761)/sum(yearCounts2$count)
+
+# arange plot parameters
+bardata <- yearCounts2$percentOfIrr
+colors <- matlab[2:19]
+
+# vert plot
+barplot(bardata, col=colors, space=0, las=1, line=-.5)
+mtext(side = 2, "Percent of Irrigated Area", line=2, cex=1.1)
+mtext(side = 1, "Years Irrigated", line=4, cex=1.1)
+
+# legend
+image.plot(z=0:18,add=F,legend.only=T,  col=c(backgroundcolor,matlab[1:18]), 
+           horizontal = T,
+          smallplot=c(0.08,.902,.13,.18), 
+         axis.args=list(at=c(0,3,6,9,12,15,18), 
+                          labels=as.character(c(0,3,6,9,12,15,18))))
+
+```
+
+hist without colorscale
+
+```{r hist_noScale, fig.width = 6.5, fig.height = 5, eval=TRUE}
+
+# vert plot
+barplot(bardata, col=colors, space=0.1, las=1, line=-.5,
+        names.arg=c('2','','4','','6','','8','','10','','12',
+                    '','14','','16','','18'))
+mtext(side = 2, "Percent of Irrigated Area", line=2, cex=1.1)
+mtext(side = 1, "Years Irrigated", line=2, cex=1.1)
+
+```
+Or a cumulative density function?
+
+```{r cdf}
+
+```
+
 
 ### Number of Years Irrigated Maps
 
 Number of years irrigated figure
 
-```{r freqMap_matlab2_bottom, fig.width = 10, fig.height = 5, dpi=96}
-rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test3_randFor_interannualClean'
-rasAll <- 'IrrigationFrequencyMap_0and1neg_boundMask.tif'
-
+```{r freqMap_matlab2_bottom, fig.width = 10, fig.height = 5}
 # load full raster
 freq <- raster(paste0(rasDir,'/',rasAll))
 
@@ -111,14 +182,13 @@ text1 = list("sp.text", c(-220000,1750000), "0")
 text2 = list("sp.text", c(-125000,1750000), "100 km")
 
 # color ramp 
-matlab <- matlab.like2(19)
-spplot(freq, col.regions = c('black',matlab), maxpixels = 2000000,
+spplot(freq, col.regions = c(backgroundcolor,matlab), maxpixels = 2000000,
        sp.layout=list(scale, text1, text2), 
        par.settings=list(axis.line=list(col=NA)), 
        colorkey=F)#list(labels=list(cex=1.2),
                   #at = c(0:18))
 
-image.plot(z=0:18,add=F,legend.only=T,  col=c('black',matlab), 
+image.plot(z=0:18,add=F,legend.only=T,  col=c(backgroundcolor,matlab), 
            horizontal = T,
           smallplot=c(0.05,.95,.15,.2), 
          axis.args=list(at=c(0,3,6,9,12,15,18), 
@@ -129,7 +199,7 @@ image.plot(z=0:18,add=F,legend.only=T,  col=c('black',matlab),
 #grid.text('Years Irrigated',x=unit(0.975, "npc"),y=unit(0.5, 'npc'), rot=-90, gp=gpar(fontsize=18))
 ```
 
-blue-yellow-red Number of years irrigated
+Integrated colorbar on right (retains map frame border)
 
 ```{r freqMap_matlab2_right, fig.width = 10, fig.height = 5, dpi=96}
 # plot scale
@@ -138,7 +208,7 @@ scale = list("SpatialPolygonsRescale", layout.scale.bar(),
 text1 = list("sp.text", c(-220000,1750000), "0")
 text2 = list("sp.text", c(-125000,1750000), "100 km")
 
-spplot(freq, col.regions = c('black',matlab), maxpixels = 2000000,
+spplot(freq, col.regions = c(backgroundcolor,matlab), maxpixels = 2000000,
        par.settings = list(layout.widths=list(right.padding=4.5)),
        sp.layout=list(scale, text1, text2),
        colorkey=list(labels=list(cex=1.2),
@@ -165,7 +235,7 @@ freq_inset <- raster(paste0(rasDir,'/',rasInset))
 # text2 = list("sp.text", c(-125000,1750000), "100 km")
 
 # color ramp 
-spplot(freq_inset, col.regions = c('black',matlab), maxpixels = 200000,
+spplot(freq_inset, col.regions = c(backgroundcolor,matlab), maxpixels = 200000,
        par.settings = list(layout.widths=list(right.padding=4.5)),
        #sp.layout=list(scale, text1, text2),
        colorkey=F)
@@ -177,7 +247,7 @@ spplot(freq_inset, col.regions = c('black',matlab), maxpixels = 200000,
 ### Stand alone color ramps
 
 ```{r colorbar_matlab,fig.width = 8, fig.height = 4}
-colRamp <- c('black',matlab.like2(19))
+colRamp <- c(backgroundcolor,matlab.like2(19))
 
 plot(1:10)
 image.plot(z=0:18,add=F,legend.only=T, nlevel=16,  col=colRamp, 

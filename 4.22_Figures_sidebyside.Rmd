@@ -10,7 +10,7 @@ output:
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
-opts_chunk$set(cache=FALSE, 
+opts_chunk$set(cache=FALSE, dev = 'pdf',
                fig.path='S:/Users/xutianfa/Irrigation/poster_files/figures/RRB/sideBySide/')
 ```
 
@@ -18,11 +18,14 @@ opts_chunk$set(cache=FALSE,
 
 ```{r packages, message=FALSE, echo=TRUE}
 library(raster)
+library(fields)
 ```
 
 ## load and plot
 
-```{r sideBySide, fig.height=6.5, fig.width = 10}
+using EVI
+
+```{r sideBySide_EVI, fig.height=7.5, fig.width = 10, eval=FALSE}
 # file names
 imageDir <- 'S:/Users/xutianfa/Irrigation/poster_files/data/RRB'
 eviName <- 'sideBySide_EVI.tif'
@@ -31,13 +34,77 @@ className <- 'sideBySide_classifiedmap.tif'
 evi <- raster(paste0(imageDir, '/',eviName))
 class <- raster(paste0(imageDir, '/', className))
 
+
 # make an EVI palette
-EviPal = colorRampPalette(c('#ffffff', '#CE7E45', '#F1B555', '#FCD163', '#99B718',
+EviPal = colorRampPalette(c('#CE7E45', '#F1B555', '#FCD163', '#99B718',
+  '#74A901', '#66A000', '#529400', '#3E8601', '#207401', '#056201',
+  '#004C00', '#023B01', '#012E01', '#011D01', '#011301'))   
+
+par(bty = 'n', mfrow=c(1,2), mar=c(5.5,0,0,0)) 
+breaks2 <- c(seq(0,1,length.out=17),4)
+
+
+plot(evi, col=EviPal(19), axes=F, legend=F, breaks=breaks2)
+image.plot(z=0:1,add=F,legend.only=T,  col=EviPal(19), 
+           horizontal = T, #breaks = breaks2,
+           smallplot=c(0.02,.90,.08,.12),
+           axis.args=list(at=c(0,0.25,0.5,0.75,1), 
+                         labels=as.character(c(0,0.25,0.5,0.75,1)),
+                         cex.axis=1.7))
+           
+
+plot(class, col = c('gray80','darkgreen'), axes=F, legend = F)
+
+# add legend at will
+par(fig=c(0, 1, 0, 1), oma=c(0, 0, 0, 0), mar=c(2, 0, 0, 2.25), new=TRUE)
+plot(0, 0, type='n', bty='n', xaxt='n', yaxt='n')
+# add legend
+legend("bottomright", legend=c('Irrigated','Not Irrigated'), 
+        fill = c('darkgreen','gray80'), border = "black", ncol=2, bty='n',
+       cex = 1.7)
+```
+
+Using GI
+
+```{r sideBySide_GI, fig.height=7.5, fig.width = 10}
+# file names
+imageDir <- 'S:/Users/xutianfa/Irrigation/poster_files/data/RRB'
+giName <- 'sideBySide_GI.tif'
+className <- 'sideBySide_classifiedmap.tif'
+
+gi <- raster(paste0(imageDir, '/',giName))
+class <- raster(paste0(imageDir, '/', className))
+
+# make an EVI palette
+EviPal = colorRampPalette(c('#CE7E45', '#F1B555', '#FCD163', '#99B718',
   '#74A901', '#66A000', '#529400', '#3E8601', '#207401', '#056201',
   '#004C00', '#023B01', '#012E01', '#011D01', '#011301'))  
 
-par(bty = 'n', mfrow=c(1,2), mar=c(.1,0,.1,0)) 
-plot(evi, col=EviPal(18), axes=F, legend=F, breaks=c(seq(0,1,length.out=17),4))
-plot(class, col = c('gray80','darkgreen'), axes=F, legend = F)
-```
 
+par(bty = 'n', mfrow=c(1,2), mar=c(5.5,0,0,0)) 
+breaks1 <- c(seq(1,15,length.out=17),22)
+
+# greenness index and colorscale legend
+plot(gi, col=EviPal(17), legend=F,axes=F, breaks=breaks1)
+image.plot(z=1:22,add=F,legend.only=T,  col=EviPal(17), bty='y',
+           horizontal = T, breaks = breaks1,
+           smallplot=c(0.02,.90,.08,.12),
+          axis.args=list(at=c(1,5,10,15,22), 
+                         labels=as.character(c(1,5,10,15,22)),
+                         cex.axis=1.7))
+
+# classified map and legend
+plot(class, col = c('gray80','darkgreen'), axes=F, legend = F)
+
+# add legend at will
+par(fig=c(0, 1, 0, 1), oma=c(0, 0, 0, 0), mar=c(2, 0, 0, 2.25), new=TRUE)
+plot(0, 0, type='n', bty='n', xaxt='n', yaxt='n')
+# add legend
+legend("bottomright", legend=c('Irrigated','Not Irrigated'), 
+        fill = c('darkgreen','gray80'), border = "black", ncol=2, bty='n',
+       cex = 1.7)
+
+
+
+
+```

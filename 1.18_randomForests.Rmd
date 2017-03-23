@@ -497,6 +497,63 @@ kable(c2002_all_2_mon, digits=1)
 
 
 ### Annual classifier
+
+#### on the full test point dataset
+
+```{r testPoints_annual3_all}
+# load points and variable data
+vpointFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/validationSets'
+p2015 <- read.csv(paste0(vpointFolder, '/2015_data_randAll_1250_jmd_annual.csv'))
+p2002 <- read.csv(paste0(vpointFolder, '/2002_data_NE_randAll_1050_jmd_annual.csv'))
+
+# 2015, certainty level 1, 3 classes, monthly
+c2015_cert_3_ann <- testToConfusion(dataset = p2015, numClasses = 3, 
+                                    certainty = 1, classifier = fit500.ann)
+kable(c2015_cert_3_ann, digits=1)
+
+# 2015, certainty level 1 & 2, 3 classes, monthly
+c2015_all_3_ann <- testToConfusion(dataset = p2015, numClasses = 3, 
+                                    certainty = 2, classifier = fit500.ann)
+kable(c2015_all_3_ann, digits=1)
+
+# 2002, certainty level 1, 3 classes, monthly
+c2002_cert_3_ann <- testToConfusion(dataset = p2002, numClasses = 3, 
+                                    certainty = 1, classifier = fit500.ann)
+kable(c2002_cert_3_ann, digits=1)
+
+# 2002, certainty level 1 & 2, 3 classes, monthly
+c2002_all_3_ann <- testToConfusion(dataset = p2002, numClasses = 3, 
+                                    certainty = 2, classifier = fit500.ann)
+kable(c2002_all_3_ann, digits=1)
+```
+
+And binary confusion tables for the monthly classifer test datasets
+
+```{r testPoints_annual2_all}
+# 2015, certainty level 1, 2 classes, monthly
+c2015_cert_2_ann <- testToConfusion(dataset = p2015, numClasses = 2, 
+                                    certainty = 1, classifier = fit500.ann)
+kable(c2015_cert_2_ann, digits=1)
+
+# 2015, certainty level 1 & 2, 2 classes, monthly
+c2015_all_2_ann <- testToConfusion(dataset = p2015, numClasses = 2, 
+                                    certainty = 2, classifier = fit500.ann)
+kable(c2015_all_2_ann, digits=1)
+
+# 2002, certainty level 1, 2 classes, monthly
+c2002_cert_2_ann <- testToConfusion(dataset = p2002, numClasses = 2, 
+                                    certainty = 1, classifier = fit500.ann)
+kable(c2002_cert_2_ann, digits=1)
+
+# 2002, certainty level 1 & 2, 2 classes, monthly
+c2002_all_2_ann <- testToConfusion(dataset = p2002, numClasses = 2, 
+                                    certainty = 2, classifier = fit500.ann)
+kable(c2002_all_2_ann, digits=1)
+```
+
+#### on points requiring the annual classifier (full - monthly)
+
+#### on the same points as the monthly
 Right now, this is all available points (so not just points which are forced to use the annual classifer because they are missing a band)
 
 ```{r testPoints_annual3}
