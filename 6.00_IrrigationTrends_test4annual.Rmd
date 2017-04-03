@@ -1,0 +1,400 @@
+---
+title: "Irrigation Over Time"
+author: "Jill Deines"
+date: "December 6, 2016"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Investigate trends in irrigated area over time - total area, areas gained, areas lost.
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, 
+               fig.path='figure/6.00_irrTrends_test4annual/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+library(latticeExtra)
+library(tidyverse) # for ggplot2, tidyr, dplyr
+library(broom)
+library(rgdal)
+library(colorRamps)
+source('functions/stat_smooth_func_all.R')
+```
+
+## Load Data
+
+### RS estimates of irrigated area
+Counts of each class type were tallied for several administrative boundaries in GEE
+
+```{r loadGee}
+cellArea <- 30*30 # m^2
+
+regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test4_regional_county_Stats'
+
+# get filenames
+files <- list.files(regionsDir, pattern="*_test4_randFor_interannual_plusAncillary.csv")
+
+# read in to a single dataframe
+all1 = as.data.frame(do.call(rbind, lapply(files, function(x) {
+              csv1 <- read.csv(paste0(regionsDir,'/',x))
+              csv1$year <- as.numeric(substr(x, start=1,stop=4))
+              return(csv1)
+            })))
+
+# convert cell count to area
+all1$irrigated_m2 <- all1$X1 * cellArea
+all1$irrigated_km2 <- all1$irrigated_m2 / 1000000
+
+# find total #cells in the rrcaExtent
+#all1$totalCells <- all1$X0 + all1$X1 + all1$null
+#all1[all1$masterID == 'rrcaRrbBuffExtent','totalCells'][1]
+```
+
+### County Trends
+run regressions to get change in area over time (slope) per county
+
+```{r countyRegress}
+# extract county data
+counties0 <- all1[grepl('county', all1$masterID),]
+counties0$fips5 <- substr(counties0$masterID, start = 11, stop = 15)
+
+# drop columns
+counties <- counties0[,c('masterID','fips5','year','irrigated_m2','irrigated_km2')]
+
+# Co county 08041 has NA's; remove
+counties <- counties[complete.cases(counties),]
+
+# run regressions by county
+countylms <- counties %>% 
+  group_by(fips5) %>% 
+  do(model = lm(irrigated_km2 ~ year, data = .))
+
+# tidy up with broom
+coeffs <- countylms %>% tidy(model)
+coeffs <- coeffs[coeffs$term == 'year',]
+
+# map the year coefficient
+# get county bounds
+gisDir <- "C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile"
+cnty <- readOGR(gisDir, 'Counties_RRCAextent_Clip', verbose=F)
+
+# get state bounds
+gisDir2 <- "C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml"
+states <- readOGR(paste0(gisDir2,'/RRB_fullExtent_states.kml'), verbose=F)
+states <- spTransform(states, CRS(proj4string(cnty)))
+
+# join the regression slopes
+countymap <- merge(cnty, coeffs[,c('fips5','estimate','p.value')])
+
+# or just significant trends
+countymap[is.na(countymap$p.value),'p.value'] <- 1 # dummy p value no data county
+countymap$sigCoeffs <- countymap$estimate
+countymap[countymap$p.value >= 0.05, 'sigCoeffs'] <- NA
+
+# plot!
+pal <- matlab.like(16)
+spplot(countymap, 'sigCoeffs', col.regions=pal) +
+  latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
+
+# give a starkly different color for declining counties
+origPal <- pal
+origPal[1] <- 'black'
+spplot(countymap, 'sigCoeffs', col.regions=origPal) +
+  latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
+
+# a map with all counties regardless of significance
+origPal2 <- origPal
+origPal2[2] <- 'black'
+spplot(countymap, 'estimate', col.regions=origPal2) +
+  latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
+```
+
+Which counties have greatest variance over time?
+
+```{r countyVar}
+# which counties are most stable?
+
+
+
+
+
+```
+
+
+### Novel/Retired Irrigated Area by year
+
+```{r loadYearly}
+cellArea <- 30*30 # m^2
+
+yearsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/earliestLatestTable'
+
+# load 
+early <- read.csv(paste0(yearsDir, '/', 'test4_randFor_earliest_regionCounts.csv'))
+late <- read.csv(paste0(yearsDir, '/', 'test4_randFor_latest_regionCounts.csv'))
+
+# remove county data
+early <- early[!grepl('county', early$masterID),]
+late <- late[!grepl('county', late$masterID),]
+
+# gather year-county columns into 1 column
+early.long <- gather(early, key = year, value = count, X1999:X2015)
+late.long <- gather(late, key = year, value = count, X2000:X2016)
+
+# remove junk columns
+early.long <- early.long[,c('masterID','year','count')]
+late.long <- late.long[,c('masterID','year','count')]
+
+# convert year column to numeric
+early.long$year <- as.numeric(substr(early.long$year, 2,5))
+late.long$year <- as.numeric(substr(late.long$year, 2,5))
+
+# convert cell count to area
+early.long$area_m2 <- early.long$count * cellArea
+early.long$area_km2 <- early.long$area_m2 / 1000000
+
+late.long$area_m2 <- late.long$count * cellArea
+late.long$area_km2 <- late.long$area_m2 / 1000000
+```
+
+### Combine datasets
+Make a long format data frame with total irrigated area, novel area each year, lost area each year
+
+```{r combine}
+# reformat total area data ------------------
+all <- all1[,c('masterID','year','irrigated_m2','irrigated_km2')]
+names(all)[3:4] <- c('area_m2', 'area_km2')
+all$dataset <- 'total'
+
+# reformat novel/retired data ----------------
+# add dataset ID column
+early.long$dataset <- 'novel'
+late.long$dataset <- 'retired'
+
+columnsWanted <- c('masterID', 'year', 'area_m2', 'area_km2', 'dataset')
+# early, drop first years
+early2 <- early.long[!(early.long$year %in% c(1999,2000,2001)),
+                       columnsWanted]
+
+# late: drop last years
+late2 <- late.long[!(late.long$year %in% c(2014,2015,2016)),
+                       columnsWanted]
+
+combined <- rbind(all, early2, late2)
+```
+
+
+
+## Plot Novel/Retired over time
+
+### full study extent
+RRB + RRCA + buffer
+
+```{r fullExtent_novelRetired}
+ggplot(data = combined[combined$masterID == 'rrcaRrbBuffExtent',],
+       aes(x = year, y = area_km2, colour = dataset)) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2," )"))) +
+    xlab('Year') + ggtitle('Full Region') + 
+    theme_bw()
+
+ggplot(data = combined[grepl('full', combined$masterID),],
+       aes(x = year, y = area_km2, colour = dataset)) + 
+    facet_wrap( ~ masterID) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2," )"))) +
+    xlab('Year') + ggtitle('Full Region by State') +
+    theme_bw()
+```
+
+Dave and Anthony requested a plot with cumulative novel and retired areas
+
+```{r fullExtent_novelRetired_cumulative}
+# extract dataset: full study extent, by state
+stateExtent <- combined[grepl('full', combined$masterID),]
+
+
+
+# make a cumulative sum column by dataset type
+stateExtent <- stateExtent %>%
+  group_by(masterID, dataset) %>%
+  arrange(year) %>%
+  mutate(cumArea_km2 = cumsum(area_km2))
+
+# make a column to plot that has raw data for total, cumulative for novel/retired
+stateExtent$toPlot <- NA
+stateExtent[stateExtent$dataset == 'total','toPlot'] <- stateExtent[stateExtent$dataset == 'total','area_km2']
+stateExtent[stateExtent$dataset == 'novel','toPlot'] <- stateExtent[stateExtent$dataset == 'novel','cumArea_km2']
+stateExtent[stateExtent$dataset == 'retired','toPlot'] <- stateExtent[stateExtent$dataset == 'retired','cumArea_km2']
+
+# plotty plot
+ggplot(data = stateExtent,
+       aes(x = year, y = toPlot, colour = dataset)) + 
+    facet_wrap( ~ masterID) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2,")"))) +
+    xlab('Year') + #ggtitle('Full Region by State') +
+    scale_color_discrete(breaks=c('total','novel','retired'),
+                         labels=c('total', 'cumulative novel',
+                                  'cumulative retired')) +
+    guides(color=guide_legend(title=NULL)) +
+    theme_bw() +
+    theme(legend.position = 'top') 
+```
+
+
+### basin only
+rrb basin bound
+
+```{r basin_novelRetired}
+
+
+ggplot(data = combined[grepl('basin', combined$masterID) &
+                     !grepl('NRD', combined$masterID),],
+       aes(x = year, y = area_km2, colour = dataset)) + 
+    facet_wrap( ~ masterID) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2," )"))) +
+    xlab('Year') + ggtitle('RRB Basin by State') +
+    theme_bw()
+```
+
+
+basin level cumulative
+
+```{r basinExtent_novelRetired_cumulative}
+# extract dataset: full study extent, by state
+stateBasin <- combined[grepl('basin', combined$masterID) &
+                     !grepl('NRD', combined$masterID),]
+
+# make a cumulative sum column by dataset type
+stateBasin <- stateBasin %>%
+  group_by(masterID, dataset) %>%
+  arrange(year) %>%
+  mutate(cumArea_km2 = cumsum(area_km2))
+
+# make a column to plot that has raw data for total, cumulative for novel/retired
+stateBasin$toPlot <- NA
+stateBasin[stateBasin$dataset == 'total','toPlot'] <- stateBasin[stateBasin$dataset == 'total','area_km2']
+stateBasin[stateBasin$dataset == 'novel','toPlot'] <- stateBasin[stateBasin$dataset == 'novel','cumArea_km2']
+stateBasin[stateBasin$dataset == 'retired','toPlot'] <- stateBasin[stateBasin$dataset == 'retired','cumArea_km2']
+
+# plotty plot
+ggplot(data = stateBasin,
+       aes(x = year, y = toPlot, colour = dataset)) + 
+    facet_wrap( ~ masterID) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2," )"))) +
+    xlab('Year') + ggtitle('Full Region by State') +
+    theme_bw()
+```
+
+## Plot Area Data (plots prior to novel/retired analysis)
+
+### Full RRCA RRB Extent
+
+```{r rrcaExtentPlots, fig.height=2.5}
+ggplot(data = all1[all1$masterID == 'rrcaRrbBuffExtent',],
+       aes(x = year, y = irrigated_km2)) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2," )"))) +
+    xlab('Year') + ggtitle('Full Region') + 
+    theme_bw()
+# precip
+ggplot(data = all1[all1$masterID == 'rrcaRrbBuffExtent',],
+       aes(x = year, y=pr_ann)) +
+    geom_line() + geom_point() +
+    ylab("Dec - Aug precip  (mm)") +
+    xlab('Year') + ggtitle('Full Region') + 
+    theme_bw()
+
+# aridity
+ggplot(data = all1[all1$masterID == 'rrcaRrbBuffExtent',],
+       aes(x = year, y=aridity)) +
+    geom_line() + geom_point() +
+    ylab("Aridity") +
+    xlab('Year') + ggtitle('Full Region') + 
+    theme_bw()
+```
+
+```{r rrcabyState}
+
+ggplot(data = all1[grepl('full', all1$masterID),],
+       aes(x = year, y = irrigated_km2, colour = masterID)) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2," )"))) +
+    xlab('Year') + ggtitle('Full Region by State') +
+    theme_bw()
+```
+
+```{r rrcaStateTrends}
+stateRRCA <- all1[grepl('full', all1$masterID),]
+stateRRCA$masterID <- as.character(stateRRCA$masterID)
+
+# run regressions by state 
+statelms <- stateRRCA %>% 
+  group_by(masterID) %>% 
+  do(model = lm(irrigated_km2 ~ year, data = .))
+
+# tidy up with broom
+coeffs2 <- statelms %>% tidy(model)
+coeffs2 <- coeffs2[coeffs2$term == 'year',]
+
+# plots with no facet labels
+ggplot(data = stateRRCA,
+      aes(x = year, y = irrigated_km2, colour=masterID)) +
+  geom_line() + 
+  # add linear model
+  #stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
+  #                xpos = 2000, ypos = 14000) +
+  # add trendline
+  stat_smooth(method = 'lm', se=T) +
+  ylab('') +
+  theme_bw() + theme(legend.position = 'none',
+                     strip.background=element_blank(),
+                     strip.text.x = element_blank(),
+                     text = element_text(size = 16))
+
+```
+
+
+### RRB Basin plots
+
+```{r rrbBasinPlots}
+ggplot(data = all1[grepl('basin', all1$masterID) &
+                     !grepl('NRD', all1$masterID),],
+       aes(x = year, y = irrigated_km2, colour = masterID)) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2," )"))) +
+    xlab('Year') + ggtitle('RRB by State') +
+   theme_bw() 
+```
+
+```{r neBasin, fig.height=2.5}
+ggplot(data = all1[grepl('NE_basin', all1$masterID),],
+       aes(x = year, y = irrigated_km2)) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2," )"))) +
+    xlab('Year') + ggtitle('Nebraska RRB') +
+   theme_bw() 
+```
+### NRD Basin plots
+
+```{r nrdBasinPlots}
+ggplot(data = all1[grepl('NRD', all1$masterID) | 
+                     grepl('GMD', all1$masterID),],
+       aes(x = year, y = irrigated_km2, colour = masterID)) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2," )"))) +
+    xlab('Year') + ggtitle('By NE NRD') +
+   theme_bw() 
+
+```
+
+
+

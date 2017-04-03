@@ -80,6 +80,7 @@ cleanNassCensusCounty <- function(nass.df, year){
   
   #Remove the GRASSES and LEGUMES separate types, and GRASSES & LEGUMES, OTHER
   
+  
   # rename HAY and HAYLAGE 
   nass.df4[grepl("HAY",nass.df4$commodity_desc),'commodity_desc'] <- 'HAY.OTHER'
   nass.df4[grepl("HAYLAGE",nass.df4$commodity_desc),'commodity_desc'] <- 'HAY.OTHER'
