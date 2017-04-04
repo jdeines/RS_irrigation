@@ -59,7 +59,7 @@ all1$irrigated_km2 <- all1$irrigated_m2 / 1000000
 ### County Trends
 run regressions to get change in area over time (slope) per county
 
-```{r countyRegress}
+```{r countyRegress, fig.width = 3.5, fig.height = 3}
 # extract county data
 counties0 <- all1[grepl('county', all1$masterID),]
 counties0$fips5 <- substr(counties0$masterID, start = 11, stop = 15)
@@ -105,8 +105,8 @@ spplot(countymap, 'sigCoeffs', col.regions=pal) +
 # give a starkly different color for declining counties
 origPal <- pal
 origPal[1] <- 'black'
-spplot(countymap, 'sigCoeffs', col.regions=origPal) +
-  latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
+spplot(countymap, 'sigCoeffs', col.regions=origPal, colorkey = list(space='bottom')) #+
+ # latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
 
 # a map with all counties regardless of significance
 origPal2 <- origPal
@@ -214,7 +214,7 @@ ggplot(data = combined[grepl('full', combined$masterID),],
 
 Dave and Anthony requested a plot with cumulative novel and retired areas
 
-```{r fullExtent_novelRetired_cumulative}
+```{r fullExtent_novelRetired_cumulative, fig.width = 6.5}
 # extract dataset: full study extent, by state
 stateExtent <- combined[grepl('full', combined$masterID),]
 
@@ -233,9 +233,14 @@ stateExtent[stateExtent$dataset == 'novel','toPlot'] <- stateExtent[stateExtent$
 stateExtent[stateExtent$dataset == 'retired','toPlot'] <- stateExtent[stateExtent$dataset == 'retired','cumArea_km2']
 
 # plotty plot
+labels <- c(`CO_full_RRCA` = 'Colorado',
+            `KS_full_RRCA` = 'Kansas',
+            `NE_full_RRCA` = 'Nebraska')
+
+
 ggplot(data = stateExtent,
        aes(x = year, y = toPlot, colour = dataset)) + 
-    facet_wrap( ~ masterID) +
+    facet_wrap( ~ masterID, labeller = as_labeller(labels)) +
     geom_line() + geom_point() +
     ylab(expression(paste("Irrigated Area (", km^2,")"))) +
     xlab('Year') + #ggtitle('Full Region by State') +
@@ -245,6 +250,40 @@ ggplot(data = stateExtent,
     guides(color=guide_legend(title=NULL)) +
     theme_bw() +
     theme(legend.position = 'top') 
+
+ggplot(data = stateExtent,
+       aes(x = year, y = toPlot, colour = dataset)) + 
+    facet_wrap( ~ masterID, labeller = as_labeller(labels)) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2,")"))) +
+    xlab('Year') + #ggtitle('Full Region by State') +
+    scale_color_discrete(breaks=c('total','novel','retired'),
+                         labels=c('total', 'cumulative novel',
+                                  'cumulative retired')) +
+    guides(color=guide_legend(title=NULL)) +
+    theme_bw() +
+    theme(legend.position = c(.85,.5)) 
+```
+
+And a plot of just retired/novel fields over time
+```{r fullExtent_novelRetired_alone, fig.height = 2.5, fig.width = 6.5}
+# remove total from dataset
+stateExtent2 <- stateExtent[stateExtent$dataset != 'total',]
+
+# plotty plot
+labels <- c(`CO_full_RRCA` = 'Colorado',
+            `KS_full_RRCA` = 'Kansas',
+            `NE_full_RRCA` = 'Nebraska')
+
+ggplot(data = stateExtent2,
+       aes(x = year, y = area_km2, colour = dataset)) + 
+    facet_wrap( ~ masterID, labeller = as_labeller(labels)) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2,")"))) +
+    xlab('Year') + #ggtitle('Full Region by State') +
+    guides(color=guide_legend(title=NULL)) +
+    theme_bw() +
+    theme(legend.position = c(0.15,.6)) 
 ```
 
 
@@ -267,7 +306,7 @@ ggplot(data = combined[grepl('basin', combined$masterID) &
 
 basin level cumulative
 
-```{r basinExtent_novelRetired_cumulative}
+```{r basinExtent_novelRetired_cumulative, fig.width = 6.5}
 # extract dataset: full study extent, by state
 stateBasin <- combined[grepl('basin', combined$masterID) &
                      !grepl('NRD', combined$masterID),]
@@ -284,14 +323,23 @@ stateBasin[stateBasin$dataset == 'total','toPlot'] <- stateBasin[stateBasin$data
 stateBasin[stateBasin$dataset == 'novel','toPlot'] <- stateBasin[stateBasin$dataset == 'novel','cumArea_km2']
 stateBasin[stateBasin$dataset == 'retired','toPlot'] <- stateBasin[stateBasin$dataset == 'retired','cumArea_km2']
 
+labels <- c(`CO_basin` = 'Colorado',
+            `KS_basin` = 'Kansas',
+            `NE_basin` = 'Nebraska')
+
 # plotty plot
 ggplot(data = stateBasin,
        aes(x = year, y = toPlot, colour = dataset)) + 
-    facet_wrap( ~ masterID) +
+    facet_wrap( ~ masterID, labeller = as_labeller(labels)) +
     geom_line() + geom_point() +
-    ylab(expression(paste("Irrigated Area (", km^2," )"))) +
-    xlab('Year') + ggtitle('Full Region by State') +
-    theme_bw()
+    ylab(expression(paste("Irrigated Area (", km^2,")"))) +
+    xlab('Year') + #ggtitle('Full Region by State') +
+    scale_color_discrete(breaks=c('total','novel','retired'),
+                         labels=c('total', 'cumulative novel',
+                                  'cumulative retired')) +
+    guides(color=guide_legend(title=NULL)) +
+    theme_bw() +
+    theme(legend.position = 'top') 
 ```
 
 ## Plot Area Data (plots prior to novel/retired analysis)
