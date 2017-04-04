@@ -9,8 +9,6 @@ output:
 
 Goal: Investigate relationship among irrigated area, precip, pumping volume, and crop prices over time 
 
-This version used test 3 randFor with time series through 2015.
-
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
 opts_chunk$set(cache=FALSE, 
@@ -20,15 +18,17 @@ opts_chunk$set(cache=FALSE,
 **R Packages Needed**
 
 ```{r packages, message=FALSE, echo=TRUE}
-library(ggplot2)
+library(tidyverse) # for ggplot2, tidyr, dplyr
+library(broom)
 library(GGally)
-library(dplyr)
-library(tidyr)
 library(corrplot)
 library(Hmisc)
+library(party) #carts
+source('functions/stat_smooth_func_all.R')
 ```
 
 ## Data wrangling
+(jump to Analyses/loaddata chunk after first time)
 
 ### NASS crop price data
 
@@ -63,7 +63,7 @@ Price data was downloaded manually from the NASS quickstats tool (https://quicks
 * SOYBEANS - PRICE RECEIVED, MEASURED IN $ / BU
 * WHEAT - PRICE RECEIVED, MEASUTED IN $ / BU
 
-- TOTAL - NATIONAL - US TOTAL - 1996:2015 - ANNUAL - YEAR
+- TOTAL - NATIONAL - US TOTAL - 1996:2016 - ANNUAL - YEAR
 
 
 Here, I load the data and clean it to have consistent pricing across crops and years
@@ -71,7 +71,7 @@ Here, I load the data and clean it to have consistent pricing across crops and y
 ```{r nassPrice}
 # load nass
 nassdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass/price'
-price0 <- read.csv(paste0(nassdir, '/nass_prices_5crops_national_1996-2015.csv'))
+price0 <- read.csv(paste0(nassdir, '/nass_prices_5crops_national_1996-2016.csv'))
 
 # load consumer price index adjustments
 cpi <- read.csv(paste0(nassdir, '/cpi_priceAdjustments.csv'))
@@ -85,11 +85,12 @@ price0 <- merge(price0,unitkey)
 price0 <- price0[,c('Commodity','Year','Value','unit')]
 
 # add the adjustment factor
-price <- merge(price0, cpi[,c('cpi_year','adj_factor_2015')], by.x = 'Year', 
-               by.y = 'cpi_year')
+price <- merge(price0, cpi[,c('cpi_year','adj_factor_2015','adj_factor_2016')], 
+               by.x = 'Year', by.y = 'cpi_year')
 
 # adjust prices (note: matched trials at https://data.bls.gov/cgi-bin/cpicalc.pl)
 price$price_2015 <- price$Value / price$adj_factor_2015
+price$price_2016 <- price$Value / price$adj_factor_2016
 
 # plot it - unadjusted
 ggplot(data = price, aes(x=Year, y = Value)) +
@@ -99,7 +100,7 @@ ggplot(data = price, aes(x=Year, y = Value)) +
 
 
 # plot it
-ggplot(data = price, aes(x=Year, y = price_2015)) +
+ggplot(data = price, aes(x=Year, y = price_2016)) +
   geom_line() +
   facet_wrap(~Commodity, scales='free_y') + theme_bw() +
   ggtitle('Inflation-adjusted Crop Prices')
@@ -107,13 +108,13 @@ ggplot(data = price, aes(x=Year, y = price_2015)) +
 # extract only corn
 cornprice <- price[price$Commodity == 'CORN',]
 
-ggplot(data = cornprice, aes(x=Year, y = price_2015)) +
+ggplot(data = cornprice, aes(x=Year, y = price_2016)) +
   geom_line() + theme_bw() +
   ggtitle('Inflation-adjusted Corn Prices')
 
 # write out dataset
 derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
-write.csv(cornprice, paste0(derivedDir, '/price_nass_corn_1996-2015.csv'), 
+write.csv(cornprice, paste0(derivedDir, '/price_nass_corn_1996-2016.csv'), 
           row.names=F)
 ```
 
@@ -126,42 +127,34 @@ loads datasets produced/cleaned from other scripts
 derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
 
 # usda nass annual corn price, $ / bushel
-cornprice <- read.csv(paste0(derivedDir, '/price_nass_corn_1996-2015.csv'))
+cornprice <- read.csv(paste0(derivedDir, '/price_nass_corn_1996-2016.csv'))
 
 # irrigation area and precipitation
 area.state <- read.csv(paste0(derivedDir, '/RRCA_fullModel_area-rfTest3_ppt-dec-aug.csv'))
+# aggregate area across states - sum
+area <- aggregate(irrigated_km2 ~ year, data = area.state, FUN = 'sum')
+# aggregate ppt across states - mean
+ppt <- aggregate(pr_ann ~ year, data = area.state, FUN = 'mean')
+# merge back
+areappt <- merge(area, ppt)
 
-# irrigation volume
+# irrigation volume ----------
 volume.state <- read.csv(paste0(derivedDir, '/RRCA_fullModel_irrigation_volume.csv'))
+# aggregate volume across states - sum
+volume <- aggregate(total_km3 ~ year, data = volume.state, FUN = 'sum', na.rm=T)
 
-# merge pumping, area, precip data
-byState <- merge(area.state, volume.state, by='key', all.x = T)
-dropCols <- c('key','masterID','state.y','year.y')
-byState <- byState %>% select(-one_of(dropCols))
-names(byState)[c(1,4)] <- c('year','state')
-
-# aggregate to full RRCA model region
-rrcairrigation <- aggregate(cbind(irrigated_km2, total_km3, gwirr_km3, swirr_km3, coirr_km3)
-                            ~ year,
-                            data = byState, FUN = 'sum', na.rm=T)
-# that loses 2016 irrigation data
-get2016area <- aggregate(irrigated_km2 ~ year, data = byState, FUN = 'sum')
-# and average precip
-precip <- aggregate(pr_ann ~ year, data = byState, FUN = 'mean')
-
-# merge precip into dataset
-rrca0 <- merge(precip,rrcairrigation)
-
+# merge all ---------------
 # merge price
-rrca <- merge(rrca0, cornprice[,c('Year','price_2015')], by.x = 'year', by.y = 'Year')
+area.ppt.price <- merge(areappt, cornprice[,c('Year','price_2016')], 
+                        by.x = 'year', by.y = 'Year')
 
-# just use total irrigation volume
-rrca <- rrca %>% select(-one_of(c('gwirr_km3','swirr_km3','coirr_km3')))
-names(rrca) <- c('Year','Precip','Area_km2','Volume_km3','Price')
+# merge volume
+rrca <- merge(area.ppt.price,volume, all=T)
+# rename columns
+names(rrca) <- c('Year','Area_km2','Precip_mm','Price','Volume_km3')
 
 # add a price lag
-rrca$priceLag1 <- cornprice$price_2015[3:19]
-
+rrca$priceLag1 <- cornprice$price_2016[3:20]
 ```
 
 ### Exploratory analyses
@@ -171,32 +164,70 @@ Average application depth: Divide irrigated pumping by area (average application
 what proportion of water demand they are satisfying?
 
 ```{r applicationDepth, fig.height=3, fig.width=3}
-rrca$depth_m <- (rrca$Volume_km3/rrca$Area_km2)*1e3
+# calculate depth of water applied
+rrca$Depth_m <- rrca$Volume_km3/rrca$Area_km2 * 1000
 
-ggplot(rrca, aes(Precip, depth_m)) +
+ggplot(rrca, aes(Precip_mm, Depth_m)) +
   geom_point() + theme_bw() +
   ggtitle('Precip vs Application Depth')
 ```
 
 And plot all time series
 
-```{r timeSeriesPlots, fig.height = 5.5, fig.width = 6}
-# adjust names for plot order
+```{r timeSeriesPlot, fig.height = 5, fig.width = 6}
+# data frame for plotting
 rrcaPlot <- rrca
-names(rrcaPlot) <- c('Year','zPrecipitation','cArea','dVolume','aPrice','tDepth')
+
+# items to plot
+plotUs <- c('Area_km2','Depth_m','Precip_mm','Price')
+
 # gather
-plotdata <- gather(rrcaPlot, key = variable, value = value,
-                          zPrecipitation:tDepth)
+plotdata <- gather_(rrcaPlot, key_col = 'variable', value_col = 'value',
+                          gather_cols = plotUs)
 
 # plots with no facet labels
 ggplot(data = plotdata,
       aes(x = Year, y = value, colour=variable)) +
   geom_line() + geom_point() +
-  scale_colour_manual(values=c('orange','black','red','forestgreen','blue')) + 
-  facet_wrap(~variable, nrow=5, scales='free_y') +
+  scale_colour_manual(values=c('black','red','blue','orange')) + 
+  facet_wrap(~variable, nrow=4, scales='free_y') +
   scale_x_continuous(name = '', 
-                     breaks = c(2000,2002,2004,2006,2008,2010,2012,2014), 
-                     labels = c(2000,2002,2004,2006,2008,2010,2012,2014)) +
+                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
+  ylab('') +
+  theme_bw() + theme(legend.position = 'none',
+                     strip.background=element_blank(), # comment to add labels
+                     strip.text.x = element_blank(),   # comment to add labels
+                     text = element_text(size = 16))
+
+# plots with trendlines
+ggplot(data = plotdata,
+      aes(x = Year, y = value, colour=variable)) +
+  geom_line() + geom_point() +
+  scale_colour_manual(values=c('black','red','blue','orange')) + 
+  facet_wrap(~variable, nrow=4, scales='free_y') +
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
+                 xpos = 2004) +
+  stat_smooth(method = 'lm', se=F) +
+  scale_x_continuous(name = '', 
+                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
+  ylab('') +
+  theme_bw() + theme(legend.position = 'none',
+                     strip.background=element_blank(), # comment to add labels
+                     strip.text.x = element_blank(),   # comment to add labels
+                     text = element_text(size = 16))
+
+# plots with trendlines no text
+ggplot(data = plotdata,
+      aes(x = Year, y = value, colour=variable)) +
+  geom_line() + geom_point() +
+  scale_colour_manual(values=c('black','red','blue','orange')) + 
+  facet_wrap(~variable, nrow=4, scales='free_y') +
+  stat_smooth(method = 'lm', se=F) +
+  scale_x_continuous(name = '', 
+                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
   ylab('') +
   theme_bw() + theme(legend.position = 'none',
                      strip.background=element_blank(), # comment to add labels
@@ -205,12 +236,27 @@ ggplot(data = plotdata,
 
 ```
 
+Run a quick set of individual regressions on these time series
+
+```{r timeSeriesLMs}
+# run regressions by county
+lms <- plotdata %>% 
+  group_by(variable) %>% 
+  do(model = lm(value ~ Year, data = .))
+
+# tidy up with broom
+coeffs <- lms %>% tidy(model)
+coeffs <- coeffs[coeffs$term == 'Year',]
+coeffs
+```
+
+
 
 Let's look at some preliminary correlations
 
 ```{r corrPlots, fig.height = 5, fig.width=5}
 # cor plots
-varcor <- cor(rrca)
+varcor <- cor(rrca, use='pairwise.complete.obs')
 corrplot(varcor, method='color', addCoef.col='black', tl.col='black',
          type = 'lower',
          col = colorRampPalette(c("darkmagenta", "white", "darkgreen"))(200))
@@ -249,7 +295,8 @@ Hm. A two step model? Predict application depth from precip; predict irrigated a
 
 ### Auto-correlation
 
-```{r autocorrelation, fig.height = 5.5, fig.width=8}
+
+```{r autocorrelation, fig.height = 5.5, fig.width=8, eval=FALSE}
 # test for autocorrelation in time series
 vars <- names(rrca)
 
@@ -258,11 +305,13 @@ par(mfrow=c(3,3))
 acfList <- list()
 #names(acfList) <- vars
 for (var in vars){
-  acf(rrca[,var], main = var)
+  acf(rrca[,var], main = var, na.action = na.pass)
 }
 ```
 
-```{r autocor2, fig.height = 5.5, fig.width = 6}
+Area and price are autocorrelated. Calculate first differences instead.
+
+```{r autocor2, fig.height = 5.5, fig.width = 6, eval=FALSE}
 # plot first differences: calculate
 rrca.firstdiff <- as.data.frame(matrix(, nrow = nrow(rrca)-1, ncol=length(vars)))
 names(rrca.firstdiff) <- vars
@@ -270,51 +319,68 @@ for (var in vars) {
  rrca.firstdiff[,var] <- diff(ts(rrca[,var]), differences=1)
 }
 
-rrca.firstdiff$year <- 2000:2015
+rrca.firstdiff$year <- 2000:2016
 rrca.firstdiff <- rrca.firstdiff[ , -which(names(rrca.firstdiff) %in% c('Price'))]
 
 # longify
-names(rrca.firstdiff) <- c('Year','zPrecipitation','cArea','dVolume','aPrice','tDepth', 'year')
-firstdiff <- gather(rrca.firstdiff, key = variable, value = value, zPrecipitation:tDepth)
+
+firstdiff <- gather_(rrca.firstdiff, key_col = 'variable', value_col = 'value',
+                     plotUs)
 
 ggplot(data = firstdiff,
       aes(x = year, y = value, colour=variable)) +
   geom_line() + geom_point() +
-  scale_colour_manual(values=c('orange','black','red','forestgreen','blue')) + 
+  scale_colour_manual(values=c('black','red','blue','orange')) + 
   facet_wrap(~variable, nrow=5, scales='free_y') +
   scale_x_continuous(name = '', 
-                     breaks = c(2000,2002,2004,2006,2008,2010,2012,2014), 
-                     labels = c(2000,2002,2004,2006,2008,2010,2012,2014)) +
-  ylab('') +
+                     breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+                     labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
+  ylab('') + ggtitle('first difference') +
   theme_bw() + theme(legend.position = 'none',
                      strip.background=element_blank(), # comment to add labels
                      strip.text.x = element_blank(),   # comment to add labels
                      text = element_text(size = 16))
 ```
 
+
 ### CaRT
 I picked 'ctree' function the party package because of the nice-ish output on an R Blogger's post, but Andy subsequently suggested it as well. Look at that!
 
+From 'party' package
+
 ```{r cart, fig.height = 5.5, fig.width = 7.5}
-library(party)
+rrca$farmBill <- c(rep(1,3), # 1999-2001
+                   rep(2,6), # 2002-2007
+                   rep(3,6), # 2008-2013
+                   rep(4,3)) # 2014-2016
 
-# control tree
-controls <- ctree_control(minsplit = 2, minbucket = 3, mincriterion = .7)
-
-# run tree
-ct <- ctree(Area_km2 ~ Precip + Volume_km3 + priceLag1, data = rrca, 
-            controls = controls)
-plot(ct, main="Conditional Inference Tree")
- 
-
-# control tree
-controls <- ctree_control(minsplit = 2, minbucket = 2, mincriterion = .7)
+# new cart ---------------------------------------------
+ # control tree
+controls <- ctree_control(minsplit = 2, minbucket = 2, mincriterion = .5)
 
 # run tree
-ct <- ctree(Area_km2 ~ Precip + priceLag1, data = rrca, 
+ct <- ctree(Area_km2 ~ Precip_mm + priceLag1, data = rrca, 
             controls = controls)
 plot(ct, main="Conditional Inference Tree")
 
+## cart without 2016 (how it looked before) ------------------------
+ # control tree
+controls <- ctree_control(minsplit = 2, minbucket = 2, mincriterion = .5)
+
+# run tree
+ct <- ctree(Area_km2 ~ Precip_mm + priceLag1, data = rrca[1:17,], 
+            controls = controls)
+plot(ct, main="Conditional Inference Tree")
+
+
+# with the farm bill ---------------------------------------------
+ # control tree
+controls <- ctree_control(minsplit = 2, minbucket = 2, mincriterion = .6)
+
+# run tree
+ct <- ctree(Area_km2 ~ Precip_mm + priceLag1 + farmBill, data = rrca, 
+            controls = controls)
+plot(ct, main="Conditional Inference Tree")
 
 ```
 
