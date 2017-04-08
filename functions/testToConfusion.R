@@ -18,6 +18,48 @@
 #' 
 #' 
 
+# for 2 class classifier
+testToConfusionBinary <- function(dataset, numClasses, certainty, classifier){
+  # clean up data
+  pointsdf <- dataset[ , -which(names(dataset) %in% c('.geo'))]
+  pointsdf$class <- as.character(pointsdf$class)
+  
+  # create a key to convert to the number of classes wanted
+  if (numClasses == 3) {
+    keyToClass <- data.frame(class = c('irrigated','dryland','noncrop','fallow'),
+                             classes = c('irrigated','dryland','noncrop','noncrop'))
+  } else if (numClasses == 2) {
+    keyToClass <- data.frame(class = c('irrigated','dryland','noncrop','fallow'),
+                             classes = c('irrigated','notirrigated','notirrigated','notirrigated'))
+  } else {
+    stop('invalid number of classes entered')
+  }
+  
+  # merge new class column with points df.
+  # incidentally, this also removes certainty level 3 as class 'Uncertain', as key is written
+  pointsdf2 <- merge(pointsdf, keyToClass)
+  
+  # subset to most certain points if needed
+  if (certainty == 1) {
+    pointsdf2 <- pointsdf2[pointsdf2$certainty == 1,]
+  }
+  
+  # run predictions/classification
+  pointsdf2$randFor <- predict(classifier, newdata = pointsdf2, type='response')
+  
+  # adjust random forest predictions based on number of classes desired
+  if (numClasses == 2) {
+    
+    # confusion tables
+    ConTable <- makeConfusion2(pointsdf2$randFor, pointsdf2$classes)
+  } else if (numClasses == 3) {
+    ConTable <- makeConfusion(pointsdf2$randFor, pointsdf2$classes) 
+  }
+  
+  return(ConTable)
+}
+
+# old function for 3 class classifier
 testToConfusion <- function(dataset, numClasses, certainty, classifier){
   # clean up data
   pointsdf <- dataset[ , -which(names(dataset) %in% c('.geo'))]
@@ -53,7 +95,7 @@ testToConfusion <- function(dataset, numClasses, certainty, classifier){
                               randFor2 = c('notirrigated','irrigated','notirrigated'))
     # add randFor2 classes to dfs
     pointsdf2 <- merge(pointsdf2, key2class.2)
-    
+
     # confusion tables
     ConTable <- makeConfusion2(pointsdf2$randFor2, pointsdf2$classes)
   } else if (numClasses == 3) {
