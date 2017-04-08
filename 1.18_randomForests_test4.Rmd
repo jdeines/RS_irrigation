@@ -39,6 +39,8 @@ library(randomForest)
 library(varSelRF)
 library(caret)
 library(knitr) # for 'kable' table display
+library(tidyr)
+library(ggplot2)
 source('functions/prettyConfusion.R')
 source('functions/testToConfusion.R')
 source('functions/testToConfusion_GEE.R')
@@ -56,9 +58,7 @@ points <- read.csv(paste0(trainingFolder, '/', trainingName))
 
 # re-class the master types into 3 categories: irrigated, dryland crop, noncrop
 typeConverter <- data.frame(masterType = unique(points$masterType),
-                            classes = c('irrigated','dryland','irrigated','dryland',
-                                        'irrigated','dryland','irrigated','dryland',
-                                        'irrigated','dryland','noncrop','noncrop'))
+                    classes = c('irrigated','dryland','irrigated','dryland',                                        'irrigated','dryland','irrigated','dryland',                                        'irrigated','dryland','noncrop','noncrop'))
 points2  <- merge(points, typeConverter)
 
 # remove extra columns
@@ -77,6 +77,7 @@ columnsWanted <- c('EVI_max_14','EVI_range_14','GI_max_14','GI_range_14',
                    'classes')
 annualNoSoy <- pointsNoSoy2[, columnsWanted]
 ```
+
 
 ## Random Forest
 
@@ -101,6 +102,144 @@ barplot(VI_F.ann/sum(VI_F.ann), las=3)
 
 ```
 
+
+### Variable Importance
+Tianfang suggested averaging variable importance scores for 20 random seeds
+
+```{r variableImportance3, fig.width = 3}
+# generate 20 random seeds
+seed20 <- round(runif(n = 20, min = 0, max = 8000))
+
+# a list to store output
+annual3 <- list()
+
+# run random forest for each seed, store in list
+for (i in 1:length(seed20)) {
+  set.seed(seed20[i])
+  rf.fit <- randomForest(x = annualNoSoy[,1:20], # all variable columns 
+                    y = as.factor(annualNoSoy$classes),
+                    ntree = 500,
+                    importance = TRUE)
+  # get variable importance
+  annual3[[i]] <- importance(rf.fit)[,4:5]
+}
+
+# reduce list by taking means
+mean3 <- as.data.frame(Reduce(`+`, annual3) / length(annual3))
+
+# format
+mean3$variable <- rownames(mean3)
+mean3long <- gather(mean3, key = metric, value = value, 
+                    MeanDecreaseAccuracy:MeanDecreaseGini)
+
+# plot
+ggplot(mean3long[mean3long$metric == 'MeanDecreaseGini',],
+       aes(x=reorder(variable, value), y = value)) +
+  geom_bar(stat='identity') +
+  coord_flip() +
+  theme_bw() + ylab('Mean Decrease in GINI Index') + xlab('') +
+  ggtitle('Annual 3 classes')
+
+ggplot(mean3long[mean3long$metric == 'MeanDecreaseAccuracy',],
+       aes(x=reorder(variable, value), y = value)) +
+  geom_bar(stat='identity') +
+  coord_flip() +
+  theme_bw() + ylab('Mean Decrease in Accuracy') + xlab('') +
+  ggtitle('Annual 3 classes')
+                                                      
+
+```
+
+### Binary Classifier test
+Run a binary classifier, since random forest chooses trees based on accuracy, so keeping 3 classes might affect this. 
+
+
+Make a 2 class training dataset to run the random forest at the 2 class level
+
+```{r data_2classes}
+# re-class the master types into 3 categories: irrigated, dryland crop, noncrop
+typeConverter2 <- data.frame(masterType = unique(points$masterType),
+            classes = c('irrigated','notirrigated','irrigated','notirrigated',                             'irrigated','notirrigated','irrigated','notirrigated',                             'irrigated','notirrigated','notirrigated','notirrigated'))
+points.binary  <- merge(points, typeConverter2)
+
+# make a dataset without dryland soy
+pointsNoSoy.bin <- points.binary[points.binary $masterType != 'soy_dryland',]
+pointsNoSoy2.bin <- pointsNoSoy.bin[ , -which(names(pointsNoSoy.bin) %in%
+                                        c('masterType','masterNum'))]
+
+# make an annual variable dataset without dryland soy
+columnsWanted <- c('EVI_max_14','EVI_range_14','GI_max_14','GI_range_14',
+                   'NDVI_max_14','NDVI_range_14','NDWI_max_14','NDWI_range_14',
+                   'aridity','b1','b1_1','greenArid','ndwi_gi','pdsi_ann',
+                   'pdsi_grow','pr_ann','pr_early','pr_grow','pr_paw','slope_mean',
+                   'classes')
+annualBinary <- pointsNoSoy2.bin[, columnsWanted]
+```
+
+Run the classifier
+
+```{r rf500_annual_binary, fig.height=6}
+# run a random forest on all variables
+set.seed(415)
+fit500.annBin <- randomForest(x = annualBinary[,1:20], # all variable columns 
+                    y = as.factor(annualBinary$classes),
+                    ntree = 500,
+                    importance = TRUE)
+
+# look at variable importance
+varImpPlot(fit500.annBin)
+VI_F.annBin <- importance(fit500.annBin)[,'MeanDecreaseGini']
+par(mar=c(7,4,4,2))
+barplot(VI_F.annBin/sum(VI_F.annBin), las=3)
+```
+
+
+### Variable Importance - 2 classes
+Tianfang suggested averaging variable importance scores for 20 random seeds
+
+```{r variableImportance2, fig.width = 3}
+# generate 20 random seeds
+seed20 <- round(runif(n = 20, min = 0, max = 8000))
+
+# a list to store output
+annual2 <- list()
+
+# run random forest for each seed, store in list
+for (i in 1:length(seed20)) {
+  set.seed(seed20[i])
+  rf.fit <- randomForest(x = annualBinary[,1:20], # all variable columns 
+                    y = as.factor(annualBinary$classes),
+                    ntree = 500,
+                    importance = TRUE)
+  # get variable importance
+  annual2[[i]] <- importance(rf.fit)[,3:4]
+}
+
+# reduce list by taking means
+mean2 <- as.data.frame(Reduce(`+`, annual2) / length(annual2))
+
+# format
+mean2$variable <- rownames(mean2)
+mean2long <- gather(mean2, key = metric, value = value, 
+                    MeanDecreaseAccuracy:MeanDecreaseGini)
+
+# plot
+ggplot(mean2long[mean3long$metric == 'MeanDecreaseGini',],
+       aes(x=reorder(variable, value), y = value)) +
+  geom_bar(stat='identity') +
+  coord_flip() +
+  theme_bw() + ylab('Mean Decrease in GINI Index') + xlab('') +
+  ggtitle('Annual 2 classes')
+
+ggplot(mean2long[mean3long$metric == 'MeanDecreaseAccuracy',],
+       aes(x=reorder(variable, value), y = value)) +
+  geom_bar(stat='identity') +
+  coord_flip() +
+  theme_bw() + ylab('Mean Decrease in Accuracy') + xlab('') +
+  ggtitle('Annual 2 classes')
+                                                      
+
+```
 
 ### Play with variable reduction
 without dryland soy. Here are the "most important" variables.
