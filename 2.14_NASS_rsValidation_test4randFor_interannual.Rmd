@@ -17,6 +17,8 @@ update 2/24/2017 - uses the regional stats files instead of the county files
 
 update/new file 4/5/2017: run with cleaned maps produced by the annual classifier
 
+update 4.8.2017: got trendlines for NASS and USGS datasets
+
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
@@ -40,6 +42,8 @@ library(RColorBrewer)
 # for data manipulation
 library(tidyr)
 library(ggplot2)
+library(broom)
+library(dplyr)
 
 # my functions (to be packaged)
 source('functions/getNASS.R')
@@ -361,6 +365,34 @@ grid.newpage()
 grid.draw(new_plot)
 
 ```
+
+## Trends in NASS and USGS
+
+getting slopes for these datasets to compare to HPAIM, to demonstrate year sampling affects on understanding of irrigation trends
+
+```{r nassUSGSTrend}
+# get total irrigation by year, by dataset
+statTotals <- aggregate(IRRIGATED ~ year + source, data = countyValid,
+                        FUN = 'sum')
+
+ggplot(data = statTotals,
+       aes(x=year, y = IRRIGATED, color=source)) +
+  geom_line() + geom_point() +
+  theme_bw() + 
+  ggtitle('NASS and USGS Trendlines')
+
+# run regressions by dataset
+sourcelms <- statTotals %>% 
+  group_by(source) %>% 
+  do(model = lm(IRRIGATED ~ year, data = .))
+
+# tidy up with broom
+coeffs <- sourcelms %>% tidy(model)
+coeffs <- coeffs[coeffs$term == 'year',] # remove intercept lines
+coeffs
+```
+
+
 
 ## error in space
 
