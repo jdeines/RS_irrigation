@@ -342,6 +342,23 @@ ggplot(data = stateBasin,
     theme(legend.position = 'top') 
 ```
 
+## Get Trends for Year Subsamples (ie, nass)
+to demonstrate year sampling affects on understanding of irrigation trends - what would our dataset say if only NASS years?
+
+```{r nassYearTrends}
+fullData <- combined[combined$masterID == 'rrcaRrbBuffExtent' &
+                       combined$dataset == 'total',]
+# overall trend
+allYears.lm <- lm(area_km2 ~ year, data = fullData)
+summary(allYears.lm)
+
+# NASS years
+nassyears <- fullData[fullData$year %in% c(2002,2007,2012),]
+nassYears.lm <- lm(area_km2 ~ year, data = nassyears)
+summary(nassYears.lm)
+```
+
+
 ## Plot Area Data (plots prior to novel/retired analysis)
 
 ### Full RRCA RRB Extent

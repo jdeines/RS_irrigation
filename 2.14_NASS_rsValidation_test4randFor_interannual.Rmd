@@ -390,6 +390,11 @@ sourcelms <- statTotals %>%
 coeffs <- sourcelms %>% tidy(model)
 coeffs <- coeffs[coeffs$term == 'year',] # remove intercept lines
 coeffs
+
+# all county statistics together
+allstats <- lm(IRRIGATED ~ year, data = statTotals)
+summary(allstats)
+
 ```
 
 

@@ -1,0 +1,170 @@
+---
+title: "Figure: Years Irrigated"
+author: "Jill Deines"
+date: "March 16, 2017"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Make maps of irrigation frequency over the region
+
+Use: 
+
+* update figure path (make a MI folder; line 21) and user variables
+* run "mapPrep" chunk within R (like normal)
+* hit 'knit html' to run documents; figures will be saved in figure folder
+* i get an error when knitting but the figures come out fine so ::shrug::
+
+Note: it takes a while to output full resolution figures. If you want to run it quickly just to get a vague idea about things, run it with a low 'maxpixel' user variable.
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, dev = 'png',
+               fig.path='S:/Users/xutianfa/Irrigation/poster_files/figures/RRB/YearMap/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE, eval=TRUE}
+library(rgdal)
+library(raster)
+library(grid)
+library(colorRamps)
+library(fields)
+library(RColorBrewer)
+library(rgdal)
+library(latticeExtra)
+```
+
+## User variables
+If changing the full map width and height (maybe necessary for MI)...you may need to adjust the color bar positioning in the map with legend. That's an irritating, iterative process. 
+
+```{r userVars}
+# raster data directory
+rasDir <- 'S:/Users/xutianfa/Irrigation/poster_files/data/RRB'
+# name of exported raster for full domain
+rasAll <- 'IrrigationFrequencyMap_0and1neg.tif'
+# name of inset raster
+rasInset <- 'IrrigationFrequencyMap_0and1neg_inset.tif'
+
+# name of raster with masked domain
+rasMask <- 'IrrigationFrequencyMap_0and1neg_boundMask.tif'
+
+# extent shapefile
+shapeDir <- 'S:/Users/deinesji/HPA/gis'
+shapename <- 'BigExtent_RRB_RRCA_buff'
+
+
+# figure dimensions and options
+fullMapWidth = 10
+fullMapHeight = 5
+insetWidth = 4
+insetHeight = 4
+dpii = 300
+maxpixel = 1500000 # defines map resolution
+backgroundcolor <- 'gray32'
+```
+
+
+## Data Prep
+We tallied number of years each pixel was irrigated in GEE using the script in the MSU_Hydrogeology/FigureScripts shared repository.
+
+First, we load the raster and set pixels outside of the model domain (value = -1) to NA, which for dumb reasons can't be done in GEE. Then we write this version out for easy use later, since masking in R takes a while.
+
+Just run this once within R normally; chunk is set to 'false' so it doesn't get run every time you knit the document to produce figures
+
+```{r mapPrep, eval=FALSE}
+# load full raster and set -1 to NA (basically mask areas outside of Extent)
+freq <- raster(paste0(rasDir,'/',rasAll))
+freq[freq == -1] <- NA
+# write out masked raster
+writeRaster(freq, paste0(rasDir,'/', rasMask))
+```
+
+
+## Number of Years Irrigated Maps
+
+vertical legend, frame
+
+```{r yearMap_right, fig.width = fullMapWidth, fig.height = fullMapHeight, dpi=dpii}
+# load full raster
+freq <- raster(paste0(rasDir,'/',rasMask))
+
+# load shapefile
+spdf <- readOGR(shapeDir, shapename, verbose=F)
+spdf <- spTransform(spdf, CRS(proj4string(freq)))
+
+# plot scale
+scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
+  offset = c(-225000,1760000), scale = 100000, fill=c("transparent","black"))
+text1 = list("sp.text", c(-220000,1745000), "0")
+text2 = list("sp.text", c(-125000,1745000), "100 km")
+
+# color ramp 
+matlab <- matlab.like2(19)
+
+# plot
+spplot(freq, col.regions = c(backgroundcolor,matlab), maxpixels = maxpixel,
+       par.settings = list(layout.widths=list(right.padding=4.5)),
+       sp.layout=list(scale, text1, text2),
+       colorkey=list(labels=list(cex=1.2),
+                     at = c(0:18)))# +
+#layer(sp.polygons(spdf, fill='transparent', col='black', alpha=0.7))
+
+# scale bar legend title
+grid.text('Years Irrigated',x=unit(0.975, "npc"),y=unit(0.5, 'npc'), rot=-90, gp=gpar(fontsize=18))
+```
+
+No frame, seperate horizontal legend
+
+```{r yearMap_bottom, fig.width = fullMapWidth, fig.height = fullMapHeight, dpi=dpii}
+# load full raster
+freq <- raster(paste0(rasDir,'/',rasMask))
+
+# plot scale
+scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
+  offset = c(-225000,1760000), scale = 100000, fill=c("transparent","black"))
+text1 = list("sp.text", c(-220000,1750000), "0")
+text2 = list("sp.text", c(-125000,1750000), "100 km")
+
+# color ramp 
+matlab <- matlab.like2(19)
+
+# plot
+spplot(freq, col.regions = c(backgroundcolor,matlab), maxpixels = maxpixel,
+       sp.layout=list(scale, text1, text2), 
+       par.settings=list(axis.line=list(col=NA)), 
+       colorkey=F) #+
+#layer(sp.polygons(spdf, fill='transparent', col='black', alpha=0.7))
+
+image.plot(z=0:18,add=F,legend.only=T,  col=c(backgroundcolor,matlab), 
+           horizontal = T,
+          smallplot=c(0.05,.95,.15,.2), 
+         axis.args=list(at=c(0,3,6,9,12,15,18), 
+                          labels=as.character(c(0,3,6,9,12,15,18))))
+
+```
+
+### inset
+
+```{r yearMap_inset, fig.width = insetWidth, fig.height = insetHeight, dpi=dpii}
+# load full raster
+freq_inset <- raster(paste0(rasDir,'/',rasInset))
+
+# # plot scale
+# scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
+#   offset = c(-225000,1760000), scale = 100000, fill=c("transparent","black"))
+# text1 = list("sp.text", c(-220000,1750000), "0")
+# text2 = list("sp.text", c(-125000,1750000), "100 km")
+
+# color ramp 
+spplot(freq_inset, col.regions = c(backgroundcolor,matlab), maxpixels = 200000,
+       par.settings = list(layout.widths=list(right.padding=4.5)),
+       #sp.layout=list(scale, text1, text2),
+       colorkey=F)
+
+```
+
+
