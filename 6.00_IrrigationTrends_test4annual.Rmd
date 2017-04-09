@@ -9,6 +9,13 @@ output:
 
 Goal: Investigate trends in irrigated area over time - total area, areas gained, areas lost.
 
+Update 4/9/2017
+
+Derived datasets produced:
+
+* full domain irrigated area is written out in the NassYearTrends chunk 
+
+
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
 opts_chunk$set(cache=FALSE, 
@@ -348,6 +355,12 @@ to demonstrate year sampling affects on understanding of irrigation trends - wha
 ```{r nassYearTrends}
 fullData <- combined[combined$masterID == 'rrcaRrbBuffExtent' &
                        combined$dataset == 'total',]
+
+# write this out to use in Figure 3 (time series)
+derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
+#write.csv(fullData, paste0(derivedDir, '/FullStudyExtent_irrigation_test4.csv'), 
+#          row.names = F)
+
 # overall trend
 allYears.lm <- lm(area_km2 ~ year, data = fullData)
 summary(allYears.lm)

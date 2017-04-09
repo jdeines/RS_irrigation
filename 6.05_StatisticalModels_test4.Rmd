@@ -9,6 +9,7 @@ output:
 
 Goal: Investigate relationship among irrigated area, precip, pumping volume, and crop prices over time 
 
+
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
 opts_chunk$set(cache=FALSE, 
@@ -25,6 +26,32 @@ library(corrplot)
 library(Hmisc)
 library(party) #carts
 source('functions/stat_smooth_func_all.R')
+```
+
+## User Vars
+Derived dataset source files
+
+* total irrigated area, full region: written out in NassYearTrends chunk of 6.00_IrrigationTrends
+* corn prices: produced in first chunks of this script
+* RRCA domain irrigation and precip in 4.21_Figures_volumeVsArea_randFor... in the 'loadAreaData' chunk
+* RRCA pumping volume: processed in 4.21_Figures_volumeVsArea_randFor... 'loadPumpingData' chunk
+
+
+```{r userVars}
+# data directory
+derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
+
+# RRCA domain irrigation and precipitation by year
+Irr.Ppt.file <- 'RRCA_fullModel_area-rfTest4_ppt-dec-aug.csv'
+
+# full study area domain irrigation
+Irr.fullExtent.file <- 'FullStudyExtent_irrigation_test4.csv'
+
+# corn prices
+cornFile <- 'price_nass_corn_1996-2016.csv'
+
+# RRCA volume
+RRCA.volume.file <- 'RRCA_fullModel_irrigation_volume.csv'
 ```
 
 ## Data wrangling
@@ -68,7 +95,7 @@ Price data was downloaded manually from the NASS quickstats tool (https://quicks
 
 Here, I load the data and clean it to have consistent pricing across crops and years
 
-```{r nassPrice}
+```{r nassPrice, eval=FALSE}
 # load nass
 nassdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass/price'
 price0 <- read.csv(paste0(nassdir, '/nass_prices_5crops_national_1996-2016.csv'))
@@ -113,7 +140,6 @@ ggplot(data = cornprice, aes(x=Year, y = price_2016)) +
   ggtitle('Inflation-adjusted Corn Prices')
 
 # write out dataset
-derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
 write.csv(cornprice, paste0(derivedDir, '/price_nass_corn_1996-2016.csv'), 
           row.names=F)
 ```
@@ -124,13 +150,11 @@ write.csv(cornprice, paste0(derivedDir, '/price_nass_corn_1996-2016.csv'),
 loads datasets produced/cleaned from other scripts
 
 ```{r loadData}
-derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
-
 # usda nass annual corn price, $ / bushel
-cornprice <- read.csv(paste0(derivedDir, '/price_nass_corn_1996-2016.csv'))
+cornprice <- read.csv(paste0(derivedDir, '/',cornFile))
 
 # irrigation area and precipitation
-area.state <- read.csv(paste0(derivedDir, '/RRCA_fullModel_area-rfTest3_ppt-dec-aug.csv'))
+area.state <- read.csv(paste0(derivedDir,'/',Irr.Ppt.file))
 # aggregate area across states - sum
 area <- aggregate(irrigated_km2 ~ year, data = area.state, FUN = 'sum')
 # aggregate ppt across states - mean
@@ -139,7 +163,7 @@ ppt <- aggregate(pr_ann ~ year, data = area.state, FUN = 'mean')
 areappt <- merge(area, ppt)
 
 # irrigation volume ----------
-volume.state <- read.csv(paste0(derivedDir, '/RRCA_fullModel_irrigation_volume.csv'))
+volume.state <- read.csv(paste0(derivedDir, '/',RRCA.volume.file))
 # aggregate volume across states - sum
 volume <- aggregate(total_km3 ~ year, data = volume.state, FUN = 'sum', na.rm=T)
 
