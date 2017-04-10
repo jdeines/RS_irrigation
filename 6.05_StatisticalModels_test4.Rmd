@@ -9,11 +9,13 @@ output:
 
 Goal: Investigate relationship among irrigated area, precip, pumping volume, and crop prices over time 
 
+update 4/9/2017: added total study area irrigated area panel to time series plot
+
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
 opts_chunk$set(cache=FALSE, 
-               fig.path='figure/6.05_statModels/')
+               fig.path='figure/6.05_statModels_test4/')
 ```
 
 **R Packages Needed**
@@ -179,11 +181,15 @@ names(rrca) <- c('Year','Area_km2','Precip_mm','Price','Volume_km3')
 
 # add a price lag
 rrca$priceLag1 <- cornprice$price_2016[3:20]
+
+# add total regional area
+area.full <- read.csv(paste0(derivedDir,'/',Irr.fullExtent.file))
+rrca$AArea_km2_full <- area.full$area_km2
 ```
 
-### Exploratory analyses
+### Exploratory analyses: RRCA domain
 
-Average application depth: Divide irrigated pumping by area (average application depth); plot vs precip expressed in mm 
+Average application depth: Divide irrigated pumping by area (average application depth); plot vs precip expressed in mm
 
 what proportion of water demand they are satisfying?
 
@@ -198,12 +204,12 @@ ggplot(rrca, aes(Precip_mm, Depth_m)) +
 
 And plot all time series
 
-```{r timeSeriesPlot, fig.height = 5, fig.width = 6}
+```{r timeSeriesPlot, fig.height = 6, fig.width = 6}
 # data frame for plotting
 rrcaPlot <- rrca
 
 # items to plot
-plotUs <- c('Area_km2','Depth_m','Precip_mm','Price')
+plotUs <- c('AArea_km2_full','Area_km2','Depth_m','Precip_mm','Price')
 
 # gather
 plotdata <- gather_(rrcaPlot, key_col = 'variable', value_col = 'value',
@@ -213,23 +219,23 @@ plotdata <- gather_(rrcaPlot, key_col = 'variable', value_col = 'value',
 ggplot(data = plotdata,
       aes(x = Year, y = value, colour=variable)) +
   geom_line() + geom_point() +
-  scale_colour_manual(values=c('black','red','blue','orange')) + 
-  facet_wrap(~variable, nrow=4, scales='free_y') +
+  scale_colour_manual(values=c('black','black','red','blue','orange')) + 
+  facet_wrap(~variable, nrow=5, scales='free_y') +
   scale_x_continuous(name = '', 
                   breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
                  labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
   ylab('') +
   theme_bw() + theme(legend.position = 'none',
-                     strip.background=element_blank(), # comment to add labels
-                     strip.text.x = element_blank(),   # comment to add labels
-                     text = element_text(size = 16))
+                     strip.background=element_blank(), # comment out to add labels
+                     strip.text.x = element_blank(),   # comment out to add labels
+                     text = element_text(size = 15))
 
 # plots with trendlines
 ggplot(data = plotdata,
       aes(x = Year, y = value, colour=variable)) +
   geom_line() + geom_point() +
-  scale_colour_manual(values=c('black','red','blue','orange')) + 
-  facet_wrap(~variable, nrow=4, scales='free_y') +
+  scale_colour_manual(values=c('black','black','red','blue','orange')) + 
+  facet_wrap(~variable, nrow=5, scales='free_y') +
   stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
                  xpos = 2004) +
   stat_smooth(method = 'lm', se=F) +
@@ -240,14 +246,14 @@ ggplot(data = plotdata,
   theme_bw() + theme(legend.position = 'none',
                      strip.background=element_blank(), # comment to add labels
                      strip.text.x = element_blank(),   # comment to add labels
-                     text = element_text(size = 16))
+                     text = element_text(size = 15))
 
 # plots with trendlines no text
 ggplot(data = plotdata,
       aes(x = Year, y = value, colour=variable)) +
   geom_line() + geom_point() +
-  scale_colour_manual(values=c('black','red','blue','orange')) + 
-  facet_wrap(~variable, nrow=4, scales='free_y') +
+  scale_colour_manual(values=c('black','black','red','blue','orange')) + 
+  facet_wrap(~variable, nrow=5, scales='free_y') +
   stat_smooth(method = 'lm', se=F) +
   scale_x_continuous(name = '', 
                   breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
@@ -256,7 +262,7 @@ ggplot(data = plotdata,
   theme_bw() + theme(legend.position = 'none',
                      strip.background=element_blank(), # comment to add labels
                      strip.text.x = element_blank(),   # comment to add labels
-                     text = element_text(size = 16))
+                     text = element_text(size = 15))
 
 ```
 
@@ -268,17 +274,24 @@ lms <- plotdata %>%
   group_by(variable) %>% 
   do(model = lm(value ~ Year, data = .))
 
-# tidy up with broom
+# tidy up with broom: model coefficients
 coeffs <- lms %>% tidy(model)
 coeffs <- coeffs[coeffs$term == 'Year',]
 coeffs
+
+# and model R2 values
+rsq <- lms %>% glance(model)
+rsq
 ```
 
 
 
-Let's look at some preliminary correlations
+Let's look at some preliminary correlations for the RRCA domain. 
 
 ```{r corrPlots, fig.height = 5, fig.width=5}
+# remove the full domain data
+rrca <- rrca[,-which(names(rrca) %in% c('AArea_km2_full'))]
+
 # cor plots
 varcor <- cor(rrca, use='pairwise.complete.obs')
 corrplot(varcor, method='color', addCoef.col='black', tl.col='black',

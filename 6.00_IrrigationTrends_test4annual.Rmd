@@ -225,8 +225,6 @@ Dave and Anthony requested a plot with cumulative novel and retired areas
 # extract dataset: full study extent, by state
 stateExtent <- combined[grepl('full', combined$masterID),]
 
-
-
 # make a cumulative sum column by dataset type
 stateExtent <- stateExtent %>%
   group_by(masterID, dataset) %>%
@@ -291,6 +289,23 @@ ggplot(data = stateExtent2,
     guides(color=guide_legend(title=NULL)) +
     theme_bw() +
     theme(legend.position = c(0.15,.6)) 
+```
+
+#### Numerical breakdowns
+Growth as a percentage of irrigated area, net new fields compared to irrigated area increases...
+
+```{r numerology}
+stataData <- combined[grepl('full', combined$masterID),]
+
+# by state, growth as a percentage of 1999 area
+percentage <- stataData[stataData$dataset == 'total' &
+              stataData$year == '2016', c('masterID','area_km2')]
+percentage$startArea <- stataData[stataData$dataset == 'total' &
+              stataData$year == '1999', 'area_km2']
+percentage$changeArea <- percentage$area_km2 - percentage$startArea
+percentage$increase_perc <- percentage$area_km2/percentage$startArea * 100
+
+
 ```
 
 
