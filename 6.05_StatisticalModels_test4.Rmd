@@ -28,6 +28,7 @@ library(corrplot)
 library(Hmisc)
 library(party) #carts
 source('functions/stat_smooth_func_all.R')
+library(RColorBrewer)
 ```
 
 ## User Vars
@@ -199,7 +200,12 @@ rrca$Depth_m <- rrca$Volume_km3/rrca$Area_km2 * 1000
 
 ggplot(rrca, aes(Precip_mm, Depth_m)) +
   geom_point() + theme_bw() +
+  stat_smooth(method = 'lm', se=F) +
+  ylab('Depth (m)') + xlab('Precip (mm)') +
   ggtitle('Precip vs Application Depth')
+
+depthlm <- lm(Depth_m ~ Precip_mm, data = rrca)
+summary(depthlm)
 ```
 
 And plot all time series
@@ -293,23 +299,24 @@ Let's look at some preliminary correlations for the RRCA domain.
 rrca <- rrca[,-which(names(rrca) %in% c('AArea_km2_full'))]
 
 # cor plots
-varcor <- cor(rrca, use='pairwise.complete.obs')
+varcor <- cor(rrca, use='complete.obs')
 corrplot(varcor, method='color', addCoef.col='black', tl.col='black',
          type = 'lower',
-         col = colorRampPalette(c("darkmagenta", "white", "darkgreen"))(200))
+         col = colorRampPalette(brewer.pal(7,'RdBu'))(200))
 
-ggcorr(rrca, palette = "RdBu", label = TRUE)
+
+#ggcorr(rrca, palette = "RdBu", label = TRUE, digits=3)
 
 # sig levels
-corsig <- rcorr(as.matrix(rrca), type = 'pearson')
+corsig <- rcorr(as.matrix(rrca[complete.cases(rrca),]), type = 'pearson')
 options(scipen = 999)
 corsig$P
 ```
 
 Interpretation:
 
-* Precip has inverse correlations with irrigation volume and irrigation area
-* Volume and area are negatively correlated
+* Precip has inverse correlations with irrigation volume (significant) and irrigation area (non-significant)
+* Volume and area are negatively correlated (p = 0.077)
 * Price Lag 1 correlated with area
 * Depth negatively corrected with area, precip; positive with volume
 
@@ -391,16 +398,32 @@ rrca$farmBill <- c(rep(1,3), # 1999-2001
                    rep(3,6), # 2008-2013
                    rep(4,3)) # 2014-2016
 
-# new cart ---------------------------------------------
+rrcaPlot$farmBill <- c(rep(1,3), # 1999-2001
+                   rep(2,6), # 2002-2007
+                   rep(3,6), # 2008-2013
+                   rep(4,3)) # 2014-2016
+
+# new cart, whole study area ---------------------------------------------
  # control tree
-controls <- ctree_control(minsplit = 2, minbucket = 2, mincriterion = .5)
+controls <- ctree_control(minsplit = 2, minbucket = 3, mincriterion = .5)
+
+# run tree
+ct <- ctree(AArea_km2_full ~ Precip_mm + priceLag1, data = rrcaPlot, 
+            controls = controls)
+plot(ct, main="Conditional Inference Tree")
+
+# new cart, RRCA area ---------------------------------------------
+ # control tree
+controls <- ctree_control(minsplit = 2, minbucket = 3, mincriterion = .5)
 
 # run tree
 ct <- ctree(Area_km2 ~ Precip_mm + priceLag1, data = rrca, 
             controls = controls)
 plot(ct, main="Conditional Inference Tree")
 
-## cart without 2016 (how it looked before) ------------------------
+
+
+## cart without 2016  ------------------------
  # control tree
 controls <- ctree_control(minsplit = 2, minbucket = 2, mincriterion = .5)
 
@@ -415,7 +438,7 @@ plot(ct, main="Conditional Inference Tree")
 controls <- ctree_control(minsplit = 2, minbucket = 2, mincriterion = .6)
 
 # run tree
-ct <- ctree(Area_km2 ~ Precip_mm + priceLag1 + farmBill, data = rrca, 
+ct <- ctree(Area_km2 ~ Precip_mm + priceLag1 + farmBill, data = rrcaPlot, 
             controls = controls)
 plot(ct, main="Conditional Inference Tree")
 

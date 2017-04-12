@@ -305,6 +305,36 @@ dfagg <- aggregateIndexByCrop_quartiles(index = 'GI', year = 2010, df=trainAllLo
 plotIndexByCrop_quartiles(dfPlot = dfagg, title = '2010 Greenness Index (GI)', index = 'Greenness')
 ```
 
+```{r greenIndexPlotByCrop_manuscript_top, fig.width = 6.25, fig.height = 4, dev='png'}
+# Greenness Index, 2010: Quartiles for talk 
+dfagg <- aggregateIndexByCrop_quartiles(index = 'GI', year = 2010, df=trainAllLong)
+#plotIndexByCrop_quartiles(dfPlot = dfagg, title = '2010 Greenness Index (GI)', index = 'Greenness')
+
+# quartiles: function to plot irrigation status by crop type facet
+dfPlot <- dfagg
+index <- 'Greenness'
+
+ggplot(data = dfPlot,
+         aes(x = month, y = Mean, colour = class, group = class)) +
+       geom_ribbon(aes(ymin = Q1, 
+                       ymax = Q3, 
+                       fill = class), alpha = 0.2, colour=NA) +
+      scale_color_manual(values=c('gray50','darkgreen','saddlebrown'),
+                         labels=c('Rainfed','Irrigated','Non-crop')) +
+      scale_fill_manual(values=c('gray50','darkgreen','saddlebrown'),
+                        labels=c('Rainfed','Irrigated','Non-crop')) +
+        geom_line() +
+        geom_line(aes(x=month, y = Q1, colour = class, group = class),
+                  size=.1, alpha=.8) +
+         geom_line(aes(x=month, y = Q3, colour = class, group = class),
+                  size=.1, alpha=.8) +
+       facet_wrap(~crop) +
+       ylab(paste0(index, ' Index')) + 
+       xlab('Month (April - November)') + theme_bw() +
+       theme(text = element_text(size = 12), legend.position = 'top',
+             legend.title = element_blank()) 
+
+```
 
 ### Index Plots by Year - talk fig
 ```{r indexPlotsByCrop, fig.width = 6.75, fig.height = 4.75}

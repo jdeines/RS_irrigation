@@ -295,17 +295,33 @@ ggplot(data = stateExtent2,
 Growth as a percentage of irrigated area, net new fields compared to irrigated area increases...
 
 ```{r numerology}
-stataData <- combined[grepl('full', combined$masterID),]
+stateData <- combined[grepl('full', combined$masterID),]
 
 # by state, growth as a percentage of 1999 area
-percentage <- stataData[stataData$dataset == 'total' &
-              stataData$year == '2016', c('masterID','area_km2')]
-percentage$startArea <- stataData[stataData$dataset == 'total' &
-              stataData$year == '1999', 'area_km2']
+percentage <- stateData[stateData$dataset == 'total' &
+              stateData$year == '2016', c('masterID','area_km2')]
+percentage$startArea <- stateData[stateData$dataset == 'total' &
+              stateData$year == '1999', 'area_km2']
 percentage$changeArea <- percentage$area_km2 - percentage$startArea
 percentage$increase_perc <- percentage$area_km2/percentage$startArea * 100
 
+# net acreage added
+totalCum <- stateExtent2 %>% 
+  group_by(masterID, dataset) %>% 
+  slice(which.max(cumArea_km2)) 
+totalCum <- as.data.frame(totalCum)
 
+# add net gain to percentage table
+percentage$netKm2 <- c(totalCum[5,6] - totalCum[6,6],  # NE
+                       totalCum[3,6] - totalCum[4,6],  # KS
+                       totalCum[1,6] - totalCum[2,6])  # CO
+
+# percent of area change due to novel fields
+percentage$netContribution <- percentage$netKm2 / percentage$changeArea
+percentage
+
+# percent of area change due to novel fields, full region
+sum(percentage$netKm2) / sum(percentage$changeArea)
 ```
 
 
