@@ -106,7 +106,7 @@ StatSmoothFunc <- ggproto("StatSmooth", Stat,
                         
                         m = model
                         eq <- substitute(italic(r)^2~"="~r2, 
-                                         list(r2 = format(summary(m)$r.squared, digits = 3)))
+                                         list(r2 = format(summary(m)$r.squared, digits = 2)))
                         func_string = as.character(as.expression(eq))
                         
                         if(is.null(xpos)) xpos = min(data$x)*0.9
