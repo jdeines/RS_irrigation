@@ -17,6 +17,8 @@ Goal: Run a variable importance test on a random forest of my training points
 
 Secondary goal unlikely to be obtained: use more functions below, less copy/pasting. Oh well, we can't all be beautiful.
 
+update 4/24/2017: compared 2 class classifier in R with GEE
+
 update 4/7/2017: did variable importance on 2 class classifier. Need to run metrics.
 
 update 4/4/2017: This version uses the annual-based classifier only to slim down this mess.
@@ -188,14 +190,13 @@ kable(c2002_all_2_ann, digits=1)
 ```
 
 ### GEE classifier
-Just do binary
-NOT YET UPDATED FOR TEST 5!!
+test 5 maps, uncleaned
 
 ```{r compare, cache=TRUE, eval=FALSE}
 # load GEE accuracy tables locations
-accuDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test4_randFor'
-g2002 <- '2002_RRB_NE_annual_confusionData_RRB_test4_randFor_uncleaned_500tree_allClasses_annual.csv'
-g2015 <- '2015_RRB_annual_confusionData_RRB_test4_randFor_uncleaned_500tree_allClasses_annual.csv'
+accuDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test5_randFor'
+g2002 <- '2002_RRB_NE_annual_confusionData_RRB_test5_randFor_uncleaned_500tree_binary_annual.csv'
+g2015 <- '2015_RRB_annual_confusionData_RRB_test5_randFor_uncleaned_500tree_binary_annual.csv'
 
 # get confusion tables
 g2002.con <-  testToConfusionGee(datadir = accuDir, dataname = g2002,
