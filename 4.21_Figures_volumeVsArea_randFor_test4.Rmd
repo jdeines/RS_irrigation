@@ -21,6 +21,7 @@ opts_chunk$set(cache=FALSE, cache.path='cache/4.21_VolumeAreaFigs_rf/',
 ```{r packages, message=FALSE, echo=TRUE, eval=TRUE}
 library(rgdal)
 library(raster)
+library(rgeos)
 library(grid)
 library(colorRamps)
 library(ggplot2)
@@ -130,15 +131,15 @@ derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDat
 #          paste0(derivedDir, '/RRCA_fullModel_irrigation_volume.csv'))
 ```
 
-I now need to propagate these changes through the plots.
+Make a 'master data' file for the RRCA boundary
 
 ```{r loadAreaData}
 cellArea <- 30*30 # m^2
 
-regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test4_regional_county_Stats'
+regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test5_regional_county_Stats'
 
 # get filenames
-files <- list.files(regionsDir, pattern="*_test4_randFor_interannual_plusAncillary.csv")
+files <- list.files(regionsDir, pattern="*_test5_randFor_interannual_plusAncillary.csv")
 
 # read in to a single dataframe
 all1 = as.data.frame(do.call(rbind, lapply(files, function(x) {
@@ -157,16 +158,28 @@ areaRRCA.states <- all1[grepl('_rrcaBound', all1$masterID),]
 # keep fewer columns (location, year, irrigated area, annual (Dec-Aug) precip)
 areaRRCA.states <- areaRRCA.states[,c('masterID','year','irrigated_km2','pr_ann')]
 
+# add total area of RRCA region
+rrca.spdf <- readOGR('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/RRCA_bound_states.kml', 
+                     'layer', verbose = T)
+rrca.spdf <- spTransform(rrca.spdf, CRS = '+init=epsg:5070')
+rrca.spdf$area_m2 <- gArea(rrca.spdf, byid=T)
+rrca.spdf$area_km2 <- rrca.spdf$area_m2 * 1e-6
+
+# 3 values will be recycled, confirmed they are in the correct order
+areaRRCA.states$totalArea_km2 <- rrca.spdf$area_km2
+
+
 # add a year column and an id column to merge with pumping
 areaRRCA.states$state <- substr(areaRRCA.states$masterID, start=1, stop=2)
 areaRRCA.states$key <- paste0(areaRRCA.states$state,areaRRCA.states$year)
 
 # export to derived dataset folder
 derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
-#write.csv(areaRRCA.states, paste0(derivedDir, '/RRCA_fullModel_area-rfTest4_ppt-dec-aug.csv'), row.names=F)
+write.csv(areaRRCA.states, paste0(derivedDir, '/RRCA_fullModel_area-rfTest5_ppt-dec-aug.csv'), row.names=F)
 ```
 
 4/9/2017 - end test 4 edits
+4/26/2017 - end test 5 edits
 
 ## RRCA groundwater model boundary analyses
 started 3/1/2017
