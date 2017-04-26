@@ -391,8 +391,8 @@ fullData <- combined[combined$masterID == 'rrcaRrbBuffExtent' &
 
 # write this out to use in Figure 3 (time series)
 derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
-#write.csv(fullData, paste0(derivedDir, '/FullStudyExtent_irrigation_test4.csv'), 
-#          row.names = F)
+#write.csv(fullData, paste0(derivedDir, '/FullStudyExtent_irrigation_test5.csv'), 
+#          
 
 # overall trend
 allYears.lm <- lm(area_km2 ~ year, data = fullData)

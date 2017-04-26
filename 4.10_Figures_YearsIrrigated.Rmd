@@ -12,8 +12,8 @@ Goal: Make figures of irrigation frequency over the region
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
-opts_chunk$set(cache=TRUE, cache.path='cache/4.1_FreqFigs/test4/',
-               fig.path='figure/4.1_FreqFigs_randFor/to2016/test4/')
+opts_chunk$set(cache=FALSE, cache.path='cache/4.1_FreqFigs/test5/',
+               fig.path='figure/4.1_FreqFigs_randFor/to2016/test5/')
 ```
 
 **R Packages Needed**
@@ -26,6 +26,8 @@ library(colorRamps)
 library(fields)
 library(RColorBrewer)
 library(latticeExtra)
+library(viridis)
+library(rasterVis)
 ```
 
 ## Irrigation frequency
@@ -35,22 +37,22 @@ Exported raster of years irrigated from 06.0_summaryMaps in GEE.
 
 ```{r userVars}
 # dirs and names
-rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test4_randFor_interannualClean'
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test5_randFor_interannualClean'
 rasRaw <- 'IrrigationFrequencyMap_0and1neg.tif'
 rasMasked <- 'IrrigationFrequencyMap_0and1neg_boundMask.tif'
   
 # inset sets
-rasSmall1.name <- 'IrrigationFrequencyMap_0and1neg_inset_1.tif'
-earlyInset1.name <- 'earliestYearIrrigated_inset_1.tif'
-lateInset1.name <- 'latestYearIrrigated_inset_1.tif'
+rasSmall1.name <- 'IrrigationFrequencyMap_0and1neg_inset.tif'
+earlyInset1.name <- 'earliestYearIrrigated_inset.tif'
+lateInset1.name <- 'latestYearIrrigated_inset.tif'
 
-rasSmall2.name <- 'IrrigationFrequencyMap_0and1neg_inset_2.tif'
-earlyInset2.name <- 'earliestYearIrrigated_inset_2.tif'
-lateInset2.name <- 'latestYearIrrigated_inset_2.tif'
-
-rasSmall3.name <- 'IrrigationFrequencyMap_0and1neg_inset_3.tif'
-earlyInset3.name <- 'earliestYearIrrigated_inset_3.tif'
-lateInset3.name <- 'latestYearIrrigated_inset_3.tif'
+# rasSmall2.name <- 'IrrigationFrequencyMap_0and1neg_inset_2.tif'
+# earlyInset2.name <- 'earliestYearIrrigated_inset_2.tif'
+# lateInset2.name <- 'latestYearIrrigated_inset_2.tif'
+# 
+# rasSmall3.name <- 'IrrigationFrequencyMap_0and1neg_inset_3.tif'
+# earlyInset3.name <- 'earliestYearIrrigated_inset_3.tif'
+# lateInset3.name <- 'latestYearIrrigated_inset_3.tif'
 
 # extent shapefile
 extentDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile'
@@ -62,10 +64,12 @@ Set some common color scales, etc, among figures
 ```{r commonPlotVars}
 # number of years color ramps
 numYears <- 18
+#backgroundcolor <- 'gray60'
 backgroundcolor <- 'gray32'
 
 # number of years color ramp
 matlab <- matlab.like2(numYears+1)
+#matlab <- viridis(numYears+1)
 
 # year color ramp
 # red yellow blue for dave
@@ -85,7 +89,7 @@ First, load raster domain raster and mask, and write out masked version to save 
 freq <- raster(paste0(rasDir,'/',rasRaw))
 
 # load extent 
-extent <- readOGR(extentDir, extentName, verbose=F)
+extent0 <- readOGR(extentDir, extentName, verbose=F)
 extent <- spTransform(extent, CRS(proj4string(freq)))
 
 # set -1 to 0 (areas masked by nlcd)
@@ -109,7 +113,7 @@ freqHist <- raster(paste0(rasDir,'/',rasRaw))
 # count by classes
 yearCounts <- freq(freqHist)
 # takes a while, save output
-write.csv(yearCounts, paste0(rasDir,'/test4_randFor_yearMapCounts.csv'),
+write.csv(yearCounts, paste0(rasDir,'/test5_randFor_yearMapCounts.csv'),
           row.names=F) 
 ```
 
@@ -117,7 +121,7 @@ plot it
 
 ```{r hist, fig.width = 6, fig.height = 5, eval=TRUE}
 # load yearmap counts
-yearCounts <- read.csv(paste0(rasDir,'/test4_randFor_yearMapCounts.csv'))
+yearCounts <- read.csv(paste0(rasDir,'/test5_randFor_yearMapCounts.csv'))
 # sort
 yearCounts <- yearCounts[order(yearCounts$value),]
 
@@ -171,22 +175,35 @@ mtext(side = 1, "Years Irrigated", line=2, cex=1.1)
 
 Number of years irrigated figure
 
-```{r freqMap_matlab2_bottom, fig.width = 10, fig.height = 5}
+```{r regionLatLong,fig.width = 10, fig.height = 6.5}
+extent0 <- readOGR(extentDir, extentName, verbose=F)
+extent.ll  <- spTransform(extent0, CRS("+proj=longlat +datum=WGS84"))
+plot(extent.ll, axes=T, las=1)       
+#plot(freq2)
+```
+
+
+```{r freqMap_matlab2_bottom_matlab, fig.width = 10, fig.height = 5}
 # load full raster
 freq2 <- raster(paste0(rasDir,'/',rasMasked))
 
 # plot scale
 scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
   offset = c(-225000,1760000), scale = 100000, fill=c("transparent","black"))
-text1 = list("sp.text", c(-220000,1750000), "0")
-text2 = list("sp.text", c(-125000,1750000), "100 km")
+text1 = list("sp.text", c(-220000,1750000), "0", cex=1.2)
+text2 = list("sp.text", c(-125000,1750000), "100 km",cex = 1.2)
+arrow = list("SpatialPolygonsRescale", layout.north.arrow(type=1), offset = c(-223000, 
+    1780000), scale = 40000)
 
 # color ramp 
 spplot(freq2, col.regions = c(backgroundcolor,matlab), maxpixels = 2000000,
-       sp.layout=list(scale, text1, text2), 
+       sp.layout=list(scale, text1, text2, arrow), 
        par.settings=list(axis.line=list(col=NA)), 
+       #scales = list(draw=T),
        colorkey=F)#list(labels=list(cex=1.2),
                   #at = c(0:18))
+
+levelplot(freq2, col.regions=c(backgroundcolor,matlab))
 
 image.plot(z=0:18,add=F,legend.only=T,  col=c(backgroundcolor,matlab), 
            horizontal = T,
@@ -199,6 +216,7 @@ image.plot(z=0:18,add=F,legend.only=T,  col=c(backgroundcolor,matlab),
 #grid.text('Years Irrigated',x=unit(0.975, "npc"),y=unit(0.5, 'npc'), rot=-90, gp=gpar(fontsize=18))
 ```
 
+
 Integrated colorbar on right (retains map frame border)
 
 ```{r freqMap_matlab2_right, fig.width = 10, fig.height = 5, dpi=96, eval=FALSE}
@@ -207,6 +225,7 @@ scale = list("SpatialPolygonsRescale", layout.scale.bar(),
   offset = c(-225000,1760000), scale = 100000, fill=c("transparent","black"))
 text1 = list("sp.text", c(-220000,1750000), "0")
 text2 = list("sp.text", c(-125000,1750000), "100 km")
+
 
 spplot(freq, col.regions = c(backgroundcolor,matlab), maxpixels = 2000000,
        par.settings = list(layout.widths=list(right.padding=4.5)),
@@ -223,26 +242,45 @@ grid.text('Years Irrigated',x=unit(0.975, "npc"),y=unit(0.5, 'npc'), rot=-90, gp
 
 3 location options
 
-```{r inset1_freqMap, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE}
+```{r inset1_freqMap_matlab, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE}
 # load full raster
 freq_inset1 <- raster(paste0(rasDir,'/',rasSmall1.name))
 freq_inset1[freq_inset1 == -1] <- 0
 
+
+
+# manually make a scale polygon... :(
+xmin <- -406500
+ymin <- 1983400
+scale <- 5000
+height <- 1500
+
+text1 = list("sp.text", c(xmin+400,ymin+300), "3 km", cex=.5)
+
+scalePoly <- Polygon(coords = as.matrix(data.frame(
+  lon = c(xmin, xmin, xmin+scale, xmin+scale, xmin),
+  lat = c(ymin, ymin+height, ymin+height, ymin, ymin))),
+  hole=F)
+scalePoly2 <- Polygons(list(scalePoly), ID='scale')
+scale.sp <- SpatialPolygons(list(scalePoly2), proj4string = CRS(proj4string(freq_inset1)))
+
+
 # color ramp 
 spplot(freq_inset1, col.regions = c(backgroundcolor,matlab), maxpixels = 200000,
        par.settings = list(layout.widths=list(right.padding=4.5)),
-       #sp.layout=list(scale, text1, text2),
+      # sp.layout=list(text1),
        colorkey=list(space = 'bottom',
                      cex = 1.2,
                      at=c(0:18), 
                      labels=c('0','','','3','','','6','','','9',
                               '','','12','','','15','','','18'),
                      width = .85,
-                     tck = .7))
+                     tck = .7)) +
+  latticeExtra::layer(sp.polygons(scale.sp, fill='white', col='black'))
 ```
 
 
-```{r inset2_freqMap, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE}
+```{r inset2_freqMap, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE, eval=FALSE}
 # load full raster
 freq_inset2 <- raster(paste0(rasDir,'/',rasSmall2.name))
 freq_inset2[freq_inset2 == -1] <- 0
@@ -260,7 +298,7 @@ spplot(freq_inset2, col.regions = c(backgroundcolor,matlab), maxpixels = 200000,
                      tck = .7))
 ```
 
-```{r inset3_freqMap, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE}
+```{r inset3_freqMap, eval=FALSE, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE}
 # load full raster
 freq_inset3 <- raster(paste0(rasDir,'/',rasSmall3.name))
 freq_inset3[freq_inset3 == -1] <- 0
@@ -301,7 +339,7 @@ spplot(early_inset1, col.regions = c(yearramp), maxpixels = 200000,
   #layer(sp.polygons(extent, fill=backgroundcolor), under=T)
 ```
 
-```{r inset2_early, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE}
+```{r inset2_early, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE, eval=FALSE}
 # load full raster
 early_inset2 <- raster(paste0(rasDir,'/',earlyInset2.name))
 early_inset2[early_inset2 == 0] <- NA
@@ -319,7 +357,7 @@ spplot(early_inset2, col.regions = c(yearramp), maxpixels = 200000,
                      tck = .7)) #+
 ```
 
-```{r inset3_early, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE}
+```{r inset3_early, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE, eval=FALSE}
 # load full raster
 early_inset3 <- raster(paste0(rasDir,'/',earlyInset3.name))
 early_inset3[early_inset3 == 0] <- NA
@@ -359,7 +397,7 @@ spplot(late_inset1, col.regions = c(yearramp), maxpixels = 200000,
                      tck = .7)) #+
 ```
 
-```{r inset2_late, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE}
+```{r inset2_late, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE, eval=FALSE}
 # load full raster
 late_inset2 <- raster(paste0(rasDir,'/',lateInset2.name))
 late_inset2[late_inset2 == 0] <- NA
@@ -377,7 +415,7 @@ spplot(late_inset2,col.regions = c(yearramp), maxpixels = 200000,
                      tck = .7)) #+
 ```
 
-```{r inset3_late, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE}
+```{r inset3_late, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE, eval=FALSE}
 # load full raster
 late_inset3 <- raster(paste0(rasDir,'/',lateInset3.name))
 late_inset3[late_inset3 == 0] <- NA
