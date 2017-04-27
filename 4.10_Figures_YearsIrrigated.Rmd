@@ -253,7 +253,7 @@ freq_inset1[freq_inset1 == -1] <- 0
 xmin <- -406500
 ymin <- 1983400
 scale <- 5000
-height <- 1500
+height <- 1800
 
 text1 = list("sp.text", c(xmin+400,ymin+300), "3 km", cex=.5)
 
