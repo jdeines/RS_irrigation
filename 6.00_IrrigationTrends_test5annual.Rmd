@@ -11,6 +11,7 @@ Goal: Investigate trends in irrigated area over time - total area, areas gained,
 
 Update 4/9/2017
 Update 4/25/2017: for test 5
+Update 4/27/2017: added trend from MIRAD for RRCA
 
 Derived datasets produced:
 
@@ -507,5 +508,42 @@ ggplot(data = all1[grepl('NRD', all1$masterID) |
 
 ```
 
+## MIRAD Trends
+What would the trend be if you only had the MIRAD dataset to work from?
+
+```{r mirad}
+cellArea <- 250*250 # m^2
+rrcaArea <- 79371.68 # km2
+
+regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test5_regional_county_Stats'
+
+# get filenames
+files <- list.files(regionsDir, pattern="*_test5_randFor_MIRAD.csv")
+
+# read in to a single dataframe
+all2 = as.data.frame(do.call(rbind, lapply(files, function(x) {
+              csv1 <- read.csv(paste0(regionsDir,'/',x))
+              csv1$year <- as.numeric(substr(x, start=1,stop=4))
+              return(csv1)
+            })))
+
+# convert cell count to area
+all2$irrigated_m2 <- all2$X1 * cellArea
+all2$irrigated_km2 <- all2$irrigated_m2 / 1000000 
+
+# extract RRCA bound
+rrca.mirad <- all2[all2$masterID == 'RRCA model boundary',]
+rrca.mirad$AreaPercentRRCA <- rrca.mirad$irrigated_km2/ rrcaArea * 100
+
+# plot and trend
+ggplot(rrca.mirad, aes(x=year, y = AreaPercentRRCA)) +
+  geom_line() + geom_point() +
+  stat_smooth(method = 'lm', se=F) +
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
+                 xpos = 2004) 
+
+mirad.lm <- lm(AreaPercentRRCA ~ year, data=rrca.mirad)
+summary(mirad.lm)
+```
 
 
