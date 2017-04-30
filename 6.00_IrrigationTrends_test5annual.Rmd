@@ -28,10 +28,10 @@ opts_chunk$set(cache=FALSE,
 
 ```{r packages, message=FALSE, echo=TRUE}
 library(rgdal)
+library(rgeos)
 library(latticeExtra)
 library(tidyverse) # for ggplot2, tidyr, dplyr
 library(broom)
-library(rgdal)
 library(colorRamps)
 source('functions/stat_smooth_func_all.R')
 ```
@@ -383,7 +383,9 @@ ggplot(data = stateBasin,
     theme(legend.position = 'top') 
 ```
 
-## Get Trends for Year Subsamples (ie, nass)
+## Get Trends For Full Study area
+
+### for Year Subsamples (ie, nass)
 to demonstrate year sampling affects on understanding of irrigation trends - what would our dataset say if only NASS years?
 
 ```{r nassYearTrends}
@@ -404,6 +406,34 @@ nassyears <- fullData[fullData$year %in% c(2002,2007,2012),]
 nassYears.lm <- lm(area_km2 ~ year, data = nassyears)
 summary(nassYears.lm)
 ```
+
+### full region trends by percent area
+Numbers reported in 'Irrigation Trends' section of the manuscript
+
+```{r fullAreaTrend_percent}
+# add full study region area
+studyArea <- readOGR('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile',
+'BigExtent_RRB_RRCA_buff', verbose=F)
+studyArea <- spTransform(studyArea, CRS('+init=epsg:5070'))
+area <- gArea(studyArea)
+fullData$studyArea.km2 <- area * 1e-6
+
+# convert percent of total area irrigated
+fullData$percentArea <- fullData$area_km2/fullData$studyArea.km2 * 100
+
+# rate of increase, in percent
+full.lm <- lm(percentArea ~ year, data = fullData)
+summary(full.lm)
+
+# percent increase from low to high
+max(fullData$area_km2)/min(fullData$area_km2)
+
+# NASS years
+nassyears2 <- fullData[fullData$year %in% c(2002,2007,2012),]
+nassYears2.lm <- lm(percentArea ~ year, data = nassyears2)
+summary(nassYears2.lm)
+```
+
 
 
 ## Plot Area Data (plots prior to novel/retired analysis)
@@ -514,6 +544,7 @@ What would the trend be if you only had the MIRAD dataset to work from?
 ```{r mirad}
 cellArea <- 250*250 # m^2
 rrcaArea <- 79371.68 # km2
+studyArea <- 141603 # km2
 
 regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test5_regional_county_Stats'
 
@@ -540,10 +571,24 @@ ggplot(rrca.mirad, aes(x=year, y = AreaPercentRRCA)) +
   geom_line() + geom_point() +
   stat_smooth(method = 'lm', se=F) +
   stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
-                 xpos = 2004) 
+                 xpos = 2004) + ggtitle('MIRAD for RRCA')
 
 mirad.lm <- lm(AreaPercentRRCA ~ year, data=rrca.mirad)
 summary(mirad.lm)
+
+# extract full study region
+full.mirad <- all2[all2$masterID == 'rrcaRrbBuffExtent',]
+full.mirad$AreaPercentRRCA <- full.mirad$irrigated_km2/ studyArea * 100
+
+# plot and trend
+ggplot(full.mirad, aes(x=year, y = AreaPercentRRCA)) +
+  geom_line() + geom_point() +
+  stat_smooth(method = 'lm', se=F) +
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
+                 xpos = 2004) + ggtitle('MIRAD for Full Area')
+
+mirad2.lm <- lm(AreaPercentRRCA ~ year, data=full.mirad)
+summary(mirad2.lm)
 ```
 
 
