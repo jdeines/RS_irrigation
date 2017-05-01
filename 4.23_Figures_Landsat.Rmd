@@ -1,0 +1,89 @@
+---
+title: "Landsat Figure"
+author: "Jill Deines"
+date: "April 30, 2017"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: plot info for Landsat observations
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, fig.path='figure/4.23_Landsat/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE, eval=TRUE}
+library(ggplot2)
+library(tidyr)
+```
+
+
+```{r LandsatObservations, fig.width=6, fig.height=3}
+# load data
+df <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/manuscript/tables/LandsatImageryTable.csv')
+
+ribbons <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/manuscript/tables/LandsatImageryTable_ribbons.csv')
+
+
+ggplot(ribbons) +
+  geom_ribbon(data=ribbons, aes(ymin=ymin, ymax = ymax, x=Year, fill=Range),
+              alpha=0.4) +
+  geom_line(data=df, aes(x=Year, y=Median, lty='Median')) +
+  scale_x_continuous(name = '', 
+                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
+  scale_fill_manual(values = c("Min-Max"='yellow','xminmax'='yellow',
+                               '1-99'='seagreen2','x1-99'='seagreen2',
+                               "25-75"='skyblue3')) +
+  scale_linetype('') +
+  xlab('') + ylab('Pixel Observations') +
+  theme_bw()
+
+
+# ggplot(data = df,
+#        aes(x=Year, y = Median)) +
+#   #min/max
+#   geom_ribbon(aes(ymin=Min, ymax = X1), fill='Min-Max', alpha=0.2) +
+#   geom_ribbon(aes(ymin=X99, ymax = Max), fill='Min-Max', alpha=0.2) +
+#   # 1/99
+#   geom_ribbon(aes(ymin=X1, ymax = X25), fill='1-99', alpha=0.4) +
+#   geom_ribbon(aes(ymin=X75, ymax = X99), fill='1-99', alpha=0.4) +
+#   # 25/75
+#   geom_ribbon(aes(ymin=X25, ymax = X75), fill='25-75', alpha=0.5) +
+#   geom_line() +
+#   scale_x_continuous(name = '', 
+#                   breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+#                  labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
+#  scale_fill_manual('Range', 
+#                    breaks = c('Min-Max','1-99','25-75'),
+#                    values = c('yellow',"seagreen2","skyblue3")) +
+#   xlab('') + ylab('Pixel Observations') +
+#   theme_bw()
+```
+
+
+```{r landsatSceneNumber, fig.width=6, fig.height=2}
+
+satellites <- data.frame(y1 = c(660,695,660),
+                         x1 = c(-Inf,1999,2012.5),
+                         xend = c(2011.5, Inf, Inf),
+                         Sensor = c('TM','ETM+','OLI'))
+
+ggplot(data = df,
+       aes(x=Year, y = Images)) +
+    geom_bar(stat='identity', fill='gray60', alpha=.7) + 
+  geom_segment(data=satellites,
+                aes(x=x1, xend = xend, y=y1, yend=y1, color=Sensor),lwd=2) +
+  scale_color_manual(values=c('#a6cee3','#1f78b4','#b2df8a')) +
+  scale_x_continuous(name = '', 
+                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
+  xlab('') + ylab('Landsat Scenes') +
+  theme_bw()
+```
+
