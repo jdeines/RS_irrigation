@@ -27,7 +27,7 @@ library(tidyr)
 ## Load and Merge Data
 training points with anthony vars included = v02
 
-```{r loadData, fig.width = 3.25, fig.height=1.75}
+```{r loadData, fig.width = 5.5, fig.height=4.5, cache=F}
 # file directory and filenames
 trainFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/trainingSets'
 files <- list.files(trainFolder, full.names = T, pattern='*_v02.csv')
@@ -55,10 +55,16 @@ koep <- readOGR(tempDir, 'Koep_RRB_dissolve', verbose=F)
 gisDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
 rrb <- readOGR(paste0(gisDir,'/BigExtent_RRB_RRCA_buff.kml'), 'boundExtent', verbose=F)
 
-par(mar=c(0,0,0,0))
-plot(koep, col=c('seashell2','wheat','honeydew'))
-plot(trainPoints[trainPoints$year == 2010,], col='#5e3c99',add=T, cex=.75, pch=19)
-plot(trainPoints[trainPoints$year == 2012,], col='#e66101',add=T, cex=.75, pch=19)
+koepPal <- c('#eff3ff','#bdd7e7','#6baed6')
+#par(mar=c(0,0,0,0))
+plot(koep, col=koepPal, axes=T)
+plot(trainPoints[trainPoints$year == 2010,], col='#fd8d3c',add=T, cex=.75, pch=19, axes=F)
+plot(trainPoints[trainPoints$year == 2012,], col='#cb181d',add=T, cex=.75, pch=19, axes=F)
+legend('topright', legend=as.character(koep$koep), fill=koepPal, bty='n',
+       cex=1)
+legend('topleft', legend=c('2010','2012'), col=c('#fd8d3c','#cb181d'),
+       bty='n', pch=19,cex=1)
+
 ```
 
 ## Export training sets for GEE

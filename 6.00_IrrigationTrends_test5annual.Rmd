@@ -306,25 +306,52 @@ percentage <- stateData[stateData$dataset == 'total' &
 percentage$startArea <- stateData[stateData$dataset == 'total' &
               stateData$year == '1999', 'area_km2']
 percentage$changeArea <- percentage$area_km2 - percentage$startArea
+
+# numbers for novel/retired years
+percentage$startArea2 <- stateData[stateData$dataset == 'total' &
+              stateData$year == '2002', 'area_km2']
+percentage$area_km2_2 <- stateData[stateData$dataset == 'total' &
+              stateData$year == '2013', 'area_km2']
+percentage$changeAreaShort <- percentage$area_km2_2 - percentage$startArea2
+  
 percentage$increase_perc <- percentage$area_km2/percentage$startArea * 100
 
-# net acreage added
+# net acreage added for years where we have data for both
 totalCum <- stateExtent2 %>% 
+  filter(year %in% c(2002:2013)) %>%
   group_by(masterID, dataset) %>% 
   slice(which.max(cumArea_km2)) 
 totalCum <- as.data.frame(totalCum)
 
-# add net gain to percentage table
-percentage$netKm2 <- c(totalCum[5,6] - totalCum[6,6],  # NE
+# net acreage added for a smorgashbord of years (all years_
+totalCum2 <- stateExtent2 %>% 
+  group_by(masterID, dataset) %>% 
+  slice(which.max(cumArea_km2)) 
+totalCum2 <- as.data.frame(totalCum2)
+
+# add net gain to percentage table: short time period
+percentage$netKm2_short <- c(totalCum[5,6] - totalCum[6,6],  # NE
                        totalCum[3,6] - totalCum[4,6],  # KS
                        totalCum[1,6] - totalCum[2,6])  # CO
 
-# percent of area change due to novel fields
-percentage$netContribution <- percentage$netKm2 / percentage$changeArea
+# add net gain to percentage table
+percentage$netKm2_all <- c(totalCum2[5,6] - totalCum2[6,6],  # NE
+                       totalCum2[3,6] - totalCum2[4,6],  # KS
+                       totalCum2[1,6] - totalCum2[2,6])  # CO
+
+# percent of area change due to novel fields, all
+percentage$netContribution_all <- percentage$netKm2_all / percentage$changeArea
+
+# percent of area change due to novel fields, 2002-2013
+percentage$netContribution_short <- percentage$netKm2_short / percentage$changeAreaShort
+
 percentage
 
-# percent of area change due to novel fields, full region
-sum(percentage$netKm2) / sum(percentage$changeArea)
+# percent of area change due to novel fields, full region, full time
+sum(percentage$netKm2_all) / sum(percentage$changeArea)
+
+# percent of area change due to novel fields, full region, 2002-2013
+sum(percentage$netKm2_short) / sum(percentage$changeAreaShort)
 ```
 
 
