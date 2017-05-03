@@ -86,6 +86,50 @@ jmd$scientist <- 'jmd'
 jmd <- jmd[,c('fips5','year','acres_frac','scientist')]
 ```
 
+### Crops in Region SI Figure 2
+
+```{r cropSupplementFig, fig.width=6.5, fig.height=4, dpi=600, dev=c('png','pdf')}
+#extract crops with some irrigation
+summary.wide2007 <- rrb2007[rrb2007$IRRIGATED > 0,
+                              c('commodity_desc','IRRIGATED', 'NON_IRR')]
+
+# filter for...5 main crops?
+cropsToKeep <- c('CORN','HAY.OTHER','SORGHUM','SOYBEANS','WHEAT')
+summary.wide2007 <- summary.wide2007[summary.wide2007$commodity_desc %in% cropsToKeep,]
+
+summary2007 <- gather(summary.wide2007, key = irrig_type, value = Value,
+                   IRRIGATED:NON_IRR)
+
+# fix words for plot
+irrStatuskey <- data.frame(irrig_type = c('IRRIGATED','NON_IRR'),
+                           plotIrrType = c('Irrigated','Dryland'))
+commodityKey <- data.frame(commodity_desc = unique(summary2007$commodity_desc),
+                           plot_desc = c('Sorghum','Alfalfa & Hay','Wheat',
+                                         'Soybeans','Corn'))
+summary2007 <- merge(summary2007, irrStatuskey)
+summary2007 <- merge(summary2007, commodityKey)                           
+
+
+# TOP 5 CROPS IN COUNTIES WITHIN STUDY AREA FOR 2007
+position <- c('Corn','Wheat','Sorghum','Soybeans','Alfalfa & Hay')
+
+ggplot(summary2007, 
+       aes(x=plot_desc, y=Value, fill=plotIrrType)) +
+  geom_bar(stat='identity') + 
+  ylab(expression(paste('Area (',km^2,')',sep=''))) + xlab('Commodity') + 
+  scale_fill_manual(values=c('#1f78b4','#b2df8a'),
+                    labels=c('Rainfed','Irrigated')) +
+  scale_x_discrete(limits = position) +
+  theme_bw() + theme(legend.title=element_blank(),
+                     axis.text=element_text(size=11),
+                     legend.text=element_text(size=11),
+                     axis.title=element_text(size=13,face="bold"))
+
+
+```
+
+
+
 ## Compare data
 
 ```{r totalArea}

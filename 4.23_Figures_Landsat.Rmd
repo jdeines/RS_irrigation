@@ -20,8 +20,46 @@ opts_chunk$set(cache=FALSE, fig.path='figure/4.23_Landsat/')
 ```{r packages, message=FALSE, echo=TRUE, eval=TRUE}
 library(ggplot2)
 library(tidyr)
+library(gridExtra)
+library(grid)
+
+library(rgdal)
+library(RColorBrewer)
 ```
 
+## Scene locations
+This needs assembly in AI later
+
+```{r sceneLocations, fig.width = 5.5, fig.height=4.5, dpi=600, dev=c('png','pdf')}
+# load data
+shapeDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile'
+
+bound <- readOGR(shapeDir, 'BigExtent_RRB_RRCA_buff', verbose=F)
+wrs <- readOGR(shapeDir, 'Landsat_overlapping_scenes_wrs2', verbose=F)
+wrs <- spTransform(wrs, CRS=proj4string(bound))
+
+# assign colors by landsat path
+pal <- brewer.pal(n=9, name = 'YlGnBu')[4:9]
+colorKey <- data.frame(PATH = (unique(wrs$PATH)),
+                       color = pal)
+wrs <- merge(wrs,colorKey)
+wrs$color <- as.character(wrs$color)
+
+# plot
+plot(wrs, axes=F, ylab = 'Row', font.lab=2, line=2)
+plot(bound, add=T, col='#ffffcc')
+plot(wrs, add=T, border=wrs$color)
+axis(2, at = c(-100000,060000,220000), labels=c(33,32,31), tck=0, col='white',
+     las=1, pos=-420000)
+axis(3, at = c(-220000,-100000,020000,140000,260000,380000), 
+     labels=c(33:28), tck=0, col='white', pos=320000)
+title('Path', cex.main=1)
+```
+
+
+
+
+## Scene Observations
 
 ```{r LandsatObservations, fig.width=6, fig.height=3}
 # load data
@@ -29,8 +67,29 @@ df <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/manuscript/tab
 
 ribbons <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/manuscript/tables/LandsatImageryTable_ribbons.csv')
 
+ribbons2 <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/manuscript/tables/LandsatImageryTable_ribbons2.csv')
 
-ggplot(ribbons) +
+# 1-99
+p3 <- ggplot(ribbons2) +
+  geom_ribbon(data=ribbons2, aes(ymin=ymin, ymax = ymax, x=Year, fill=Range),
+              alpha=0.4) +
+  geom_line(data=df, aes(x=Year, y=Median, lty='Median')) +
+  #geom_line(data=df, aes(x=Year, y=Max, lty='Maximum'), linetype='dashed') +
+  scale_x_continuous(name = '', 
+                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016),
+                 limits = c(1998.5,2016.5)) +
+  scale_fill_manual(values = c('1-99'='#bdc9e1',
+                               "25-75"='#045a8d'),
+                    labels=c('1-99','25-75')) +
+  scale_linetype('') +
+  xlab('') + ylab('Pixel Observations') +
+  theme_bw() #+   theme(plot.margin=unit(c(.2,1,.1,1),"cm"))
+p3
+
+
+# with min/max
+p1 <- ggplot(ribbons) +
   geom_ribbon(data=ribbons, aes(ymin=ymin, ymax = ymax, x=Year, fill=Range),
               alpha=0.4) +
   geom_line(data=df, aes(x=Year, y=Median, lty='Median')) +
@@ -43,27 +102,7 @@ ggplot(ribbons) +
   scale_linetype('') +
   xlab('') + ylab('Pixel Observations') +
   theme_bw()
-
-
-# ggplot(data = df,
-#        aes(x=Year, y = Median)) +
-#   #min/max
-#   geom_ribbon(aes(ymin=Min, ymax = X1), fill='Min-Max', alpha=0.2) +
-#   geom_ribbon(aes(ymin=X99, ymax = Max), fill='Min-Max', alpha=0.2) +
-#   # 1/99
-#   geom_ribbon(aes(ymin=X1, ymax = X25), fill='1-99', alpha=0.4) +
-#   geom_ribbon(aes(ymin=X75, ymax = X99), fill='1-99', alpha=0.4) +
-#   # 25/75
-#   geom_ribbon(aes(ymin=X25, ymax = X75), fill='25-75', alpha=0.5) +
-#   geom_line() +
-#   scale_x_continuous(name = '', 
-#                   breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
-#                  labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
-#  scale_fill_manual('Range', 
-#                    breaks = c('Min-Max','1-99','25-75'),
-#                    values = c('yellow',"seagreen2","skyblue3")) +
-#   xlab('') + ylab('Pixel Observations') +
-#   theme_bw()
+p1
 ```
 
 
@@ -74,7 +113,7 @@ satellites <- data.frame(y1 = c(660,695,660),
                          xend = c(2011.5, Inf, Inf),
                          Sensor = c('TM','ETM+','OLI'))
 
-ggplot(data = df,
+p2 <- ggplot(data = df,
        aes(x=Year, y = Images)) +
     geom_bar(stat='identity', fill='gray60', alpha=.7) + 
   geom_segment(data=satellites,
@@ -82,8 +121,18 @@ ggplot(data = df,
   scale_color_manual(values=c('#a6cee3','#1f78b4','#b2df8a')) +
   scale_x_continuous(name = '', 
                   breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
-                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
+                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016),
+                 limits = c(1998.5,2016.5)) +
   xlab('') + ylab('Landsat Scenes') +
   theme_bw()
+p2
 ```
+
+figure arranging from https://gist.github.com/tomhopper/faa24797bb44addeba79
+
+```{r landsatCombined, fig.width=6, fig.height = 5, dpi=600}
+grid.newpage()
+grid.draw(rbind(ggplotGrob(p2), ggplotGrob(p3), size = "last"))
+```
+
 
