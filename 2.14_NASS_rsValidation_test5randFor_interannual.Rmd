@@ -315,14 +315,14 @@ ggplot(countyValid, aes(x=IRRIGATED,y=irrArea.km2)) +
 
 Change color of facet label strip by dataset. taken from http://stackoverflow.com/questions/19440069/ggplot2-facet-wrap-strip-color-based-on-variable-in-data-set
 
-```{r nassusgs_colored, fig.width = 6.5, fig.height = 5}
+```{r nassusgs_colored, fig.width = 6.5, fig.height = 5, dpi=600, dev=c('png','pdf')}
 library(gtable)
 library(grid)
 # store main plot
 p1 <- ggplot(countyValid, aes(x=IRRIGATED,y=irrArea.km2)) +
   geom_point() +
   geom_abline(slope = 1, intercept = 0, linetype='dashed') + 
-  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 100, ypos = 800) + 
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 0, ypos = 1000) + 
   stat_smooth(method = 'lm', se=F, size=.3, colour='black') +
   #geom_smooth(method="lm",se=FALSE) +
   facet_wrap(~year, nrow=2) + 

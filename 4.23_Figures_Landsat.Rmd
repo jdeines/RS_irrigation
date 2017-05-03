@@ -81,7 +81,8 @@ p3 <- ggplot(ribbons2) +
                  limits = c(1998.5,2016.5)) +
   scale_fill_manual(values = c('1-99'='#bdc9e1',
                                "25-75"='#045a8d'),
-                    labels=c('1-99','25-75')) +
+                    labels=c('1-99','25-75'),
+                    name="Percentile \n Range") +
   scale_linetype('') +
   xlab('') + ylab('Pixel Observations') +
   theme_bw() #+   theme(plot.margin=unit(c(.2,1,.1,1),"cm"))

@@ -105,8 +105,11 @@ StatSmoothFunc <- ggproto("StatSmooth", Stat,
                         model <- do.call(method, c(base.args, method.args))
                         
                         m = model
-                        eq <- substitute(italic(r)^2~"="~r2, 
-                                         list(r2 = format(summary(m)$r.squared, digits = 2)))
+                        eq <- substitute('m' == b*','~~italic(r)^2~"="~r2, 
+                                         list( b = format(coef(m)[2], digits = 2), 
+                                               r2 = format(summary(m)$r.squared, digits = 2)))
+                        
+                   
                         func_string = as.character(as.expression(eq))
                         
                         if(is.null(xpos)) xpos = min(data$x)*0.9

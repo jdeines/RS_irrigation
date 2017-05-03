@@ -40,12 +40,15 @@ continuous variables and variables with many categories
 **R Packages Needed**
 
 ```{r packages, message=FALSE, echo=TRUE}
+library(gridExtra)
 library(randomForest)
 library(varSelRF)
 library(caret)
 library(knitr) # for 'kable' table display
 library(tidyr)
 library(ggplot2)
+library(grid)
+
 source('functions/prettyConfusion.R')
 source('functions/testToConfusion.R')
 source('functions/testToConfusion_GEE.R')
@@ -133,21 +136,41 @@ mean2 <- as.data.frame(Reduce(`+`, annual2) / length(annual2))
 
 # format
 mean2$variable <- rownames(mean2)
+
+# add each variable's short name
+mean2$shortname = c('EVI max','EVI range','GI max', 'GI range',                 
+                    'NDVI max','NDVI range','NDWI max','NDWI range',                                     'Aridity','paw-cm','paw-vol','AGI',
+                    'WGI','PDSI-grow','PDSI-ann','ppt-grow',
+                    'ppt-early','ppt-late','ppt-paw','slope')
+
 mean2long <- gather(mean2, key = metric, value = value, 
                     MeanDecreaseAccuracy:MeanDecreaseGini)
 
 # plot
-ggplot(mean2long[mean2long$metric == 'MeanDecreaseGini',],
-       aes(x=reorder(variable, value), y = value)) +
+p2 <- ggplot(mean2long[mean2long$metric == 'MeanDecreaseGini',],
+       aes(x=reorder(shortname, value), y = value)) +
   geom_bar(stat='identity') +
   coord_flip() +
-  theme_bw() + ylab('Mean Decrease in GINI Index') + xlab('') 
+  theme_bw() + ylab('Mean Decrease in GINI Index') + xlab('') +
+  theme(legend.title=element_blank(),
+        axis.text=element_text(size=11))
+p2
 
-ggplot(mean2long[mean2long$metric == 'MeanDecreaseAccuracy',],
-       aes(x=reorder(variable, value), y = value)) +
+p1 <- ggplot(mean2long[mean2long$metric == 'MeanDecreaseAccuracy',],
+       aes(x=reorder(shortname, value), y = value)) +
   geom_bar(stat='identity') +
   coord_flip() +
-  theme_bw() + ylab('Mean Decrease in Accuracy') + xlab('') 
+  theme_bw() + ylab('Mean Decrease in Accuracy') + xlab('') +
+  theme(legend.title=element_blank(),
+        axis.text=element_text(size=11))
+p1
+```
+
+combine plots
+
+```{r variableImpt_nice_dark, fig.width=6.5, fig.height=6, dpi=600, dev=c('png','pdf')}
+grid.newpage()
+grid.draw(cbind(ggplotGrob(p1), ggplotGrob(p2), size = "last"))
 ```
 
 
