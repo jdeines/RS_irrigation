@@ -1,6 +1,6 @@
 # taken from https://gist.github.com/kdauria/524eade46135f6348140
 
-# modified to only add r^2, not the equation as well
+# modified to only add r^2, not the equation as well; and b
 
 stat_smooth_func <- function(mapping = NULL, data = NULL,
                         geom = "smooth", position = "identity",

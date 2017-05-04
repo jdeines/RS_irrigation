@@ -326,7 +326,7 @@ p1 <- ggplot(countyValid, aes(x=IRRIGATED,y=irrArea.km2)) +
   stat_smooth(method = 'lm', se=F, size=.3, colour='black') +
   #geom_smooth(method="lm",se=FALSE) +
   facet_wrap(~year, nrow=2) + 
-  coord_equal(xlim=c(0,1075), ylim=c(0,1075)) + 
+  coord_equal(xlim=c(0,1100), ylim=c(0,1100)) + 
   ylab(expression(paste("HP-AIM Area (", km^2,")"))) + 
   xlab(expression(paste('County Statistics (', km^2,')'))) + theme_bw() +
        theme(text = element_text(size = 15))

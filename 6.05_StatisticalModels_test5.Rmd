@@ -11,7 +11,7 @@ Goal: Investigate relationship among irrigated area, precip, pumping volume, and
 
 update 4/9/2017: added total study area irrigated area panel to time series plot
 
-update 4/25/2017: test 5 data, RRCA bounds?
+update 4/25/2017: test 5 data, RRCA bounds
 
 
 ```{r knitrOpts, echo=FALSE}
@@ -23,6 +23,8 @@ opts_chunk$set(cache=FALSE,
 **R Packages Needed**
 
 ```{r packages, message=FALSE, echo=TRUE}
+library(gridExtra)
+library(grid)
 library(tidyverse) # for ggplot2, tidyr, dplyr
 library(broom)
 library(GGally)
@@ -211,21 +213,30 @@ rrca$Precip_cm <- rrca$Precip_mm / 10
 ggplot(rrca, aes(Precip_mm, Depth_m)) +
   geom_point() + theme_bw() +
   stat_smooth(method = 'lm', se=F) + 
-  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
-                 xpos = 250, ypos = .68) +
-  ylab('Depth (m)') + xlab('Precip (mm)') 
+  stat_smooth_func_all(geom="text",method="lm",hjust=0,parse=TRUE, 
+                 xpos = 250, ypos = .68, size=.5) +
+  ylab('Depth (m)') + xlab('Precip (mm)') +
+  theme(axis.text=element_text(size=11),
+               legend.text=element_text(size=11),
+               axis.title=element_text(size=13))
+
 
 depthlm <- lm(Depth_m ~ Precip_mm, data = rrca)
 summary(depthlm)
 ```
 
-```{r applicationDepth_cm, fig.height = 3, fig.width = 3}
-ggplot(rrca, aes(Precip_cm, Depth_cm)) +
+```{r applicationDepth_cm_noStats, fig.height = 3, fig.width = 3, dpi=600, dev=c('png','pdf')}
+
+depth <- ggplot(rrca, aes(Precip_cm, Depth_cm)) +
   geom_point() + theme_bw() +
-  stat_smooth(method = 'lm', se=F) + 
-  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
-                 xpos = 25, ypos = 68) +
-  ylab('Depth (cm)') + xlab('Precip (cm)') 
+  stat_smooth(method = 'lm', se=F, size=.5) + 
+  #stat_smooth_func_all(geom="text",method="lm",hjust=0,parse=TRUE, 
+  #               xpos = 25, ypos = 68) +
+  ylab('Depth (cm)') + xlab('Precipitation (cm)')  +
+  theme(axis.text=element_text(size=11),
+               legend.text=element_text(size=11),
+               axis.title=element_text(size=13))
+depth
 
 depthlm <- lm(Depth_cm ~ Precip_cm, data = rrca)
 summary(depthlm)
@@ -235,7 +246,7 @@ And plot all time series.
 Update 4/26/2017 - this goes back to only using RRCA boundaries
 
 
-```{r timeSeriesPlot, fig.height = 5, fig.width = 6}
+```{r timeSeriesPlot_finalish, fig.height = 4, fig.width = 6, dpi=600, dev=c('png','pdf')}
 # data frame for plotting
 rrcaPlot <- rrca
 
@@ -245,39 +256,6 @@ plotUs <- c('Area_km2','Depth_cm','Precip_cm','Price')
 # gather
 plotdata <- gather_(rrcaPlot, key_col = 'variable', value_col = 'value',
                           gather_cols = plotUs)
-
-# plots with no facet labels
-ggplot(data = plotdata,
-      aes(x = Year, y = value, colour=variable)) +
-  geom_line() + geom_point() +
-  scale_colour_manual(values=c('black','red','blue','orange')) + 
-  facet_wrap(~variable, nrow=4, scales='free_y') +
-  scale_x_continuous(name = '', 
-                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
-                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
-  ylab('') +
-  theme_bw() + theme(legend.position = 'none',
-                     strip.background=element_blank(), # comment out to add labels
-                     strip.text.x = element_blank(),   # comment out to add labels
-                     text = element_text(size = 15))
-
-# plots with trendlines
-ggplot(data = plotdata,
-      aes(x = Year, y = value, colour=variable)) +
-  geom_line() + geom_point() +
-  scale_colour_manual(values=c('black','red','blue','orange')) + 
-  facet_wrap(~variable, nrow=4, scales='free_y') +
-  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
-                 xpos = 2004) +
-  stat_smooth(method = 'lm', se=F, size=.5) +
-  scale_x_continuous(name = '', 
-                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
-                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
-  ylab('') +
-  theme_bw() + theme(legend.position = 'none',
-                     strip.background=element_blank(), # comment to add labels
-                     strip.text.x = element_blank(),   # comment to add labels
-                     text = element_text(size = 15))
 
 # plots with trendlines no text
 ggplot(data = plotdata,
@@ -320,7 +298,7 @@ rsq
 #### redo with percent area
 Dave/Anthony suggested using percent of study area irrigated instead of absolute area
 
-```{r timeSeriesPlot_percent, fig.height = 5, fig.width = 6}
+```{r timeSeriesPlot_percent_finalish, fig.height = 4, fig.width = 6, dpi=600, dev=c('png','pdf')}
 # get percent of RRCA area irrigated
 rrca$AreaPercentRRCA <- (rrca$Area_km2/rrca$tAreaRRCA_km2) * 100
 
@@ -331,56 +309,27 @@ plotUs2 <- c('AreaPercentRRCA','Depth_cm','Precip_cm','Price')
 plotdata2 <- gather_(rrca, key_col = 'variable', value_col = 'value',
                           gather_cols = plotUs2)
 
-# plots with no facet labels
-ggplot(data = plotdata2,
-      aes(x = Year, y = value, colour=variable)) +
-  geom_line() + geom_point() +
-  scale_colour_manual(values=c('black','red','blue','orange')) + 
-  facet_wrap(~variable, nrow=4, scales='free_y') +
-  scale_x_continuous(name = '', 
-                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
-                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
-  ylab('') +
-  theme_bw() + theme(legend.position = 'none',
-                     strip.background=element_blank(), # comment out to add labels
-                     strip.text.x = element_blank(),   # comment out to add labels
-                     text = element_text(size = 15))
-
-# plots with trendlines
-ggplot(data = plotdata2,
-      aes(x = Year, y = value, colour=variable)) +
-  geom_line() + geom_point() +
-  scale_colour_manual(values=c('black','red','blue','orange')) + 
-  facet_wrap(~variable, nrow=4, scales='free_y') +
-  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
-                 xpos = 2004) +
-  stat_smooth(method = 'lm', se=F, size=.5) +
-  scale_x_continuous(name = '', 
-                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
-                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
-  ylab('') +
-  theme_bw() + theme(legend.position = 'none',
-                     strip.background=element_blank(), # comment to add labels
-                     strip.text.x = element_blank(),   # comment to add labels
-                     text = element_text(size = 15))
 
 # plots with trendlines no text
-ggplot(data = plotdata2,
+ptime <- ggplot(data = plotdata2,
       aes(x = Year, y = value, colour=variable)) +
   geom_line() + geom_point() +
   scale_colour_manual(values=c('black','red','blue','orange')) + 
   facet_wrap(~variable, nrow=4, scales='free_y') +
   stat_smooth(data = subset(plotdata2, variable %in% 
                               c('AreaPercentRRCA','Depth_cm','Price')), 
-              method = 'lm', se=F, size=.5) +
+              method = 'lm', se=F, size=.4) +
   scale_x_continuous(name = '', 
                   breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
                  labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
-  ylab('') +
+  ylab('') + xlab('Year') +
   theme_bw() + theme(legend.position = 'none',
                      strip.background=element_blank(), # comment to add labels
                      strip.text.x = element_blank(),   # comment to add labels
-                     text = element_text(size = 15))
+                      axis.text=element_text(size=11),
+                     legend.text=element_text(size=11),
+                     axis.title=element_text(size=13))
+ptime
 ```
 
 Run a quick set of individual regressions on these time series
@@ -404,7 +353,7 @@ rsq
 #### Correlations
 Let's look at some preliminary correlations for the RRCA domain. 
 
-```{r corrPlots, fig.height = 5, fig.width=5}
+```{r corrPlots, fig.height=5, fig.width=5, dpi=600, dev=c('png','pdf')}
 # remove the full domain data and other columns not to include in cors
 nonsense <- c('AArea_km2_full', 'tAreaRRCA_km2', 'Depth_m', 'Precip_mm','AreaPercentRRCA')
 rrca2 <- rrca[,-which(names(rrca) %in% nonsense)]
@@ -513,7 +462,7 @@ I picked 'ctree' function the party package because of the nice-ish output on an
 
 From 'party' package
 
-```{r cart, fig.height = 5, fig.width = 5.5}
+```{r cart, fig.height = 5, fig.width = 5, dpi=600, dev=c('png','pdf')}
 # rrca domain dataset - complete across variables
 rrca3 <- rrca[complete.cases(rrca),]
 
@@ -550,4 +499,62 @@ ggplot(rrca3,
   theme_bw()
          
 ```
+
+Visualize differently
+```{r cartplot2, fig.height=3, fig.width = 3.5, dpi=600, dev=c('png','pdf')}
+# add a factor variable based on price split
+rrca3$PriceSplit <- NA
+rrca3[rrca3$Price_Lag > 3.924,'PriceSplit'] <- 'High'
+rrca3[is.na(rrca3$PriceSplit),'PriceSplit'] <- 'Low'
+
+pcart <- ggplot(rrca3,
+       aes(x=Precip, y = Area, colour = PriceSplit)) +
+  geom_point() + 
+  geom_smooth(method=lm, se=F, size=.5) +
+  scale_colour_manual(values=c('#cc4c02','#fe9929'),
+                      name='Price Split') +
+  ylab(expression(paste('Area (',km^2,')',sep=''))) + 
+  xlab('Precipitation (cm)') + 
+  theme_bw() + theme(axis.text=element_text(size=11),
+                     legend.text=element_text(size=11),
+                     axis.title=element_text(size=13),
+                     legend.position=c(0.2,.8))
+pcart
+
+# run regressions by county
+lms <- rrca3 %>% 
+  group_by(PriceSplit) %>% 
+  do(model = lm(Area ~ Precip, data = .))
+
+# and model R2 values
+rsq <- lms %>% glance(model)
+rsq
+```
+
+## Combo Figs
+grid layout ref http://www.sthda.com/english/wiki/ggplot2-easy-way-to-mix-multiple-graphs-on-the-same-page-r-software-and-data-visualization
+
+```{r precipTrendsCombo, fig.height=3, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
+grid.newpage()
+grid.draw(cbind(ggplotGrob(depth), ggplotGrob(pcart), size = "last"))
+```
+
+```{r fig3Combo, fig.height=6.5, fig.width = 6, dpi=600, dev=c('png','pdf')}
+# grid.newpage()
+# # Create layout : nrow = 2, ncol = 2
+# pushViewport(viewport(layout = grid.layout(2,2)))
+#              
+# # A helper function to define a region on the layout
+# define_region <- function(row, col){
+#   viewport(layout.pos.row = row, layout.pos.col = col)
+# } 
+# # Arrange the plots
+# print(ptime, vp=define_region(1, 1:2))
+# print(depth, vp = define_region(2, 1))
+# print(pcart, vp = define_region(2, 2))  
+
+grid.arrange(ptime, depth, pcart, layout_matrix = rbind(c(1,1), c(2,3)),
+             heights=c(1.45,1))
+```
+
 

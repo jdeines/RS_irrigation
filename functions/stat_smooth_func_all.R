@@ -1,6 +1,6 @@
 # taken from https://gist.github.com/kdauria/524eade46135f6348140
 
-stat_smooth_func <- function(mapping = NULL, data = NULL,
+stat_smooth_func_all <- function(mapping = NULL, data = NULL,
                              geom = "smooth", position = "identity",
                              ...,
                              method = "auto",
@@ -104,9 +104,9 @@ StatSmoothFunc <- ggproto("StatSmooth", Stat,
                             
                             m = model
                             eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
-                                             list(a = format(coef(m)[1], digits = 3), 
-                                                  b = format(coef(m)[2], digits = 3), 
-                                                  r2 = format(summary(m)$r.squared, digits = 3)))
+                                             list(a = format(coef(m)[1], digits = 2), 
+                                                  b = format(coef(m)[2], digits = 2), 
+                                                  r2 = format(summary(m)$r.squared, digits = 2)))
                             func_string = as.character(as.expression(eq))
                             
                             if(is.null(xpos)) xpos = min(data$x)*0.9
