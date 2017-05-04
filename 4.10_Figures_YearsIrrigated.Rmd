@@ -175,29 +175,47 @@ mtext(side = 1, "Years Irrigated", line=2, cex=1.1)
 
 Number of years irrigated figure
 
-```{r regionLatLong,fig.width = 10, fig.height = 6.5}
+```{r regionLatLong, fig.width = 8, fig.height = 5.5, dpi=600, dev=c('png','pdf')}
+# manually make polygon to highligh inset area
+xmin <- -101.1
+xmax <- -100.78
+ymin <- 40.76
+ymax <- 40.98
+
+insetPOly0 <- Polygon(coords = as.matrix(data.frame(
+  lon = c(xmin, xmin, xmax, xmax, xmin),
+  lat = c(ymin, ymax, ymax, ymin, ymin))),
+  hole=F)
+insetPOly00 <- Polygons(list(insetPOly0), ID='scale')
+insetPoly <- SpatialPolygons(list(insetPOly00), 
+                            proj4string = CRS("+proj=longlat +datum=WGS84"))
+
+
 extent0 <- readOGR(extentDir, extentName, verbose=F)
 extent.ll  <- spTransform(extent0, CRS("+proj=longlat +datum=WGS84"))
-plot(extent.ll, axes=T, las=1)       
+plot(extent.ll, axes=T, las=1)
+plot(insetPoly, add=T)
 #plot(freq2)
 ```
 
 
-```{r freqMap_matlab2_bottom_matlab, fig.width = 10, fig.height = 5}
+```{r freqMap_matlab2_bottom_matlab, fig.width = 7, fig.height = 5, dpi=600, dev=c('png','pdf')}
 # load full raster
 freq2 <- raster(paste0(rasDir,'/',rasMasked))
+
+
 
 # plot scale
 scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
   offset = c(-225000,1760000), scale = 100000, fill=c("transparent","black"))
-text1 = list("sp.text", c(-220000,1750000), "0", cex=1.2)
-text2 = list("sp.text", c(-125000,1750000), "100 km",cex = 1.2)
-arrow = list("SpatialPolygonsRescale", layout.north.arrow(type=1), offset = c(-223000, 
-    1780000), scale = 40000)
+text1 = list("sp.text", c(-220000,1750000), "0", cex=1)
+text2 = list("sp.text", c(-125000,1750000), "100 km",cex = 1)
+#arrow = list("SpatialPolygonsRescale", layout.north.arrow(type=1), 
+#             offset = c(-223000, 1780000), scale = 40000)
 
 # color ramp 
 spplot(freq2, col.regions = c(backgroundcolor,matlab), maxpixels = 2000000,
-       sp.layout=list(scale, text1, text2, arrow), 
+       sp.layout=list(scale, text1, text2), #, arrow), 
        par.settings=list(axis.line=list(col=NA)), 
        #scales = list(draw=T),
        colorkey=F)#list(labels=list(cex=1.2),
@@ -242,7 +260,7 @@ grid.text('Years Irrigated',x=unit(0.975, "npc"),y=unit(0.5, 'npc'), rot=-90, gp
 
 3 location options
 
-```{r inset1_freqMap_matlab, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE}
+```{r inset1_freqMap_matlab, fig.width = 2.5, fig.height = 3.2, dpi=600, dev=c('png','pdf')}
 # load full raster
 freq_inset1 <- raster(paste0(rasDir,'/',rasSmall1.name))
 freq_inset1[freq_inset1 == -1] <- 0
@@ -319,7 +337,7 @@ spplot(freq_inset3, col.regions = c(backgroundcolor,matlab), maxpixels = 200000,
 #### inset: Earliest Year Irrigated maps
 
 
-```{r inset1_early, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE}
+```{r inset1_early, fig.width = 2.5, fig.height = 3.2, dpi=600, dev=c('png','pdf'), cache=FALSE}
 # load full raster
 early_inset1 <- raster(paste0(rasDir,'/',earlyInset1.name))
 early_inset1[early_inset1 == 0] <- NA
@@ -379,7 +397,7 @@ spplot(early_inset3, col.regions = c(yearramp), maxpixels = 200000,
 
 3 location options
 
-```{r inset1_late, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE}
+```{r inset1_late, fig.width = 2.5, fig.height = 3.2, dpi=600, dev=c('png','pdf'), cache=FALSE}
 # load full raster
 late_inset1 <- raster(paste0(rasDir,'/',lateInset1.name))
 late_inset1[late_inset1 == 0] <- NA

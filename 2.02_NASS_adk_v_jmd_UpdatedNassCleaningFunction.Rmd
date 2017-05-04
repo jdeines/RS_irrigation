@@ -123,7 +123,7 @@ ggplot(summary2007,
   theme_bw() + theme(legend.title=element_blank(),
                      axis.text=element_text(size=11),
                      legend.text=element_text(size=11),
-                     axis.title=element_text(size=13,face="bold"))
+                     axis.title=element_text(size=13))
 
 
 ```
