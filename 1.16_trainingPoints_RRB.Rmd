@@ -317,14 +317,14 @@ dfagg <- aggregateIndexByCrop_quartiles(index = 'GI', year = 2010, df=trainAllLo
 plotIndexByCrop_quartiles(dfPlot = dfagg, title = '2010 Greenness Index (GI)', index = 'Greenness')
 ```
 
-```{r greenIndexPlotByCrop_manuscript_top, fig.width = 6.25, fig.height = 4, dev='png'}
+```{r greenIndexPlotByCrop_manuscript_top, fig.width = 6.5, fig.height = 4, dpi = 600, dev=c('png','pdf')}
 # Greenness Index, 2010: Quartiles for talk 
 dfagg <- aggregateIndexByCrop_quartiles(index = 'GI', year = 2010, df=trainAllLong)
 #plotIndexByCrop_quartiles(dfPlot = dfagg, title = '2010 Greenness Index (GI)', index = 'Greenness')
 
 # quartiles: function to plot irrigation status by crop type facet
 dfPlot <- dfagg
-index <- 'Greenness'
+index <- 'Green'
 
 ggplot(data = dfPlot,
          aes(x = month, y = Mean, colour = class, group = class)) +

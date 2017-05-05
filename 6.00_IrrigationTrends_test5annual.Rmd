@@ -68,7 +68,7 @@ all1$irrigated_km2 <- all1$irrigated_m2 / 1000000
 ### County Trends
 run regressions to get change in area over time (slope) per county
 
-```{r countyRegress, fig.width = 3.5, fig.height = 3}
+```{r countyRegress, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
 # extract county data
 counties0 <- all1[grepl('county', all1$masterID),]
 counties0$fips5 <- substr(counties0$masterID, start = 11, stop = 15)
@@ -108,8 +108,8 @@ countymap[countymap$p.value >= 0.05, 'sigCoeffs'] <- NA
 
 # plot!
 pal <- matlab.like(16)
-spplot(countymap, 'sigCoeffs', col.regions=pal) +
-  latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
+# spplot(countymap, 'sigCoeffs', col.regions=pal) +
+#   #latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
 
 # give a starkly different color for declining counties
 origPal <- pal
@@ -117,11 +117,11 @@ origPal[1] <- 'black'
 spplot(countymap, 'sigCoeffs', col.regions=origPal, colorkey = list(space='bottom')) #+
  # latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
 
-# a map with all counties regardless of significance
-origPal2 <- origPal
-origPal2[2] <- 'black'
-spplot(countymap, 'estimate', col.regions=origPal2) +
-  latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
+# # a map with all counties regardless of significance
+# origPal2 <- origPal
+# origPal2[2] <- 'black'
+# spplot(countymap, 'estimate', col.regions=origPal2) +
+#   latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
 ```
 
 Which counties have greatest variance over time?
@@ -223,7 +223,7 @@ ggplot(data = combined[grepl('full', combined$masterID),],
 
 Dave and Anthony requested a plot with cumulative novel and retired areas
 
-```{r fullExtent_novelRetired_cumulative, fig.width = 6.5}
+```{r fullExtent_novelRetired_cumulative, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
 # extract dataset: full study extent, by state
 stateExtent <- combined[grepl('full', combined$masterID),]
 
@@ -244,6 +244,19 @@ labels <- c(`CO_full_RRCA` = 'Colorado (CO)',
             `KS_full_RRCA` = 'Kansas (KS)',
             `NE_full_RRCA` = 'Nebraska (NE)')
 
+## legend at the top
+# ggplot(data = stateExtent,
+#        aes(x = year, y = toPlot, colour = dataset)) + 
+#     facet_wrap( ~ masterID, labeller = as_labeller(labels)) +
+#     geom_line() + geom_point() +
+#     ylab(expression(paste("Irrigated Area (", km^2,")"))) +
+#     xlab('Year') + #ggtitle('Full Region by State') +
+#     scale_color_discrete(breaks=c('total','novel','retired'),
+#                          labels=c('total', 'cumulative novel',
+#                                   'cumulative retired')) +
+#     guides(color=guide_legend(title=NULL)) +
+#     theme_bw() +
+#     theme(legend.position = 'top') 
 
 ggplot(data = stateExtent,
        aes(x = year, y = toPlot, colour = dataset)) + 
@@ -251,22 +264,10 @@ ggplot(data = stateExtent,
     geom_line() + geom_point() +
     ylab(expression(paste("Irrigated Area (", km^2,")"))) +
     xlab('Year') + #ggtitle('Full Region by State') +
-    scale_color_discrete(breaks=c('total','novel','retired'),
+    scale_color_manual(breaks=c('total','novel','retired'),
                          labels=c('total', 'cumulative novel',
-                                  'cumulative retired')) +
-    guides(color=guide_legend(title=NULL)) +
-    theme_bw() +
-    theme(legend.position = 'top') 
-
-ggplot(data = stateExtent,
-       aes(x = year, y = toPlot, colour = dataset)) + 
-    facet_wrap( ~ masterID, labeller = as_labeller(labels)) +
-    geom_line() + geom_point() +
-    ylab(expression(paste("Irrigated Area (", km^2,")"))) +
-    xlab('Year') + #ggtitle('Full Region by State') +
-    scale_color_discrete(breaks=c('total','novel','retired'),
-                         labels=c('total', 'cumulative novel',
-                                  'cumulative retired')) +
+                                  'cumulative retired'),
+                         values=c('red','blue','black')) +
     guides(color=guide_legend(title=NULL)) +
     theme_bw() +
     theme(legend.position = c(.85,.5),
@@ -597,7 +598,7 @@ rrca.mirad$AreaPercentRRCA <- rrca.mirad$irrigated_km2/ rrcaArea * 100
 ggplot(rrca.mirad, aes(x=year, y = AreaPercentRRCA)) +
   geom_line() + geom_point() +
   stat_smooth(method = 'lm', se=F) +
-  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
+  stat_smooth_func_all(geom="text",method="lm",hjust=0,parse=TRUE, 
                  xpos = 2004) + ggtitle('MIRAD for RRCA')
 
 mirad.lm <- lm(AreaPercentRRCA ~ year, data=rrca.mirad)
@@ -611,7 +612,7 @@ full.mirad$AreaPercentRRCA <- full.mirad$irrigated_km2/ studyArea * 100
 ggplot(full.mirad, aes(x=year, y = AreaPercentRRCA)) +
   geom_line() + geom_point() +
   stat_smooth(method = 'lm', se=F) +
-  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, 
+  stat_smooth_func_all(geom="text",method="lm",hjust=0,parse=TRUE, 
                  xpos = 2004) + ggtitle('MIRAD for Full Area')
 
 mirad2.lm <- lm(AreaPercentRRCA ~ year, data=full.mirad)
