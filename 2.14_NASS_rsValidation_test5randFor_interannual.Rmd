@@ -329,7 +329,11 @@ p1 <- ggplot(countyValid, aes(x=IRRIGATED,y=irrArea.km2)) +
   coord_equal(xlim=c(0,1100), ylim=c(0,1100)) + 
   ylab(expression(paste("HP-AIM Area (", km^2,")"))) + 
   xlab(expression(paste('County Statistics (', km^2,')'))) + theme_bw() +
-       theme(text = element_text(size = 15))
+       theme(axis.text=element_text(size=10),
+             legend.text=element_text(size=10),
+             axis.title=element_text(size=11),
+             panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank()) 
 
 # dummy plot
 dummy <- ggplot(countyValid, aes(x=IRRIGATED,y=irrArea.km2)) +

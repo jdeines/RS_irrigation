@@ -121,9 +121,13 @@ ggplot(summary2007,
                     labels=c('Rainfed','Irrigated')) +
   scale_x_discrete(limits = position) +
   theme_bw() + theme(legend.title=element_blank(),
-                     axis.text=element_text(size=11),
-                     legend.text=element_text(size=11),
-                     axis.title=element_text(size=13))
+                     axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     axis.title=element_text(size=11),
+                     panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank())
+
+
 
 
 ```

@@ -69,12 +69,17 @@ ribbons <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/manuscrip
 
 ribbons2 <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/manuscript/tables/LandsatImageryTable_ribbons2.csv')
 
+# line df long
+names(df)[11] <- 'Maximum'
+df.long <- gather(df[,c('Year','Median','Maximum')], value = value,
+                  key = stat, 
+                  Median:Maximum)
+
 # 1-99
 p3 <- ggplot(ribbons2) +
   geom_ribbon(data=ribbons2, aes(ymin=ymin, ymax = ymax, x=Year, fill=Range),
               alpha=0.4) +
-  geom_line(data=df, aes(x=Year, y=Median, lty='Median')) +
-  #geom_line(data=df, aes(x=Year, y=Max, lty='Maximum'), linetype='dashed') +
+  geom_line(data=df.long, aes(x=Year, y=value, linetype=stat)) +
   scale_x_continuous(name = '', 
                   breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
                  labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016),
@@ -83,9 +88,16 @@ p3 <- ggplot(ribbons2) +
                                "25-75"='#045a8d'),
                     labels=c('1-99','25-75'),
                     name="Percentile \n Range") +
-  scale_linetype('') +
-  xlab('') + ylab('Pixel Observations') +
-  theme_bw() #+   theme(plot.margin=unit(c(.2,1,.1,1),"cm"))
+  scale_linetype_manual(values = c("dashed","solid"),
+                        name='') +
+    xlab('') + ylab('Pixel Observations') +
+  theme_bw() + theme(axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     axis.title=element_text(size=11),
+                     panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank()) +
+  guides(linetype = guide_legend(order = 2),
+         fill = guide_legend(order=1))
 p3
 
 
@@ -125,13 +137,18 @@ p2 <- ggplot(data = df,
                  labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016),
                  limits = c(1998.5,2016.5)) +
   xlab('') + ylab('Landsat Scenes') +
-  theme_bw()
+  theme_bw() + theme(legend.title=element_blank(),
+                     axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     axis.title=element_text(size=11),
+                     panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank())
 p2
 ```
 
 figure arranging from https://gist.github.com/tomhopper/faa24797bb44addeba79
 
-```{r landsatCombined, fig.width=6, fig.height = 5, dpi=600}
+```{r landsatCombined, fig.width=6, fig.height = 5, dpi=600, dev=c('png','pdf')}
 grid.newpage()
 grid.draw(rbind(ggplotGrob(p2), ggplotGrob(p3), size = "last"))
 ```

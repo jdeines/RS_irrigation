@@ -229,13 +229,15 @@ summary(depthlm)
 
 depth <- ggplot(rrca, aes(Precip_cm, Depth_cm)) +
   geom_point() + theme_bw() +
-  stat_smooth(method = 'lm', se=F, size=.5) + 
+  stat_smooth(method = 'lm', se=F, size=.5, color='black') + 
   #stat_smooth_func_all(geom="text",method="lm",hjust=0,parse=TRUE, 
   #               xpos = 25, ypos = 68) +
   ylab('Depth (cm)') + xlab('Precipitation (cm)')  +
-  theme(axis.text=element_text(size=11),
-               legend.text=element_text(size=11),
-               axis.title=element_text(size=13))
+  theme(axis.text=element_text(size=10),
+               legend.text=element_text(size=10),
+               axis.title=element_text(size=11),        
+            panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank())
 depth
 
 depthlm <- lm(Depth_cm ~ Precip_cm, data = rrca)
@@ -326,9 +328,11 @@ ptime <- ggplot(data = plotdata2,
   theme_bw() + theme(legend.position = 'none',
                      strip.background=element_blank(), # comment to add labels
                      strip.text.x = element_blank(),   # comment to add labels
-                      axis.text=element_text(size=11),
-                     legend.text=element_text(size=11),
-                     axis.title=element_text(size=13))
+                      axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     axis.title=element_text(size=11),
+                             panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank())
 ptime
 ```
 
@@ -515,10 +519,13 @@ pcart <- ggplot(rrca3,
                       name='Price Split') +
   ylab(expression(paste('Area (',km^2,')',sep=''))) + 
   xlab('Precipitation (cm)') + 
-  theme_bw() + theme(axis.text=element_text(size=11),
-                     legend.text=element_text(size=11),
-                     axis.title=element_text(size=13),
-                     legend.position=c(0.2,.8))
+  theme_bw() + theme(axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     legend.title = element_text(size=10),
+                     axis.title=element_text(size=11),
+                     legend.position=c(0.2,.8),
+                    panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank())
 pcart
 
 # run regressions by county
@@ -539,7 +546,7 @@ grid.newpage()
 grid.draw(cbind(ggplotGrob(depth), ggplotGrob(pcart), size = "last"))
 ```
 
-```{r fig3Combo, fig.height=6.5, fig.width = 6, dpi=600, dev=c('png','pdf')}
+```{r fig3Combo_noGrid, fig.height=6.5, fig.width = 6, dpi=600, dev=c('png','pdf')}
 # grid.newpage()
 # # Create layout : nrow = 2, ncol = 2
 # pushViewport(viewport(layout = grid.layout(2,2)))

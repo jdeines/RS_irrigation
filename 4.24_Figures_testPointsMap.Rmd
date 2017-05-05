@@ -1,0 +1,62 @@
+---
+title: "test point map"
+author: "Jill Deines"
+date: "May 5, 2017"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: plot map test data point locations
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, fig.path='figure/4.24_testPointMap/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE, eval=TRUE}
+library(rgdal)
+```
+
+
+## Load and Merge Data
+training points with anthony vars included = v02
+
+```{r FigureS6_testPointMap, fig.width = 5.5, fig.height=4.5, cache=F, dpi=600, dev=c('png','pdf')}
+# file directory and filenames
+testDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/generatedPointsForUpload'
+
+# load
+p2002 <- readOGR(paste0(testDir,'/2002_data__NE_randAll_1050_jmd_annual1036.kml'),
+                 'layer', verbose=F)
+p2015 <- readOGR(paste0(testDir,'/2015_data_randAll_1250_jmd_annual1248.kml'),
+                 'layer', verbose=F)
+
+# Plot with Koepen counties
+tempDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/1.15_makeRrbPoints_workspace'
+koep <- readOGR(tempDir, 'Koep_RRB_dissolve', verbose=F)
+
+# basin boundaries
+gisDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml'
+rrb <- readOGR(paste0(gisDir,'/BigExtent_RRB_RRCA_buff.kml'), 'boundExtent', verbose=F)
+
+
+#par(mar=c(0,0,0,0))
+koepPal <- c('#eff3ff','#bdd7e7','#6baed6')
+pch2 <- 1 # 19 solid, 1 open, 3 plus, 4 x)
+ptcex <- 1
+plot(koep, col=koepPal, axes=T)
+plot(p2015, col='#cb181d',add=T, cex=ptcex,
+     pch=pch2, axes=F)
+plot(p2002, col='#fd8d3c',add=T, cex=ptcex,
+     pch=pch2, axes=F)
+legend('topright', legend=as.character(koep$koep), fill=koepPal, bty='n',
+       cex=1)
+legend('topleft', legend=c('2002','2015'), col=c('#fd8d3c','#cb181d'),
+       bty='n', pch=pch2,cex=1)
+
+
+```

@@ -317,7 +317,7 @@ dfagg <- aggregateIndexByCrop_quartiles(index = 'GI', year = 2010, df=trainAllLo
 plotIndexByCrop_quartiles(dfPlot = dfagg, title = '2010 Greenness Index (GI)', index = 'Greenness')
 ```
 
-```{r greenIndexPlotByCrop_manuscript_top, fig.width = 6.5, fig.height = 4, dpi = 600, dev=c('png','pdf')}
+```{r greenIndexPlotByCrop_manuscript_top_noGrid, fig.width = 6.5, fig.height = 4, dpi = 600, dev=c('png','pdf')}
 # Greenness Index, 2010: Quartiles for talk 
 dfagg <- aggregateIndexByCrop_quartiles(index = 'GI', year = 2010, df=trainAllLong)
 #plotIndexByCrop_quartiles(dfPlot = dfagg, title = '2010 Greenness Index (GI)', index = 'Greenness')
@@ -343,8 +343,11 @@ ggplot(data = dfPlot,
        facet_wrap(~crop) +
        ylab(paste0(index, ' Index')) + 
        xlab('Month (April - November)') + theme_bw() +
-       theme(text = element_text(size = 12), legend.position = 'top',
-             legend.title = element_blank()) 
+       theme(text = element_text(size = 12), 
+             legend.position = 'top',
+             legend.title = element_blank(),
+             panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank()) 
 
 ```
 

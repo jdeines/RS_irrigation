@@ -223,7 +223,7 @@ ggplot(data = combined[grepl('full', combined$masterID),],
 
 Dave and Anthony requested a plot with cumulative novel and retired areas
 
-```{r fullExtent_novelRetired_cumulative, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
+```{r fullExtent_novelRetired_cumulative_nogrid, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
 # extract dataset: full study extent, by state
 stateExtent <- combined[grepl('full', combined$masterID),]
 
@@ -271,7 +271,15 @@ ggplot(data = stateExtent,
     guides(color=guide_legend(title=NULL)) +
     theme_bw() +
     theme(legend.position = c(.85,.5),
-          text = element_text(size = 13))
+          axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     legend.title = element_text(size=10),
+                     axis.title=element_text(size=11),
+           panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank())
+
+
+
 ```
 
 And a plot of just retired/novel fields over time

@@ -139,9 +139,9 @@ mean2$variable <- rownames(mean2)
 
 # add each variable's short name
 mean2$shortname = c('EVI max','EVI range','GI max', 'GI range',                 
-                    'NDVI max','NDVI range','NDWI max','NDWI range',                                     'Aridity','paw-cm','paw-vol','AGI',
-                    'WGI','PDSI-grow','PDSI-ann','ppt-grow',
-                    'ppt-early','ppt-late','ppt-paw','slope')
+                    'NDVI max','NDVI range','NDWI max','NDWI range',                                     'Aridity','PAW-cm','PAW-Vol','AGI',
+                    'WGI','PDSI-Late','PDSI-Grow','Ppt-Grow',
+                    'Ppt-Early','Ppt-Late','Ppt-PAW','Slope')
 
 mean2long <- gather(mean2, key = metric, value = value, 
                     MeanDecreaseAccuracy:MeanDecreaseGini)
@@ -153,8 +153,10 @@ p2 <- ggplot(mean2long[mean2long$metric == 'MeanDecreaseGini',],
   coord_flip() +
   theme_bw() + ylab('Mean Decrease in GINI Index') + xlab('') +
   theme(legend.title=element_blank(),
-        axis.text=element_text(size=11))
-p2
+        axis.text=element_text(size=10),
+        legend.text=element_text(size=10),
+        axis.title=element_text(size=11),
+        panel.grid = element_blank())
 
 p1 <- ggplot(mean2long[mean2long$metric == 'MeanDecreaseAccuracy',],
        aes(x=reorder(shortname, value), y = value)) +
@@ -162,7 +164,10 @@ p1 <- ggplot(mean2long[mean2long$metric == 'MeanDecreaseAccuracy',],
   coord_flip() +
   theme_bw() + ylab('Mean Decrease in Accuracy') + xlab('') +
   theme(legend.title=element_blank(),
-        axis.text=element_text(size=11))
+        axis.text=element_text(size=10),
+        legend.text=element_text(size=10),
+        axis.title=element_text(size=11),
+        panel.grid = element_blank())
 p1
 ```
 
