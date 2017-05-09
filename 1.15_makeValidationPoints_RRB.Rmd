@@ -9,6 +9,8 @@ output:
 
 Goal: Use Koeppengeiger climate divisions, along with CDL crop layers, to stratify sampled points across the RRB.
 
+Note: full scale validation points made in GEE - 02-03-2017
+
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)

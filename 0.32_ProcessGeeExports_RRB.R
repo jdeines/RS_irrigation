@@ -1,0 +1,41 @@
+# ArcGIS can't read the projection info in GEE outputs for some reason
+
+# This script reads in the GEE output rasters, tweaks the datum in the 
+# proj4 projection specification, and writes back out to a new directory
+# using the same filename
+
+# it's set up for the annual maps from HP-AIM-v1, or the greater RRB region.
+# no tile merging necessary.
+
+
+# Jill Deines
+
+# load packages
+library(raster)
+library(rgdal)
+
+
+
+# directory containing rasters
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test5_FINAL/rrb_test5_0_1_raw'
+
+# director to write out to
+outDir <- 'S:/Data/GIS_Data/Downloaded/Irrigation_Datasets/HP_AIM_v1.0/binary_rasters_noMasks_noNoDataValues'
+
+# specified projection
+# add the datum specification (NAD83) for EPSG 5070 (Albers Equal Area US48)
+newProj <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
+
+
+# end user specifications -------------------------------------------
+
+# get filenames
+files <- list.files(rasDir, pattern='*tif$')
+
+# loop over files to load, define projection, write back out
+for (file in files) {
+  ras1 <- raster(paste(rasDir,file,sep='/'))
+  proj4string(ras1) <- newProj
+  writeRaster(ras1, paste(outDir,file,sep='/'), datatype='INT1S')
+}
+
