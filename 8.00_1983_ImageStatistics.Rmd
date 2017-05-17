@@ -1,0 +1,230 @@
+---
+title: "Landsat Figure"
+author: "Jill Deines"
+date: "April 30, 2017"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: plot info for Landsat observations going back to 1983 to investigate data drop-off prior to 1999.
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, fig.path='figure/8.00_landsatStats/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE, eval=TRUE}
+library(ggplot2)
+library(tidyr)
+library(gridExtra)
+library(grid)
+
+library(rgdal)
+library(RColorBrewer)
+```
+
+## Data processing
+GEE script 01.07_Landsat_Annual_Statistics out a csv for each year; combine them into one dataset
+
+```{r processData}
+dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Landsat_Annual_Statistics'
+
+# annual file names
+annualFiles <- list.files(dataDir, pattern = '*extent.csv$')
+earlyFiles <- list.files(dataDir, pattern = '*earlyPeak0420-0610.csv$')
+lateFiles <- list.files(dataDir, pattern = '*Peak0715-0831.csv$')
+
+# read in to a single dataframe
+annual = as.data.frame(do.call(rbind, lapply(annualFiles, function(x) {
+              csv1 <- read.csv(paste0(dataDir,'/',x))
+              csv2 <- csv1[, -which(names(csv1) %in%
+                                        c('system.index','.geo'))]
+            })))
+
+early = as.data.frame(do.call(rbind, lapply(earlyFiles, function(x) {
+              csv1 <- read.csv(paste0(dataDir,'/',x))
+              csv2 <- csv1[, -which(names(csv1) %in%
+                                        c('system.index','.geo'))]
+            })))
+
+late = as.data.frame(do.call(rbind, lapply(lateFiles, function(x) {
+              csv1 <- read.csv(paste0(dataDir,'/',x))
+              csv2 <- csv1[, -which(names(csv1) %in%
+                                        c('system.index','.geo'))]
+            })))
+```
+
+
+## Scene Observations
+
+### Total annual scenes
+
+```{r annualObs, fig.width=8, fig.height=3}
+
+# interquartile
+p1 <- ggplot(annual) +
+  geom_ribbon(aes(ymin=GI_p25, ymax = GI_p75, x=year),
+              alpha=0.4) +
+  geom_line(aes(x=year, y=GI_p50, lty='Median'),linetype='solid') +
+    geom_point(aes(x=year, y=GI_p50)) +
+    geom_line(aes(x=year, y=GI_p1, lty='1'), linetype = 'dashed') +
+      geom_line(aes(x=year, y=GI_p100, lty='1'), linetype = 'dashed') +
+  scale_x_continuous(name = '', 
+                  breaks = c(1985,1990,1995,2000,2005,2010,2015), 
+                 labels = c(1985,1990,1995,2000,2005,2010,2015),
+                     limits = c(1982.5,2016.5)) +
+  xlab('year') + ylab('Pixel Observations') +
+ theme_bw() + theme(axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     axis.title=element_text(size=11))
+                     #panel.grid.major = element_blank(),
+                     #panel.grid.minor = element_blank()) 
+p1
+
+```
+
+
+```{r annual_SceneNumber, fig.width=8, fig.height=2.5}
+
+satellites <- data.frame(y1 = c(695,660,695,660),
+                         x1 = c(1982.5, 1984,1999,2012.5),
+                         xend = c(1993.9, 2011.5, Inf, Inf),
+                         Sensor = c('4 TM','5 TM','ETM+','OLI'))
+
+p2 <- ggplot(data = annual,
+       aes(x=year, y = images)) +
+    geom_bar(stat='identity', fill='gray60', alpha=.7) + 
+  geom_segment(data=satellites,
+                aes(x=x1, xend = xend, y=y1, yend=y1, color=Sensor),lwd=2) +
+  scale_color_manual(values=c('#fb9a99','#a6cee3','#1f78b4','#b2df8a')) +
+  scale_x_continuous(name = '', 
+                  breaks = c(1985,1990,1995,2000,2005,2010,2015), 
+                 labels = c(1985,1990,1995,2000,2005,2010,2015), 
+                 limits = c(1982.5,2016.5)) +
+  xlab('year') + ylab('Landsat Scenes') +
+  theme_bw() + theme(legend.title=element_blank(),
+                     axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     axis.title=element_text(size=11))
+                    # panel.grid.major = element_blank(),
+                    # panel.grid.minor = element_blank())
+p2
+```
+
+
+### Total peak scenes
+
+```{r peakObs, fig.width=8, fig.height=3}
+
+# interquartile
+ggplot(late) +
+  geom_ribbon(aes(ymin=GI_p25, ymax = GI_p75, x=year),
+              alpha=0.4) +
+  geom_line(aes(x=year, y=GI_p50, lty='Median'),linetype='solid') +
+    geom_point(aes(x=year, y=GI_p50)) +
+    geom_line(aes(x=year, y=GI_p1, lty='1'), linetype = 'dashed') +
+      geom_line(aes(x=year, y=GI_p100, lty='1'), linetype = 'dashed') +
+  scale_x_continuous(name = '', 
+                  breaks = c(1985,1990,1995,2000,2005,2010,2015), 
+                 labels = c(1985,1990,1995,2000,2005,2010,2015),
+                     limits = c(1982.5,2016.5)) +
+   scale_y_continuous(name = '', 
+                  breaks = c(0,2,4,6,8,10,14,18), 
+                 labels = c(0,2,4,6,8,10,14,18)) +
+  xlab('year') + ylab('Pixel Observations') +
+ theme_bw() + theme(axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     axis.title=element_text(size=11))
+                     #panel.grid.major = element_blank(),
+                     #panel.grid.minor = element_blank()) 
+```
+
+
+```{r peak_SceneNumber, fig.width=8, fig.height=2.5}
+
+satellites2 <- data.frame(y1 = c(115,100,115,100),
+                         x1 = c(1982.5, 1984,1999,2012.5),
+                         xend = c(1993.9, 2011.5, Inf, Inf),
+                         Sensor = c('4 TM','5 TM','ETM+','OLI'))
+
+ggplot(data = late,
+       aes(x=year, y = images)) +
+    geom_bar(stat='identity', fill='gray60', alpha=.7) + 
+  geom_segment(data=satellites2,
+                aes(x=x1, xend = xend, y=y1, yend=y1, color=Sensor),lwd=2) +
+  scale_color_manual(values=c('#fb9a99','#a6cee3','#1f78b4','#b2df8a')) +
+  scale_x_continuous(name = '', 
+                  breaks = c(1985,1990,1995,2000,2005,2010,2015), 
+                 labels = c(1985,1990,1995,2000,2005,2010,2015), 
+                 limits = c(1982.5,2016.5)) +
+  xlab('year') + ylab('Landsat Scenes') +
+  theme_bw() + theme(legend.title=element_blank(),
+                     axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     axis.title=element_text(size=11))
+                    # panel.grid.major = element_blank(),
+                    # panel.grid.minor = element_blank())
+
+```
+
+
+### Total early scenes
+
+```{r earlyObs, fig.width=8, fig.height=3}
+
+# interquartile
+ggplot(early) +
+  geom_ribbon(aes(ymin=GI_p25, ymax = GI_p75, x=year),
+              alpha=0.4) +
+  geom_line(aes(x=year, y=GI_p50, lty='Median'),linetype='solid') +
+    geom_point(aes(x=year, y=GI_p50)) +
+    geom_line(aes(x=year, y=GI_p1, lty='1'), linetype = 'dashed') +
+      geom_line(aes(x=year, y=GI_p100, lty='1'), linetype = 'dashed') +
+  scale_x_continuous(name = '', 
+                  breaks = c(1985,1990,1995,2000,2005,2010,2015), 
+                 labels = c(1985,1990,1995,2000,2005,2010,2015),
+                     limits = c(1982.5,2016.5)) +
+   scale_y_continuous(name = '', 
+                  breaks = c(0,2,4,6,8,10,14,18), 
+                 labels = c(0,2,4,6,8,10,14,18)) +
+  xlab('year') + ylab('Pixel Observations') +
+ theme_bw() + theme(axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     axis.title=element_text(size=11))
+                     #panel.grid.major = element_blank(),
+                     #panel.grid.minor = element_blank()) 
+```
+
+
+```{r early_SceneNumber, fig.width=8, fig.height=2.5}
+
+satellites2 <- data.frame(y1 = c(115,100,115,100),
+                         x1 = c(1982.5, 1984,1999,2012.5),
+                         xend = c(1993.9, 2011.5, Inf, Inf),
+                         Sensor = c('4 TM','5 TM','ETM+','OLI'))
+
+ggplot(data = late,
+       aes(x=year, y = images)) +
+    geom_bar(stat='identity', fill='gray60', alpha=.7) + 
+  geom_segment(data=satellites2,
+                aes(x=x1, xend = xend, y=y1, yend=y1, color=Sensor),lwd=2) +
+  scale_color_manual(values=c('#fb9a99','#a6cee3','#1f78b4','#b2df8a')) +
+  scale_x_continuous(name = '', 
+                  breaks = c(1985,1990,1995,2000,2005,2010,2015), 
+                 labels = c(1985,1990,1995,2000,2005,2010,2015), 
+                 limits = c(1982.5,2016.5)) +
+  xlab('year') + ylab('Landsat Scenes') +
+  theme_bw() + theme(legend.title=element_blank(),
+                     axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     axis.title=element_text(size=11))
+                    # panel.grid.major = element_blank(),
+                    # panel.grid.minor = element_blank())
+
+```
+
+
