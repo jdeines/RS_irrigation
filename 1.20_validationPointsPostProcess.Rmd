@@ -7,7 +7,7 @@ output:
     toc: yes
 ---
 
-Goal: Take the KML exported from GEE during validation point creation and post-process. 
+Goal: Take the KML exported from GEE during validation point creation and post-process. yep.
 
 **Update Sept. 7 2016**: This now has several iterations as the validation point methodology evolved. 
 
