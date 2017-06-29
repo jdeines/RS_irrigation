@@ -73,6 +73,7 @@ plot(original, border='blue')
 plot(buffer10p, border = 'red',add=T)
 plot(bufferSmall2, add=T)
 plot(unioned, col='gray80',border='gray80',add=T)
+plot(bound, border='gray50', add=T)
 legend('bottom',legend = c('original','10 percent','10 km','union'), 
        col = c('blue','red','black','gray80'), lty=1, ncol=4)
 #plot(unioned, add=T)
@@ -118,6 +119,12 @@ plot(counties[original,], main = 'Original 35 Counties Used')
 plot(original, border = 'blue', add=T)
 plot(county.original, col='red', add=T)
 
+county.original37 <- getInCounties(original, counties, threshold=.99)
+nrow(county.original37)
+plot(counties[original,], main = 'Original, 37 Counties Option')
+plot(original, border = 'blue', add=T)
+plot(county.original37, col='red', add=T)
+
 # get counties by boundary: strict untion
 county.union <- getInCounties(unioned, counties, threshold=.999)
 nrow(county.union)
@@ -140,15 +147,69 @@ plot(buffer10p, border = 'blue', add=T)
 plot(county.10p, col='red', add=T)
 
 # counties combined
-par(mar=c(2,0,0,0))
-plot(county.original, border='green', main = 'County Comparison')
-plot(county.10p, col = 'gray20', add=T)
+par(mar=c(2,0,2,2))
+#plot(county.original, border='green', main = 'County Comparison')
+plot(county.10p, col = 'gray20', main = 'county comparison')
 plot(county.original, border='green', add=T)
 plot(county.10km, col='blue', add=T)
 plot(county.union, col='red', add=T)
 legend('bottom', legend = c('original','10%','10 km','union'),
        fill = c('green','gray20','blue','red'), ncol=4)
+
+# export a list of fips for each option
+maxrow <- nrow(county.original37)
+fips = data.frame(original37 = as.character(county.original37$fips5),
+                  original = as.character(c(county.original$fips5,
+                                            rep(NA, maxrow-nrow(county.original)))),
+                  union = as.character(c(county.union$fips5, 
+                                         rep(NA, maxrow-nrow(county.union)))),
+                  p10 = as.character(c(county.10p$fips5, 
+                                       rep(NA, maxrow - nrow(county.10p)))),
+                  km10 = as.character(c(county.10km$fips5, 
+                                        rep(NA, maxrow - nrow(county.10km)))))
+
+# export
+outDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
+write.csv(fips, paste0(outDir,'/boundary_options_fips_for_contained_countyies.csv'),
+          row.names=F)
 ```
 
-## Effect of choices
+## Areal Comparisons
+Compare study areas (since mapping a large area is part of our novelty). Calculates are in AEA conus, as maps are presented
+
+```{r areas}
+# RRCA km^2
+gArea(bound) * 1e-6
+
+# RRB k^2
+gArea(rrb) * 1e-6
+
+# original manuscript study area (uneven buffer)
+gArea(original) * 1e-6
+
+# union
+gArea(unioned) * 1e-6
+
+# small buffer (10 km)
+gArea(bufferSmall2) * 1e-6
+
+# large buffer (10 percent of union width, ish)
+gArea(buffer10p) * 1e-6
+```
+
+
+
+## EXport
+```{r export, eval=FALSE}
+# Export boundaries and county options
+outDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
+
+# boundary options
+unioned <- SpatialPolygonsDataFrame(unioned, match.ID=F,
+                                         data.frame(name='union'))
+unioned.wgs <- spTransform(unioned, CRS("+proj=longlat +datum=WGS84")
+writeOGR(unioned, outDir, 'RRCA_RRB_union_aea', driver='ESRI Shapefile')
+writeOGR(unioned.wgs, outDir, 'RRCA_RRB_union_wgs84', driver='ESRI Shapefile')
+```
+
 

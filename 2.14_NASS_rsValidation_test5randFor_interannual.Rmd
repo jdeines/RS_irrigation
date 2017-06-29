@@ -65,7 +65,7 @@ based on counties completely contained within study boundary
 fipsDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
 fips <- read.csv(paste0(outDir,'/boundary_options_fips_for_contained_countyies.csv'),
                  colClasses = 'character')
-fipsToUse0 <- fips$original
+fipsToUse0 <- fips$original37
 fipsToUse <- fipsToUse0[!is.na(fipsToUse0)]
 ```
 
