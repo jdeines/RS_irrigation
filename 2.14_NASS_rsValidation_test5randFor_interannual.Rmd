@@ -59,6 +59,16 @@ In GEE, I calculated the number of cells of each classification type in each cou
 
 Here, I load this dataset from yearly files, add a year attribute, and converting cell counts to areas (both retained).
 
+### specify fips of counties to use
+based on counties completely contained within study boundary
+```{r setFips}
+fipsDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
+fips <- read.csv(paste0(outDir,'/boundary_options_fips_for_contained_countyies.csv'),
+                 colClasses = 'character')
+fipsToUse0 <- fips$original
+fipsToUse <- fipsToUse0[!is.na(fipsToUse0)]
+```
+
 
 ```{r loadGee}
 # years with county level datasets
@@ -95,6 +105,8 @@ countyShape <- readOGR('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/G
             'Counties_RRCAextent_Clip', verbose=F)
 # retrieve list of fips within bounds
 fips.in <- as.character(countyShape[countyShape$proportion == 1,]$fips5)
+fips.in <- fipsToUse
+
 
 # keep counties 100% within the rrca
 countyAll <- countyAll[countyAll$fips5 %in% fips.in,]
