@@ -1,0 +1,154 @@
+---
+title: "Study Bounds"
+author: "Jill Deines"
+date: "June 29, 2017"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Document full production of study area boundary, and evaluate the number of counties various options include for a robust county validation. This aggregates study bound polygon generation from several sources prior to manuscript revisions. It also incorporates the area calculations from the old 0.01_polygonAreaFinder.R script.
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=TRUE,
+               fig.path='figure/0.02_studyBounds/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+library(rgeos)
+library(raster)
+```
+
+
+## Model boundary: uniform buffer
+This is a new boundary created 6/29/2017 for manuscript revisions. Load RRCA groundwater model boundary and RRB basin boundary, union, then apply a uniform buffer to the full region.
+
+Buffer distances will be calculated using `CRS('+init=epsg:5070'))`, CONUS albers equal area, to be consistent with final map outputs.
+
+```{r loadBounds}
+gisDir <- 'S:/Users/deinesji/HPA/gis'
+# load bound used for first submission for comparison
+original <-  readOGR(gisDir, 'BigExtent_RRB_RRCA_buff', verbose=F)
+
+# rrca bound exported from model
+bound <- readOGR(paste0(gisDir,'/RRCA_Model_Export'), 'bound', verbose=F)
+
+# republican basin
+rrb <- readOGR(gisDir, 'RepBasin', verbose=F)
+
+# reproject
+aeaProj <- '+init=epsg:5070'
+bound <- spTransform(bound, CRS(aeaProj)) 
+rrb <- spTransform(rrb, CRS(aeaProj))
+original <- spTransform(original, CRS(aeaProj))
+
+# union
+unioned <- gUnion(bound,rrb)
+
+# buffer options --------------------------------------------------
+# get lateral width
+boundwidth <- abs(bbox(unioned)[2,1]-bbox(unioned)[2,2])
+percent10 <- boundwidth*.1
+
+# buffer and reformat
+buffer10p <- gBuffer(unioned, width=percent10)
+buffer10p <- SpatialPolygonsDataFrame(buffer10p, match.ID=F,
+                                         data.frame(name='buffered'))
+
+# minimum buffer: rrb matching
+buff <- 10000
+bufferSmall <- gBuffer(unioned, width=buff)
+bufferSmall <- SpatialPolygonsDataFrame(bufferSmall, match.ID=F,
+                                         data.frame(name='buffered'))
+# make minute adjustments since original data was buffered in HPA class projection
+bufferSmall2 <- raster::intersect(bufferSmall, original)
+
+# visualize
+par(mar=c(2,0,0,0))
+plot(original, border='blue')
+plot(buffer10p, border = 'red',add=T)
+plot(bufferSmall2, add=T)
+plot(unioned, col='gray80',border='gray80',add=T)
+legend('bottom',legend = c('original','10 percent','10 km','union'), 
+       col = c('blue','red','black','gray80'), lty=1, ncol=4)
+#plot(unioned, add=T)
+```
+
+## County Analyses
+See how buffer choices affect the number of fully included counties
+
+```{r countyCheck}
+# county shapefile
+tigerDir <- 'S:/Data/GIS_Data/Downloaded/TIGER/TIGER2012/COUNTY'
+tigerName <- 'tl_2012_us_county'
+counties <- readOGR(tigerDir, tigerName, verbose=F)
+counties <- spTransform(counties, CRS(aeaProj))
+
+# subset columns and add 5 digit fips
+columnsToKeep <- c('STATEFP','COUNTYFP','COUNTYNS','NAME')
+counties <- counties[,columnsToKeep]
+counties$fips5 <- paste0(counties$STATEFP, counties$COUNTYFP)
+
+
+# function to return counties 100% within polygons
+getInCounties <- function(aoi0, countyAll, threshold = .999, tolerance = -100){
+  #do a slight negative buffer to avoid line mismatches
+  aoi <- gBuffer(aoi0, width=tolerance)
+  # subset counties by aoi (all counties with any overlap)
+  counties.overlap <- countyAll[aoi,]
+  # crop counties by aoi
+  countyCrop  <- raster::intersect(countyAll, aoi)
+  # find the proportion of each county within the aoi by getting the area of
+  # both and dividing
+  counties.overlap$area_km2 <- round(gArea(counties.overlap, byid=T)/1000000)
+  countyCrop$area_km2 <- round(gArea(countyCrop, byid=T)/1000000)
+  countyCrop$proportion <- countyCrop$area_km2/counties.overlap$area_km2
+  countiesIn <- countyCrop[countyCrop$proportion > threshold,]
+  return(countiesIn)
+}
+
+# get counties by boundary: original
+county.original <- getInCounties(original, counties, threshold=.999)
+nrow(county.original)
+plot(counties[original,], main = 'Original 35 Counties Used')
+plot(original, border = 'blue', add=T)
+plot(county.original, col='red', add=T)
+
+# get counties by boundary: strict untion
+county.union <- getInCounties(unioned, counties, threshold=.999)
+nrow(county.union)
+plot(counties[unioned,], main = 'Unioned Counties: 21')
+plot(unioned, border = 'blue', add=T)
+plot(county.union, col='red', add=T)
+
+# get counties by boundary: smallest consensus buffer
+county.10km <- getInCounties(bufferSmall2, counties, threshold=.999)
+nrow(county.10km)
+plot(counties[bufferSmall2,], main = '10 km buffer Counties: 25')
+plot(bufferSmall2, border = 'blue', add=T)
+plot(county.10km, col='red', add=T)
+
+# get counties by boundary: biggest consensus buffer
+county.10p <- getInCounties(buffer10p, counties, threshold=.999)
+nrow(county.10p)
+plot(counties[buffer10p,], main = '10% buffer Counties: 34')
+plot(buffer10p, border = 'blue', add=T)
+plot(county.10p, col='red', add=T)
+
+# counties combined
+par(mar=c(2,0,0,0))
+plot(county.original, border='green', main = 'County Comparison')
+plot(county.10p, col = 'gray20', add=T)
+plot(county.original, border='green', add=T)
+plot(county.10km, col='blue', add=T)
+plot(county.union, col='red', add=T)
+legend('bottom', legend = c('original','10%','10 km','union'),
+       fill = c('green','gray20','blue','red'), ncol=4)
+```
+
+## Effect of choices
+
