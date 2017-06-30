@@ -1,0 +1,92 @@
+---
+title: "Irrigation Trends - Management Areas"
+author: "Jill Deines"
+date: "June 29, 2017"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Check irrigation trends in NRD's and GMD4, etc
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, 
+               fig.path='figure/6.01_managementAreas/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+library(rgeos)
+library(latticeExtra)
+library(tidyverse) # for ggplot2, tidyr, dplyr
+library(broom)
+library(colorRamps)
+source('functions/stat_smooth_func_all.R')
+source('functions/stat_smooth_func.R')
+```
+
+## Load Data
+
+### RS estimates of irrigated area
+Counts of each class type were tallied for several administrative boundaries in GEE
+
+```{r loadGee}
+cellArea <- 30*30 # m^2
+
+regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test5_regional_county_Stats'
+
+# get filenames
+files <- list.files(regionsDir, pattern="*_test5_randFor_interannual_plusAncillary.csv")
+
+# read in to a single dataframe
+all1 = as.data.frame(do.call(rbind, lapply(files, function(x) {
+              csv1 <- read.csv(paste0(regionsDir,'/',x))
+              csv1$year <- as.numeric(substr(x, start=1,stop=4))
+              return(csv1)
+            })))
+
+# convert cell count to area
+all1$irrigated_m2 <- all1$X1 * cellArea
+all1$irrigated_km2 <- all1$irrigated_m2 / 1000000
+
+# find total #cells in the rrcaExtent
+#all1$totalCells <- all1$X0 + all1$X1 + all1$null
+#all1[all1$masterID == 'rrcaRrbBuffExtent','totalCells'][1]
+```
+
+### Trends by management area
+
+```{r trends, fig.height=6, fig.width=5}
+# extract county data
+nrds <- all1[grepl('NRD', all1$masterID),]
+gmd4 <- all1[grepl('GMD', all1$masterID),]
+rrcaState <- all1[grepl('rrcaBound', all1$masterID),]
+rrbState <- rrcaState <- all1[grepl('_basin$', all1$masterID),]
+
+regions <- rbind(nrds, gmd4, rrcaState, rrbState)
+
+# drop columns
+regions2 <- regions[,c('masterID','year','irrigated_m2','irrigated_km2')]
+
+# run regressions by county
+regionlms <- regions2 %>% 
+  group_by(masterID) %>% 
+  do(model = lm(irrigated_km2 ~ year, data = .))
+
+# tidy up with broom
+coeffs <- regionlms %>% tidy(model)
+coeffs <- coeffs[coeffs$term == 'year',]
+coeffs
+
+ggplot(regions2, aes(x=year,y=irrigated_km2)) +
+  geom_point() +
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 2000, ypos = 5000) + 
+  stat_smooth(method = 'lm', se=F, size=.3, colour='black') +
+  #geom_smooth(method="lm",se=FALSE) +
+  facet_wrap(~masterID, nrow=4) + 
+  ylab('Irrigated Area (km^2)') + 
+  xlab('year') + theme_bw() 
+```
