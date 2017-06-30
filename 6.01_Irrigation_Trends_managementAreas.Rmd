@@ -64,7 +64,7 @@ all1$irrigated_km2 <- all1$irrigated_m2 / 1000000
 nrds <- all1[grepl('NRD', all1$masterID),]
 gmd4 <- all1[grepl('GMD', all1$masterID),]
 rrcaState <- all1[grepl('rrcaBound', all1$masterID),]
-rrbState <- rrcaState <- all1[grepl('_basin$', all1$masterID),]
+rrbState <- all1[grepl('_basin$', all1$masterID),]
 
 regions <- rbind(nrds, gmd4, rrcaState, rrbState)
 
@@ -83,7 +83,7 @@ coeffs
 
 ggplot(regions2, aes(x=year,y=irrigated_km2)) +
   geom_point() +
-  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 2000, ypos = 5000) + 
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 1999, ypos = 4600) + 
   stat_smooth(method = 'lm', se=F, size=.3, colour='black') +
   #geom_smooth(method="lm",se=FALSE) +
   facet_wrap(~masterID, nrow=4) + 
