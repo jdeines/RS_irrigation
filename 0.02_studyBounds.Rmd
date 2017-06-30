@@ -207,7 +207,7 @@ outDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_
 # boundary options
 unioned <- SpatialPolygonsDataFrame(unioned, match.ID=F,
                                          data.frame(name='union'))
-unioned.wgs <- spTransform(unioned, CRS("+proj=longlat +datum=WGS84")
+unioned.wgs <- spTransform(unioned, CRS("+proj=longlat +datum=WGS84"))
 writeOGR(unioned, outDir, 'RRCA_RRB_union_aea', driver='ESRI Shapefile')
 writeOGR(unioned.wgs, outDir, 'RRCA_RRB_union_wgs84', driver='ESRI Shapefile')
 ```
