@@ -24,10 +24,13 @@ library(raster)
 ```
 
 
+
 ## Model boundary: uniform buffer
 This is a new boundary created 6/29/2017 for manuscript revisions. Load RRCA groundwater model boundary and RRB basin boundary, union, then apply a uniform buffer to the full region.
 
 Buffer distances will be calculated using `CRS('+init=epsg:5070'))`, CONUS albers equal area, to be consistent with final map outputs.
+
+Note: The RRCA boundary used here is the HPA Aquifer polygon, manually clipped to the Platte/RRCA model bound in the northern edge, and the RRCA bound in the southern edge, in ArcGIS by J Deines. The purpose of this is to have actual aquifer boundaries along the Eastern, Western, and partial southern borders instead of a boundary based on the 1 mile cells in the RRCA model, with its associated holes and weirdnesses.
 
 ```{r loadBounds}
 gisDir <- 'S:/Users/deinesji/HPA/gis'
@@ -35,7 +38,7 @@ gisDir <- 'S:/Users/deinesji/HPA/gis'
 original <-  readOGR(gisDir, 'BigExtent_RRB_RRCA_buff', verbose=F)
 
 # rrca bound exported from model
-bound <- readOGR(paste0(gisDir,'/RRCA_Model_Export'), 'bound', verbose=F)
+bound <- readOGR(gisDir, 'Aquifer_RRCA_manualClip', verbose=F)
 
 # republican basin
 rrb <- readOGR(gisDir, 'RepBasin', verbose=F)
@@ -46,8 +49,10 @@ bound <- spTransform(bound, CRS(aeaProj))
 rrb <- spTransform(rrb, CRS(aeaProj))
 original <- spTransform(original, CRS(aeaProj))
 
-# union
+# union and keep as spdf
 unioned <- gUnion(bound,rrb)
+unioned <- SpatialPolygonsDataFrame(unioned, match.ID=F,
+                                         data.frame(name='union'))
 
 # buffer options --------------------------------------------------
 # get lateral width
@@ -128,7 +133,7 @@ plot(county.original37, col='red', add=T)
 # get counties by boundary: strict untion
 county.union <- getInCounties(unioned, counties, threshold=.999)
 nrow(county.union)
-plot(counties[unioned,], main = 'Unioned Counties: 21')
+plot(counties[unioned,], main = 'Unioned Counties: 20')
 plot(unioned, border = 'blue', add=T)
 plot(county.union, col='red', add=T)
 
@@ -200,16 +205,67 @@ gArea(buffer10p) * 1e-6
 
 
 ## EXport
+including breaking down some regions by state
+
 ```{r export, eval=FALSE}
 # Export boundaries and county options
 outDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
 
-# boundary options
-unioned <- SpatialPolygonsDataFrame(unioned, match.ID=F,
-                                         data.frame(name='union'))
+# boundary options ---------------------------------------------------------
 unioned.wgs <- spTransform(unioned, CRS("+proj=longlat +datum=WGS84"))
 writeOGR(unioned, outDir, 'RRCA_RRB_union_aea', driver='ESRI Shapefile')
 writeOGR(unioned.wgs, outDir, 'RRCA_RRB_union_wgs84', driver='ESRI Shapefile')
+
+# write out the manually created RRCA bound to Dropbox
+bound.wgs <- spTransform(bound, CRS("+proj=longlat +datum=WGS84"))
+writeOGR(bound, outDir, 'RRCA_manual_aea', driver='ESRI Shapefile')
+writeOGR(bound.wgs, outDir, 'RRCA_manual_wgs84', driver='ESRI Shapefile')
+
+# write out the RRB to Dropbox for completeness
+rrb.wgs <- spTransform(rrb, CRS("+proj=longlat +datum=WGS84"))
+writeOGR(rrb, outDir, 'RRB_aea', driver='ESRI Shapefile')
+writeOGR(rrb.wgs, outDir, 'RRB_wgs84', driver='ESRI Shapefile')
+
+# sub-regions by state ----------------------------------------------------
+# manual RRCA (hpa + RRCA) -----------------
+stateDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile'
+states <- readOGR(stateDir, 'States', verbose=F)
+states <- spTransform(states, CRS(aeaProj))
+rrcastates <- raster::intersect(states, bound)
+rrcastates <- rrcastates[,c('STATE_NAME','STATE_FIPS','STATE_ABBR')]
+
+rrcastates.wgs <- spTransform(rrcastates, CRS("+proj=longlat +datum=WGS84"))
+writeOGR(rrcastates, outDir, 'RRCA_manual_byStates_aea', driver='ESRI Shapefile')
+writeOGR(rrcastates.wgs, outDir, 'RRCA_manual_byStates_wgs84', driver='ESRI Shapefile')
+
+# RRB by state --------------------
+rrbstates <- raster::intersect(states, rrb)
+rrbtail <- gDifference(rrb,bound)
+
+# gut check: splitting KS "upper" and "lower" sections doesn't 100% coincide with 
+# aquifer/non-aquifer
+plot(rrbstates, col='blue',main = 'Non-aquifer RRB in red')
+plot(rrbtail, add=T, col='red')
+plot(bound, add=T)
+
+# regardless, split
+rrbstates2 <- disaggregate(rrbstates)
+rrbstates2$aream2 <- gArea(rrbstates2, byid=T) # check polygon areas
+rrbstates2$areakm2 <-rrbstates2$aream2 * 1e-6
+rrbstates3 <- rrbstates2[rrbstates2$aream2 > 5000,] # remove sliver polygon 
+rrbstates3$STATE_NAME <- as.factor(c('Nebraska','Colorado','Kansas_Upper','Kansas_Lower'))
+
+spplot(rrbstates3, c('STATE_NAME'), col.regions=bpy.colors(4), main='basin split')
+
+#export
+rrbstates3.wgs <- spTransform(rrbstates3, CRS("+proj=longlat +datum=WGS84"))
+writeOGR(rrbstates3, outDir, 'RRB_byState_KS_split_aea', driver='ESRI Shapefile')
+writeOGR(rrbstates3.wgs, outDir, 'RRB_byStates_KS_split_wgs84', driver='ESRI Shapefile')
+
+# RRCA-RRB intersection, by state
+rrca.rrb <- raster::intersect(bound, rrb)
+rrca.rrb.states <- raster::intersect(rrca.rrb, states)
+
 ```
 
 
