@@ -212,31 +212,29 @@ including breaking down some regions by state
 outDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
 
 # boundary options ---------------------------------------------------------
-unioned.wgs <- spTransform(unioned, CRS("+proj=longlat +datum=WGS84"))
+# rrca/rrb union (main study area)
+unioned$masterID <- 'RRCA_RRB_Union'
 writeOGR(unioned, outDir, 'RRCA_RRB_union_aea', driver='ESRI Shapefile')
-writeOGR(unioned.wgs, outDir, 'RRCA_RRB_union_wgs84', driver='ESRI Shapefile')
 
-# write out the manually created RRCA bound to Dropbox
-bound.wgs <- spTransform(bound, CRS("+proj=longlat +datum=WGS84"))
-writeOGR(bound, outDir, 'RRCA_manual_aea', driver='ESRI Shapefile')
-writeOGR(bound.wgs, outDir, 'RRCA_manual_wgs84', driver='ESRI Shapefile')
+# manually created RRCA bound to Dropbox
+bound$masterID <- 'RRCA_modifiedBorders'
+bound <- bound[,c('masterID')]
+writeOGR(bound, outDir, 'RRCA_modified_aea', driver='ESRI Shapefile')
 
-# write out the RRB to Dropbox for completeness
-rrb.wgs <- spTransform(rrb, CRS("+proj=longlat +datum=WGS84"))
+# RRB to Dropbox for completeness
+rrb$masterID <- 'RRB_basin'
 writeOGR(rrb, outDir, 'RRB_aea', driver='ESRI Shapefile')
-writeOGR(rrb.wgs, outDir, 'RRB_wgs84', driver='ESRI Shapefile')
 
 # sub-regions by state ----------------------------------------------------
-# manual RRCA (hpa + RRCA) -----------------
+# manual moddified RRCA (hpa + RRCA) -----------------
 stateDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile'
 states <- readOGR(stateDir, 'States', verbose=F)
 states <- spTransform(states, CRS(aeaProj))
 rrcastates <- raster::intersect(states, bound)
 rrcastates <- rrcastates[,c('STATE_NAME','STATE_FIPS','STATE_ABBR')]
 
-rrcastates.wgs <- spTransform(rrcastates, CRS("+proj=longlat +datum=WGS84"))
-writeOGR(rrcastates, outDir, 'RRCA_manual_byStates_aea', driver='ESRI Shapefile')
-writeOGR(rrcastates.wgs, outDir, 'RRCA_manual_byStates_wgs84', driver='ESRI Shapefile')
+rrcastates$masterID <- c('RRCA_mod_NE', 'RRCA_mod_CO','RRCA_mod_KS')
+writeOGR(rrcastates, outDir, 'RRCA_modified_byState_aea', driver='ESRI Shapefile')
 
 # RRB by state --------------------
 rrbstates <- raster::intersect(states, rrb)
@@ -258,13 +256,16 @@ rrbstates3$STATE_NAME <- as.factor(c('Nebraska','Colorado','Kansas_Upper','Kansa
 spplot(rrbstates3, c('STATE_NAME'), col.regions=bpy.colors(4), main='basin split')
 
 #export
-rrbstates3.wgs <- spTransform(rrbstates3, CRS("+proj=longlat +datum=WGS84"))
+rrbstates3$masterID <- c('RRB_NE_basin','RRB_CO_basin','RRB_KS_upperBasin','RRB_KS_lowerBasin')
+rrbstates3 <- rrbstates3[,c('masterID','STATE_ABBR','STATE_FIPS','areakm2')]
 writeOGR(rrbstates3, outDir, 'RRB_byState_KS_split_aea', driver='ESRI Shapefile')
-writeOGR(rrbstates3.wgs, outDir, 'RRB_byStates_KS_split_wgs84', driver='ESRI Shapefile')
 
-# RRCA-RRB intersection, by state
+
+# RRCA-RRB intersection, by state -------------
 rrca.rrb <- raster::intersect(bound, rrb)
 rrca.rrb.states <- raster::intersect(rrca.rrb, states)
+
+# platte area of the rrca ---------------------
 
 ```
 
