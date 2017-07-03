@@ -21,6 +21,7 @@ opts_chunk$set(cache=TRUE,
 library(rgdal)
 library(rgeos)
 library(raster)
+library(maptools)
 ```
 
 
@@ -297,22 +298,29 @@ NEplatte2 <- disaggregate(NEplatte)
 NEplatte2$areakm2 <- gArea(NEplatte2, byid=T)
 NEplatte3 <- NEplatte2[NEplatte2$areakm2 > 1e3,]
 
-# look at Driver Analysis Regions? ---------------------
+#writeOGR(NEplatte3, outDir, 'RRCA-nePlatte-noRRB_aea', driver='ESRI Shapefile')
 
-# KS gw
+# KS RRCA, Upper ----------------------------------------------
+# prep KS gw polygon for GMD4 region/upper
 KS.gw.up <- rrcastates[rrcastates$masterID == 'RRCA_mod_KS',]
 KS.gw.up2 <- disaggregate(KS.gw.up)
 KS.gw.up2$areakm2 <- gArea(KS.gw.up2, byid=T) * 1e-6
 KS.gw.up3 <- KS.gw.up2[KS.gw.up2$areakm2 > 100,]
+KS.gw.up3 <- KS.gw.up3[,c('masterID','areakm2')]
 
+#writeOGR(KS.gw.up3, outDir, 'RRCA-KS-upperOnly_aea', driver='ESRI Shapefile')
+
+# crazy plot of main areas  ---------------------
 plot(rrbstates3, border='white', main = 'Analysis Regions')
-plot(rrca.rrb.states[rrca.rrb.states$STATE_ABBR == 'NE',], add=T, col='blue')
+plot(rrbstates3[rrbstates3$STATE_ABBR == 'NE',], add=T, col = 'blue')
+plot(rrca.rrb.states[rrca.rrb.states$STATE_ABBR == 'NE',], add=T, col='lightblue')
+plot(rrbstates3[rrbstates3$masterID == 'RRB_KS_lowerBasin',], add=T, col='orange')
 plot(KS.gw.up3, add=T, col = 'purple')
 plot(rrca.rrb.states[rrca.rrb.states$STATE_ABBR == 'KS',], add=T, col='purple4')
 plot(rrcastates[rrcastates$STATE_ABBR == 'CO',], add=T, col='green4')
 plot(rrca.rrb.states[rrca.rrb.states$STATE_ABBR == 'CO',], add=T, col='green')
 plot(NEplatte3, add=T, col='yellow')
-plot(rrbstates3[rrbstates3$masterID == 'RRB_KS_lowerBasin',], add=T, col='orange')
+
 
 ```
 
