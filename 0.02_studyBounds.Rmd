@@ -9,6 +9,8 @@ output:
 
 Goal: Document full production of study area boundary, and evaluate the number of counties various options include for a robust county validation. This aggregates study bound polygon generation from several sources prior to manuscript revisions. It also incorporates the area calculations from the old 0.01_polygonAreaFinder.R script.
 
+Also generates an aggregated 4km grid to summarize irrigated trends for, instead of counties, for Figure 4.
+
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
 opts_chunk$set(cache=TRUE,
@@ -85,7 +87,7 @@ legend('bottom',legend = c('original','10 percent','10 km','union'),
 #plot(unioned, add=T)
 ```
 
-## County Analyses
+### County Analyses
 See how buffer choices affect the number of fully included counties
 
 ```{r countyCheck}
@@ -180,7 +182,7 @@ write.csv(fips, paste0(outDir,'/boundary_options_fips_for_contained_countyies.cs
           row.names=F)
 ```
 
-## Areal Comparisons
+### Areal Comparisons
 Compare study areas (since mapping a large area is part of our novelty). Calculates are in AEA conus, as maps are presented
 
 ```{r areas}
@@ -205,7 +207,7 @@ gArea(buffer10p) * 1e-6
 
 
 
-## EXport
+### EXport
 including breaking down some regions by state
 
 ```{r export}
@@ -320,8 +322,104 @@ plot(rrca.rrb.states[rrca.rrb.states$STATE_ABBR == 'KS',], add=T, col='purple4')
 plot(rrcastates[rrcastates$STATE_ABBR == 'CO',], add=T, col='green4')
 plot(rrca.rrb.states[rrca.rrb.states$STATE_ABBR == 'CO',], add=T, col='green')
 plot(NEplatte3, add=T, col='yellow')
-
-
 ```
 
+
+## 4 km/ 8 km grids for trend analyses
+Create gridded polygons for analysis of irrigation trends over time, to use large regular grid cells instead of irregular county boundaries.
+
+```{r bigGrids}
+aeaProj <- '+init=epsg:5070'
+
+# load the original uneven buffered extent 
+shapeDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile'
+uneven <- readOGR(shapeDir, 'BigExtent_RRB_RRCA_buff', verbose=F)
+uneven <- spTransform(uneven, CRS(aeaProj))
+
+# and unioned 
+boundDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
+unioned <- readOGR(boundDir, 'RRCA_RRB_union_aea', verbose=F)
+
+# 4 km grid using uneven extent
+grid4km <- raster(res = 4000, ext=extent(uneven), 
+                  crs=proj4string(uneven))
+grid4km[] <- runif(13363, 0, 400)
+plot(grid4km, main='4 km grid', legend=F)
+plot(uneven, add=T)
+
+grid4.union <- crop(grid4km, unioned)
+grid4.union.masked <- mask(grid4.union, unioned)
+plot(grid4.union.masked, '4 km grid, masked', legend=F)
+plot(unioned, add=T)
+
+# 8 km grid using uneven extent
+grid8km <- raster(res = 8000, ext=extent(uneven), 
+                  crs=proj4string(uneven))
+grid8km[] <- runif(3321, 0, 400)
+plot(grid8km, main='8 km grid', legend=F)
+plot(uneven, add=T)
+
+grid8.union <- crop(grid8km, unioned)
+grid8.union.masked <- mask(grid8.union, unioned)
+plot(grid8.union.masked, '8 km grid, masked', legend=F)
+plot(unioned, add=T)
+
+# 12 km grid, because why not
+grid12km <- raster(res = 12000, ext=extent(uneven), 
+                  crs=proj4string(uneven))
+grid12km[] <- runif(1512, 0, 400)
+plot(grid12km, main='12 km grid', legend=F)
+plot(uneven, add=T)
+
+grid12.union <- crop(grid12km, unioned)
+grid12.union.masked <- mask(grid12.union, unioned)
+plot(grid12.union.masked, '12 km grid, masked', legend=F)
+plot(unioned, add=T)
+```
+
+I think I'll make the final decision on resolution size on the trend calculates, so make polygon gets for all 3 options
+
+```{r polyNets}
+# function to extract grid cells covering the study area
+# crops cells to study boundary
+# adds attributes to cells for cells 100% contained within buffer
+gridToPoly <- function(rasterGrid, boundary){
+  # raster to poly
+  polynet <- rasterToPolygons(rasterGrid)
+  # crop to study buffered boundary 
+  polycrop <- raster::intersect(polynet, boundary)
+  # add a cell area column, to subset incomplete cells downstream
+  polycrop$area.m2 <- round(gArea(polycrop, byid=T))
+  # cell area criteria
+  theoryArea <- res(rasterGrid)[1]*res(rasterGrid)[2]
+  areaCriteria <- theoryArea - 1
+  polycrop$contained <- polycrop$area.m2 > areaCriteria
+  # add a unique ID
+  polycrop$polyID <- 1:nrow(polycrop)
+  polyout <- polycrop[,c('contained','area.m2','polyID')]
+}
+
+# 4 k
+poly4 <- gridToPoly(grid4km, uneven)
+plot(poly4, main = '4 km polygons')
+plot(poly4[poly4$contained == TRUE,], add=T, col='red')
+plot(unioned, add=T)
+writeOGR(poly4, boundDir, 'Polynet_4km_aea', driver='ESRI Shapefile')
+
+# 8 k
+poly8 <- gridToPoly(grid8km, uneven)
+plot(poly8, main = '8 km polygons')
+plot(poly8[poly8$contained == TRUE,], add=T, col='red')
+plot(unioned, add=T)
+writeOGR(poly8, boundDir, 'Polynet_8km_aea', driver='ESRI Shapefile')
+
+# 4 k
+poly12 <- gridToPoly(grid12km, uneven)
+plot(poly12, main = '12 km polygons')
+plot(poly12[poly12$contained == TRUE,], add=T, col='red')
+plot(unioned, add=T)
+writeOGR(poly12, boundDir, 'Polynet_12km_aea', driver='ESRI Shapefile',
+         layer_options = 'RESIZE=YES')
+
+```
 
