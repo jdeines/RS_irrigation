@@ -62,8 +62,7 @@ loadStats <- function(fileList){
 all1 = loadStats(files)
 
 # remove county data 
-# remove county data
-all1 <- all1[!grepl('county', all1$masterID),]
+all1 <- all1[!grepl('county', all1$masterid),]
 
 
 # find total #cells in the rrcaExtent
@@ -284,16 +283,16 @@ early <- read.csv(paste0(yearsDir, '/', 'test5_randFor_earliest_revisionBoundari
 late <- read.csv(paste0(yearsDir, '/', 'test5_randFor_latest_revisionBoundaries_regionCounts.csv'))
 
 # remove county data
-early <- early[!grepl('county', early$masterID),]
-late <- late[!grepl('county', late$masterID),]
+early <- early[!grepl('county', early$masterid),]
+late <- late[!grepl('county', late$masterid),]
 
 # gather year-count columns into 1 column
 early.long <- gather(early, key = year, value = count, X1999:X2015)
 late.long <- gather(late, key = year, value = count, X2000:X2016)
 
 # remove junk columns
-early.long <- early.long[,c('masterID','year','count')]
-late.long <- late.long[,c('masterID','year','count')]
+early.long <- early.long[,c('masterid','year','count')]
+late.long <- late.long[,c('masterid','year','count')]
 
 # convert year column to numeric
 early.long$year <- as.numeric(substr(early.long$year, 2,5))
@@ -312,7 +311,7 @@ Make a long format data frame with total irrigated area, novel area each year, l
 
 ```{r combine}
 # reformat total area data ------------------
-all <- all1[,c('masterID','year','irrigated_m2','irrigated_km2')]
+all <- all1[,c('masterid','year','irrigated_m2','irrigated_km2')]
 names(all)[3:4] <- c('area_m2', 'area_km2')
 all$dataset <- 'total'
 
@@ -321,7 +320,7 @@ all$dataset <- 'total'
 early.long$dataset <- 'novel'
 late.long$dataset <- 'retired'
 
-columnsWanted <- c('masterID', 'year', 'area_m2', 'area_km2', 'dataset')
+columnsWanted <- c('masterid', 'year', 'area_m2', 'area_km2', 'dataset')
 # early, drop first years
 early2 <- early.long[!(early.long$year %in% c(1999,2000,2001)),
                        columnsWanted]
@@ -339,16 +338,16 @@ combined <- rbind(all, early2, late2)
 RRB + RRCA + buffer
 
 ```{r fullExtent_novelRetired}
-ggplot(data = combined[combined$masterID == 'rrcaRrbBuffExtent',],
+ggplot(data = combined[combined$masterid == 'rrcaRrbBuffExtent',],
        aes(x = year, y = area_km2, colour = dataset)) +
     geom_line() + geom_point() +
     ylab(expression(paste("Irrigated Area (", km^2," )"))) +
     xlab('Year') + ggtitle('Full Region') + 
     theme_bw()
 
-ggplot(data = combined[grepl('full', combined$masterID),],
+ggplot(data = combined[grepl('full', combined$masterid),],
        aes(x = year, y = area_km2, colour = dataset)) + 
-    facet_wrap( ~ masterID) +
+    facet_wrap( ~ masterid) +
     geom_line() + geom_point() +
     ylab(expression(paste("Irrigated Area (", km^2," )"))) +
     xlab('Year') + ggtitle('Full Region by State') +
@@ -357,26 +356,33 @@ ggplot(data = combined[grepl('full', combined$masterID),],
 
 Dave and Anthony requested a plot with cumulative novel and retired areas
 
-```{r fullExtent_novelRetired_cumulative_nogrid, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
+```{r fullExtent_novelRetired_cumulative_nogrid_allRegions, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
 # extract regions to plot
-regionsWanted <- c('')
+regionsWanted <- c('RRB_KS_lowerBasin','Platte-NE_RRCA','RRB_KS_upperBasin',
+                   'RRB_CO_basin','RRB_NE_basin','RRCA_mod_CO', 'RRCA_mod_KS')
+
+regions <- combined[combined$masterid %in% regionsWanted,]
 
 # make a cumulative sum column by dataset type
-combined <- combined %>%
-  group_by(masterID, dataset) %>%
+regions <- regions %>%
+  group_by(masterid, dataset) %>%
   arrange(year) %>%
   mutate(cumArea_km2 = cumsum(area_km2))
 
 # make a column to plot that has raw data for total, cumulative for novel/retired
-combined$toPlot <- NA
-combined[combined$dataset == 'total','toPlot'] <- combined[combined$dataset == 'total','area_km2']
-combined[combined$dataset == 'novel','toPlot'] <- combined[combined$dataset == 'novel','cumArea_km2']
-combined[combined$dataset == 'retired','toPlot'] <- combined[combined$dataset == 'retired','cumArea_km2']
+regions$toPlot <- NA
+regions[regions$dataset == 'total','toPlot'] <- regions[regions$dataset == 'total','area_km2']
+regions[regions$dataset == 'novel','toPlot'] <- regions[regions$dataset == 'novel','cumArea_km2']
+regions[regions$dataset == 'retired','toPlot'] <- regions[regions$dataset == 'retired','cumArea_km2']
 
 # plotty plot
-labels <- c(`CO_full_RRCA` = 'Colorado (CO)',
-            `KS_full_RRCA` = 'Kansas (KS)',
-            `NE_full_RRCA` = 'Nebraska (NE)')
+labels <- c(`RRB_KS_lowerBasin` = 'KS RRB (lower)',
+            `Platte-NE_RRCA` = 'Platte RRCA',
+            `RRB_KS_upperBasin` = 'KS RRB (upper)',
+            `RRB_CO_basin` = 'CO RRB',
+            `RRB_NE_basin` = 'NE RRB',
+            `RRCA_mod_CO` = 'CO RRCA',
+            `RRCA_mod_KS` = 'KS RRCA')
 
 ## legend at the top
 # ggplot(data = stateExtent,
@@ -392,9 +398,9 @@ labels <- c(`CO_full_RRCA` = 'Colorado (CO)',
 #     theme_bw() +
 #     theme(legend.position = 'top') 
 
-ggplot(data = stateExtent,
+ggplot(data = regions,
        aes(x = year, y = toPlot, colour = dataset)) + 
-    facet_wrap( ~ masterID, labeller = as_labeller(labels)) +
+    facet_wrap( ~ masterid, labeller = as_labeller(labels)) +
     geom_line() + geom_point() +
     ylab(expression(paste("Irrigated Area (", km^2,")"))) +
     xlab('Year') + #ggtitle('Full Region by State') +
@@ -404,7 +410,7 @@ ggplot(data = stateExtent,
                          values=c('red','blue','black')) +
     guides(color=guide_legend(title=NULL)) +
     theme_bw() +
-    theme(legend.position = c(.85,.5),
+    theme(legend.position = c(.85,.18),
           axis.text=element_text(size=10),
                      legend.text=element_text(size=10),
                      legend.title = element_text(size=10),
@@ -412,12 +418,57 @@ ggplot(data = stateExtent,
            panel.grid.major = element_blank(),
              panel.grid.minor = element_blank())
 
+# large regions
+regionsWanted1 <- c('RRCA_RRB_Union','RRCA_modifiedBorders','RRB_basin',
+                   'RRCARRB_intersection','rrcaRrbBuffExtent')
+largeRegions <- combined[combined$masterid %in% regionsWanted1,]
+
+# make a cumulative sum column by dataset type
+largeRegions <- largeRegions %>%
+  group_by(masterid, dataset) %>%
+  arrange(year) %>%
+  mutate(cumArea_km2 = cumsum(area_km2))
+
+# make a column to plot that has raw data for total, cumulative for novel/retired
+largeRegions$toPlot <- NA
+largeRegions[largeRegions$dataset == 'total','toPlot'] <- largeRegions[largeRegions$dataset == 'total','area_km2']
+largeRegions[largeRegions$dataset == 'novel','toPlot'] <- largeRegions[largeRegions$dataset == 'novel','cumArea_km2']
+largeRegions[largeRegions$dataset == 'retired','toPlot'] <- largeRegions[largeRegions$dataset == 'retired','cumArea_km2']
+
+# plotty plot
+labels2 <- c(`RRCA_RRB_Union` = 'RRCA + RRB',
+            `RRCA_modifiedBorders` = 'RRCA',
+            `RRB_basin` = 'RRB basin',
+            `RRCARRB_intersection` = 'RRCA RRB clip',
+            `rrcaRrbBuffExtent` = 'Full Buffered')
 
 
+
+ggplot(data = largeRegions,
+       aes(x = year, y = toPlot, colour = dataset)) + 
+    facet_wrap( ~ masterid, labeller = as_labeller(labels2)) +
+    geom_line() + geom_point() +
+    ylab(expression(paste("Irrigated Area (", km^2,")"))) +
+    xlab('Year') + #ggtitle('Full Region by State') +
+    scale_color_manual(breaks=c('total','novel','retired'),
+                         labels=c('total', 'cumulative novel',
+                                  'cumulative retired'),
+                         values=c('red','blue','black')) +
+    guides(color=guide_legend(title=NULL)) +
+    theme_bw() +
+    theme(legend.position = c(.85,.25),
+          axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     legend.title = element_text(size=10),
+                     axis.title=element_text(size=11),
+           panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank())
 ```
 
 And a plot of just retired/novel fields over time
-```{r fullExtent_novelRetired_alone, fig.height = 2.5, fig.width = 6.5}
+Not run do to changes away from 'stateExtent' variable
+
+```{r fullExtent_novelRetired_alone, fig.height = 2.5, fig.width = 6.5, eval=FALSE}
 # remove total from dataset
 stateExtent2 <- stateExtent[stateExtent$dataset != 'total',]
 
@@ -440,8 +491,10 @@ ggplot(data = stateExtent2,
 #### Numerical breakdowns
 Growth as a percentage of irrigated area, net new fields compared to irrigated area increases...
 
+NEEDS TO BE RE-DONE WITH FINAL FIGURE 4 REGIONS
+
 ```{r numerology}
-stateData <- combined[grepl('full', combined$masterID),]
+stateData <- combined[grepl('full', combined$masterid),]
 
 # by state, growth as a percentage of 1999 area
 percentage <- stateData[stateData$dataset == 'total' &
