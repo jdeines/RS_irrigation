@@ -16,7 +16,7 @@ Derived datasets produced:
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
-opts_chunk$set(cache=TRUE, cache.path = 'cache/6.02_gridTrends/'
+opts_chunk$set(cache=TRUE, cache.path = 'cache/6.02_gridTrends/',
                fig.path='figure/6.02_irrTrends_test5annual_grids/')
 ```
 
@@ -61,6 +61,11 @@ loadStats <- function(fileList){
 
 all1 = loadStats(files)
 
+# remove county data 
+# remove county data
+all1 <- all1[!grepl('county', all1$masterID),]
+
+
 # find total #cells in the rrcaExtent
 #all1$totalCells <- all1$X0 + all1$X1 + all1$null
 #all1[all1$masterID == 'rrcaRrbBuffExtent','totalCells'][1]
@@ -73,10 +78,13 @@ files8 <- list.files(regionsDir, pattern="*_test5_randFor_interannual_plusAncill
 
 files12 <- list.files(regionsDir, pattern="*_test5_randFor_interannual_plusAncillary_POLYGRID_12km.csv")
 
+files20 <- list.files(regionsDir, pattern="*_test5_randFor_interannual_plusAncillary_POLYGRID_20km.csv")
+
 # read in to a single dataframe, while dropping the "dummy" row
 all4 <- loadStats(files4)[-1,]
 all8 <- loadStats(files8)[-1,]
 all12 <- loadStats(files12)[-1,]
+all20 <- loadStats(files20)[-1,]
 ```
 
 ### Gridded Trends
@@ -127,89 +135,141 @@ gisDir <- "C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_
 grid4 <-  readOGR(gisDir, 'Polynet_4km_aea', verbose=F)
 grid8 <-  readOGR(gisDir, 'Polynet_8km_aea', verbose=F)
 grid12 <- readOGR(gisDir, 'Polynet_12km_aea', verbose=F)
+grid20 <- readOGR(gisDir, 'Polynet_20km_aea', verbose=F)
 # get union bounds
-union <- readOGR(gisDir, 'RRCA_RRB_union_aea', verbose=F)
+unioned <- readOGR(gisDir, 'RRCA_RRB_union_aea', verbose=F)
 
+# other bounds
+KS <- readOGR(gisDir, 'RRCA-KS-upperOnly_aea', verbose=F)
+rrbstates <- readOGR(gisDir, 'RRB_byState_KS_split_aea', verbose=F)
+neKsLower <- rrbstates[rrbstates$masterID != 'RRB_KS_upperBasin',]
 
 # plot specs
-pal <- matlab.like(16)
-# give a starkly different color for declining counties
-origPal <- pal
-origPal[1] <- 'black'
+origPal <- matlab.like(16)
+
 ```
 
+```{r gridRegress20, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
+# run lms by grid cell: in km^2
+poly20 <- getSpatialRegression(all20, grid20, p=0.05, normalize=FALSE)
+poly20.union <- raster::intersect(poly20, unioned)
+
+# run lms by grid cell: in percent area
+poly20.P <- getSpatialRegression(all20, grid20, p=0.05, normalize=TRUE)
+poly20.P.union <- raster::intersect(poly20.P, unioned)
+
+# plot! - absolute area
+spplot(poly20, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
+       main = 'Absolute area, 20 km grid', lwd=0.1) 
+spplot(poly20.union, 'sigCoeffs', col.regions=origPal,
+       colorkey=list(space='bottom'),
+       main = 'Absolute area, 20 km grid', lwd=0.1) 
+
+# plot! - percent area
+spplot(poly20.P, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
+       main = 'Percent area, 20 km grid', lwd=0.1) 
+spplot(poly20.P.union, 'sigCoeffs', col.regions=origPal,
+       colorkey=list(space='bottom'),
+       main = 'Percent area, 20 km grid', lwd=0.1)  
+
+spplot(poly20.P.union, 'estimate', col.regions=origPal,
+       colorkey=list(space='bottom'), lwd=.05,
+       main = 'Percent area, 20 km grid, all sig')
+``` 
 
 ```{r gridRegress12, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
 # run lms by grid cell: in km^2
 poly12 <- getSpatialRegression(all12, grid12, p=0.05, normalize=FALSE)
-poly12.union <- raster::intersect(poly12, union)
+poly12.union <- raster::intersect(poly12, unioned)
 
 # run lms by grid cell: in percent area
 poly12.P <- getSpatialRegression(all12, grid12, p=0.05, normalize=TRUE)
-poly12.P.union <- raster::intersect(poly12.P, union)
+poly12.P.union <- raster::intersect(poly12.P, unioned)
 
 # plot! - absolute area
 spplot(poly12, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
-       main = 'Absolute area, 12 km grid') 
+       main = 'Absolute area, 12 km grid', lwd=.1) 
 spplot(poly12.union, 'sigCoeffs', col.regions=origPal,
        colorkey=list(space='bottom'),
-       main = 'Absolute area, 12 km grid') 
+       main = 'Absolute area, 12 km grid', lwd=.1) 
 
 # plot! - percent area
 spplot(poly12.P, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
-       main = 'Percent area, 12 km grid') 
+       main = 'Percent area, 12 km grid', col=NA, lwd=.1) 
 spplot(poly12.P.union, 'sigCoeffs', col.regions=origPal,
-       colorkey=list(space='bottom'),
-       main = 'Percent area, 12 km grid') 
+       colorkey=list(space='bottom'), lwd=.1,
+       main = 'Percent area, 12 km grid') +
+  latticeExtra::layer(sp.polygons(KS,col='forestgreen')) +
+  latticeExtra::layer(sp.polygons(neKsLower,col=c('blue','black','red')))
+
+spplot(poly12.P, 'estimate', col.regions=origPal,
+       colorkey=list(space='bottom'), lwd=.05,
+       main = 'Percent area, 12 km grid, all sig') +
+  latticeExtra::layer(sp.polygons(KS,col='forestgreen')) +
+  latticeExtra::layer(sp.polygons(neKsLower,col=c('blue','black','red')))
 ``` 
 
 
 ```{r gridRegress8, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
 # run lms by grid cell: in km^2
 poly8 <- getSpatialRegression(all8, grid8, p=0.05, normalize=FALSE)
-poly8.union <- raster::intersect(poly8, union)
+poly8.union <- raster::intersect(poly8, unioned)
 
 # run lms by grid cell: in percent area
 poly8.P <- getSpatialRegression(all8, grid8, p=0.05, normalize=TRUE)
-poly8.P.union <- raster::intersect(poly8.P, union)
+poly8.P.union <- raster::intersect(poly8.P, unioned)
 
 # plot! - absolute area
 spplot(poly8, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
-       main = 'Absolute area, 8 km grid') 
+       main = 'Absolute area, 8 km grid', lwd=.1) 
 spplot(poly8.union, 'sigCoeffs', col.regions=origPal,
        colorkey=list(space='bottom'),
-       main = 'Absolute area, 8 km grid') 
+       main = 'Absolute area, 8 km grid', lwd=.1) 
 
 # plot! - percent area
 spplot(poly8.P, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
-       main = 'Percent area, 8 km grid') 
+       main = 'Percent area, 8 km grid', lwd=.1) 
 spplot(poly8.P.union, 'sigCoeffs', col.regions=origPal,
        colorkey=list(space='bottom'),
-       main = 'Percent area, 8 km grid') 
+       main = 'Percent area, 8 km grid', lwd=.1)
+
+spplot(poly8.P.union, 'estimate', col.regions=origPal,
+       colorkey=list(space='bottom'), lwd=.05,
+       main = 'Percent area, 8 km grid, all sig') 
 ``` 
 
 ```{r gridRegress4, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
 # run lms by grid cell: in km^2
 poly4 <- getSpatialRegression(all4, grid4, p=0.05, normalize=FALSE)
-poly4.union <- raster::intersect(poly4, union)
+poly4.union <- raster::intersect(poly4, unioned)
 
 # run lms by grid cell: in percent area
 poly4.P <- getSpatialRegression(all4, grid4, p=0.05, normalize=TRUE)
-poly4.P.union <- raster::intersect(poly4.P, union)
+poly4.P.union <- raster::intersect(poly4.P, unioned)
 
 # plot! - absolute area
 spplot(poly4, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
-       main = 'Absolute area, 4 km grid') 
+       main = 'Absolute area, 4 km grid', lwd=.1) 
 spplot(poly4.union, 'sigCoeffs', col.regions=origPal,
        colorkey=list(space='bottom'),
-       main = 'Absolute area, 4 km grid') 
+       main = 'Absolute area, 4 km grid', lwd=.1) 
 
 # plot! - percent area
 spplot(poly4.P, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
-       main = 'Percent area, 4 km grid') 
+       main = 'Percent area, 4 km grid', lwd=.1) 
 spplot(poly4.P.union, 'sigCoeffs', col.regions=origPal,
-       colorkey=list(space='bottom'),
+       colorkey=list(space='bottom'), lwd=.1,
        main = 'Percent area, 4 km grid') 
+
+# plot: all cells
+spplot(poly4.P.union, 'estimate', col.regions=origPal,
+       colorkey=list(space='bottom'), lwd=.05,
+       main = 'Percent area, 4 km grid, all sig') 
+
+# plot: all cells
+spplot(poly4.P.union, 'estimate', col.regions=origPal,
+       colorkey=list(space='bottom'), col=NA,
+       main = 'Percent area, 4 km grid, all sig') 
 ``` 
 
 ### Novel/Retired Irrigated Area by year
@@ -220,14 +280,14 @@ cellArea <- 30*30 # m^2
 yearsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/earliestLatestTable'
 
 # load 
-early <- read.csv(paste0(yearsDir, '/', 'test5_randFor_earliest_regionCounts.csv'))
-late <- read.csv(paste0(yearsDir, '/', 'test5_randFor_latest_regionCounts.csv'))
+early <- read.csv(paste0(yearsDir, '/', 'test5_randFor_earliest_revisionBoundaries_regionCounts.csv'))
+late <- read.csv(paste0(yearsDir, '/', 'test5_randFor_latest_revisionBoundaries_regionCounts.csv'))
 
 # remove county data
 early <- early[!grepl('county', early$masterID),]
 late <- late[!grepl('county', late$masterID),]
 
-# gather year-county columns into 1 column
+# gather year-count columns into 1 column
 early.long <- gather(early, key = year, value = count, X1999:X2015)
 late.long <- gather(late, key = year, value = count, X2000:X2016)
 
@@ -273,8 +333,6 @@ late2 <- late.long[!(late.long$year %in% c(2014,2015,2016)),
 combined <- rbind(all, early2, late2)
 ```
 
-
-
 ## Plot Novel/Retired over time
 
 ### full study extent
@@ -300,20 +358,20 @@ ggplot(data = combined[grepl('full', combined$masterID),],
 Dave and Anthony requested a plot with cumulative novel and retired areas
 
 ```{r fullExtent_novelRetired_cumulative_nogrid, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
-# extract dataset: full study extent, by state
-stateExtent <- combined[grepl('full', combined$masterID),]
+# extract regions to plot
+regionsWanted <- c('')
 
 # make a cumulative sum column by dataset type
-stateExtent <- stateExtent %>%
+combined <- combined %>%
   group_by(masterID, dataset) %>%
   arrange(year) %>%
   mutate(cumArea_km2 = cumsum(area_km2))
 
 # make a column to plot that has raw data for total, cumulative for novel/retired
-stateExtent$toPlot <- NA
-stateExtent[stateExtent$dataset == 'total','toPlot'] <- stateExtent[stateExtent$dataset == 'total','area_km2']
-stateExtent[stateExtent$dataset == 'novel','toPlot'] <- stateExtent[stateExtent$dataset == 'novel','cumArea_km2']
-stateExtent[stateExtent$dataset == 'retired','toPlot'] <- stateExtent[stateExtent$dataset == 'retired','cumArea_km2']
+combined$toPlot <- NA
+combined[combined$dataset == 'total','toPlot'] <- combined[combined$dataset == 'total','area_km2']
+combined[combined$dataset == 'novel','toPlot'] <- combined[combined$dataset == 'novel','cumArea_km2']
+combined[combined$dataset == 'retired','toPlot'] <- combined[combined$dataset == 'retired','cumArea_km2']
 
 # plotty plot
 labels <- c(`CO_full_RRCA` = 'Colorado (CO)',
