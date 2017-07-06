@@ -16,7 +16,7 @@ Derived datasets produced:
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
-opts_chunk$set(cache=FALSE, 
+opts_chunk$set(cache=TRUE, cache.path = 'cache/6.02_gridTrends/'
                fig.path='figure/6.02_irrTrends_test5annual_grids/')
 ```
 
@@ -82,86 +82,135 @@ all12 <- loadStats(files12)[-1,]
 ### Gridded Trends
 run regressions to get change in area over time (slope) per grid cell. Three resolution options (4km, 8km, 12km)
 
-```{r gridRegress_fun, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
-# load spatial bits
-gisDir <- "C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES"
-grid4 <-  readOGR(gisDir, 'Polynet_4km_aea', verbose=F)
-grid8 <-  readOGR(gisDir, 'Polynet_8km_aea', verbose=F)
-grid12 <- readOGR(gisDir, 'Polynet_12km_aea', verbose=F)
-
-# get union bounds
-union <- readOGR(gisDir, 'RRCA_RRB_union_aea', verbose=F)
+```{r gridRegress_fun}
 
 # function to get regression coefficients for each cell
-getLmCoeffs <- function(dataset, polygrid, normalize=TRUE){
+getSpatialRegression <- function(dataset, polygrid, p = 0.05, normalize=TRUE){
   # drop columns
   data1 <- dataset[,c('polyid','year','irrigated_m2','irrigated_km2','contained',
                       'area_m2')]
   # remove NAs
   data1 <- data1[!is.na(data1$irrigated_m2),]
   # normalize areal data
-  data1$perc_irr <- data1$irrigated_m2/data1$area_m2
+  data1$perc_irr <- (data1$irrigated_m2/data1$area_m2) * 100
   
   # run regressions by polygon
   if(normalize == TRUE){
     data1 <- data1[!is.na(data1$perc_irr),]
     lms <- data1 %>% 
       group_by(polyid) %>% 
-      do(model = lm(irrigated_m2 ~ year, data = .))
-  } else {}  # use raw data
+      do(model = lm(perc_irr ~ year, data = .))
+  } else if (normalize == FALSE) {  # use raw data
     lms <- data1 %>% 
     group_by(polyid) %>% 
     do(model = lm(irrigated_km2 ~ year, data = .))
- }
-    # tidy up with broom
+  }
+  # tidy up with broom
   coeffs <- lms %>% tidy(model)
   coeffs <- coeffs[coeffs$term == 'year',]
-  return(coeffs)
   # merge coefficients with grid polygons
-  poly <- merge(polygrid, coeffs[,c('polyid','estimate','p.value')])
-  # r
+  polygrid$polyid <- as.character(polygrid$polyID)
+  coeffs$polyid <- as.character(coeffs$polyid)
+  poly <- sp::merge(polygrid, coeffs[,c('polyid','estimate','p.value')])
+  # just sig trends
+  poly[is.na(poly$p.value),'p.value'] <- 1 # dummy p value no data county
+  poly$sigCoeffs <- poly$estimate
+  poly[poly$p.value >= p, 'sigCoeffs'] <- NA
+  return(poly)
 } 
 
+```
+
+```{r gridPrep}
+# load spatial bits
+gisDir <- "C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES"
+grid4 <-  readOGR(gisDir, 'Polynet_4km_aea', verbose=F)
+grid8 <-  readOGR(gisDir, 'Polynet_8km_aea', verbose=F)
+grid12 <- readOGR(gisDir, 'Polynet_12km_aea', verbose=F)
+# get union bounds
+union <- readOGR(gisDir, 'RRCA_RRB_union_aea', verbose=F)
 
 
-
-# join the regression slopes
-countymap <- merge(cnty, coeffs[,c('fips5','estimate','p.value')])
-
-# or just significant trends
-countymap[is.na(countymap$p.value),'p.value'] <- 1 # dummy p value no data county
-countymap$sigCoeffs <- countymap$estimate
-countymap[countymap$p.value >= 0.05, 'sigCoeffs'] <- NA
-
-# plot!
+# plot specs
 pal <- matlab.like(16)
-# spplot(countymap, 'sigCoeffs', col.regions=pal) +
-#   #latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
-
 # give a starkly different color for declining counties
 origPal <- pal
 origPal[1] <- 'black'
-spplot(countymap, 'sigCoeffs', col.regions=origPal, colorkey = list(space='bottom')) #+
- # latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
-
-# # a map with all counties regardless of significance
-# origPal2 <- origPal
-# origPal2[2] <- 'black'
-# spplot(countymap, 'estimate', col.regions=origPal2) +
-#   latticeExtra::layer(sp.polygons(states, col='black', lwd=2))
 ```
 
-Which counties have greatest variance over time?
 
-```{r countyVar}
-# which counties are most stable?
+```{r gridRegress12, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
+# run lms by grid cell: in km^2
+poly12 <- getSpatialRegression(all12, grid12, p=0.05, normalize=FALSE)
+poly12.union <- raster::intersect(poly12, union)
+
+# run lms by grid cell: in percent area
+poly12.P <- getSpatialRegression(all12, grid12, p=0.05, normalize=TRUE)
+poly12.P.union <- raster::intersect(poly12.P, union)
+
+# plot! - absolute area
+spplot(poly12, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
+       main = 'Absolute area, 12 km grid') 
+spplot(poly12.union, 'sigCoeffs', col.regions=origPal,
+       colorkey=list(space='bottom'),
+       main = 'Absolute area, 12 km grid') 
+
+# plot! - percent area
+spplot(poly12.P, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
+       main = 'Percent area, 12 km grid') 
+spplot(poly12.P.union, 'sigCoeffs', col.regions=origPal,
+       colorkey=list(space='bottom'),
+       main = 'Percent area, 12 km grid') 
+``` 
 
 
+```{r gridRegress8, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
+# run lms by grid cell: in km^2
+poly8 <- getSpatialRegression(all8, grid8, p=0.05, normalize=FALSE)
+poly8.union <- raster::intersect(poly8, union)
 
+# run lms by grid cell: in percent area
+poly8.P <- getSpatialRegression(all8, grid8, p=0.05, normalize=TRUE)
+poly8.P.union <- raster::intersect(poly8.P, union)
 
+# plot! - absolute area
+spplot(poly8, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
+       main = 'Absolute area, 8 km grid') 
+spplot(poly8.union, 'sigCoeffs', col.regions=origPal,
+       colorkey=list(space='bottom'),
+       main = 'Absolute area, 8 km grid') 
 
-```
+# plot! - percent area
+spplot(poly8.P, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
+       main = 'Percent area, 8 km grid') 
+spplot(poly8.P.union, 'sigCoeffs', col.regions=origPal,
+       colorkey=list(space='bottom'),
+       main = 'Percent area, 8 km grid') 
+``` 
 
+```{r gridRegress4, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
+# run lms by grid cell: in km^2
+poly4 <- getSpatialRegression(all4, grid4, p=0.05, normalize=FALSE)
+poly4.union <- raster::intersect(poly4, union)
+
+# run lms by grid cell: in percent area
+poly4.P <- getSpatialRegression(all4, grid4, p=0.05, normalize=TRUE)
+poly4.P.union <- raster::intersect(poly4.P, union)
+
+# plot! - absolute area
+spplot(poly4, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
+       main = 'Absolute area, 4 km grid') 
+spplot(poly4.union, 'sigCoeffs', col.regions=origPal,
+       colorkey=list(space='bottom'),
+       main = 'Absolute area, 4 km grid') 
+
+# plot! - percent area
+spplot(poly4.P, 'sigCoeffs', col.regions=origPal, colorkey=list(space='bottom'),
+       main = 'Percent area, 4 km grid') 
+spplot(poly4.P.union, 'sigCoeffs', col.regions=origPal,
+       colorkey=list(space='bottom'),
+       main = 'Percent area, 4 km grid') 
+``` 
 
 ### Novel/Retired Irrigated Area by year
 

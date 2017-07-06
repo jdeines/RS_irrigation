@@ -375,6 +375,19 @@ grid12.union <- crop(grid12km, unioned)
 grid12.union.masked <- mask(grid12.union, unioned)
 plot(grid12.union.masked, '12 km grid, masked', legend=F)
 plot(unioned, add=T)
+
+# 20 km grid: go big or go home
+grid20km <- raster(res = 20000, ext=extent(uneven), 
+                  crs=proj4string(uneven))
+grid20km[] <- runif(1520, 0, 400)
+plot(grid20km, main='20 km grid', legend=F)
+plot(uneven, add=T)
+
+grid20.union <- crop(grid20km, unioned)
+grid20.union.masked <- mask(grid20.union, unioned)
+plot(grid20.union.masked, '20 km grid, masked', legend=F)
+plot(unioned, add=T)
+
 ```
 
 I think I'll make the final decision on resolution size on the trend calculates, so make polygon gets for all 3 options
@@ -413,12 +426,20 @@ plot(poly8[poly8$contained == TRUE,], add=T, col='red')
 plot(unioned, add=T)
 writeOGR(poly8, boundDir, 'Polynet_8km_aea', driver='ESRI Shapefile')
 
-# 4 k
+# 12 k
 poly12 <- gridToPoly(grid12km, uneven)
 plot(poly12, main = '12 km polygons')
 plot(poly12[poly12$contained == TRUE,], add=T, col='red')
 plot(unioned, add=T)
 writeOGR(poly12, boundDir, 'Polynet_12km_aea', driver='ESRI Shapefile',
+         layer_options = 'RESIZE=YES')
+
+# 20 km
+poly20 <- gridToPoly(grid20km, uneven)
+plot(poly20, main = '20 km polygons')
+plot(poly20[poly20$contained == TRUE,], add=T, col='red')
+plot(unioned, add=T)
+writeOGR(poly20, boundDir, 'Polynet_20km_aea', driver='ESRI Shapefile',
          layer_options = 'RESIZE=YES')
 
 ```

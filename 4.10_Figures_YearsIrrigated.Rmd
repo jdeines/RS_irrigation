@@ -9,11 +9,13 @@ output:
 
 Goal: Make figures of irrigation frequency over the region
 
+Update 7/5/2017: changed boundary to the union of the RRCA and RRb
+
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
-opts_chunk$set(cache=FALSE, cache.path='cache/4.1_FreqFigs/test5/',
-               fig.path='figure/4.1_FreqFigs_randFor/to2016/test5/')
+opts_chunk$set(cache=FALSE, cache.path='cache/4.1_FreqFigs/test5/union/',
+               fig.path='figure/4.1_FreqFigs_randFor/to2016/test5/union/')
 ```
 
 **R Packages Needed**
@@ -37,7 +39,7 @@ Exported raster of years irrigated from 06.0_summaryMaps in GEE.
 
 ```{r userVars}
 # dirs and names
-rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test5_randFor_interannualClean'
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test5_randFor_interannualClean_unionBound'
 rasRaw <- 'IrrigationFrequencyMap_0and1neg.tif'
 rasMasked <- 'IrrigationFrequencyMap_0and1neg_boundMask.tif'
   
@@ -55,8 +57,8 @@ lateInset1.name <- 'latestYearIrrigated_inset.tif'
 # lateInset3.name <- 'latestYearIrrigated_inset_3.tif'
 
 # extent shapefile
-extentDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile'
-extentName <- 'BigExtent_RRB_RRCA_buff'
+extentDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
+extentName <- 'RRCA_RRB_union_aea'
 ```
 
 Set some common color scales, etc, among figures
@@ -90,13 +92,13 @@ freq <- raster(paste0(rasDir,'/',rasRaw))
 
 # load extent 
 extent0 <- readOGR(extentDir, extentName, verbose=F)
-extent <- spTransform(extent, CRS(proj4string(freq)))
+extent1 <- spTransform(extent0, CRS(proj4string(freq)))
 
 # set -1 to 0 (areas masked by nlcd)
 freq[freq == -1] <- 0
 
 # mask by polygon bound
-freq2 <- mask(freq, extent)
+freq2 <- mask(freq, extent1)
 
 # write out masked raster
 writeRaster(freq2, paste0(rasDir,'/',rasMasked))
@@ -197,6 +199,7 @@ plot(extent.ll, axes=T, las=1)
 plot(insetPoly, add=T)
 #plot(freq2)
 ```
+
 
 
 ```{r freqMap_matlab2_bottom_matlab, fig.width = 7, fig.height = 5, dpi=600, dev=c('png','pdf')}
