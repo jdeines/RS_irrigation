@@ -1,0 +1,612 @@
+---
+title: "Statistical Model"
+author: "Jill Deines"
+date: "July 6, 2017"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Investigate relationship among irrigated area, precip, pumping volume, and crop prices over time 
+
+updated from 6.05 Statistical Models, test5
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, 
+               fig.path='figure/6.06_statModels_test5_rrb/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(gridExtra)
+library(grid)
+library(tidyverse) # for ggplot2, tidyr, dplyr
+library(broom)
+library(GGally)
+library(corrplot)
+library(Hmisc)
+library(party) #carts
+source('functions/stat_smooth_func_all.R')
+library(RColorBrewer)
+```
+
+## User Vars
+Derived dataset source files
+
+* corn prices: produced in first chunks of this script
+* RRCA pumping volume: processed in 4.21_Figures_volumeVsArea_randFor... 'loadPumpingData' chunk
+* RRB pumping volume from the RRCA; also processed in 4.21
+
+
+```{r userVars}
+# data directory
+derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
+# corn prices
+cornFile <- 'price_nass_corn_1996-2016.csv'
+# RRCA volume
+RRCA.volume.file <- 'RRCA_fullModel_irrigation_volume.csv'
+# RRB volume
+RRB.volume.file <- 'RRB_byState_irrigation_volume.csv'
+```
+
+## Data wrangling
+(jump to Analyses/loaddata chunk after first time)
+
+### NASS crop price data
+
+First, make a table of inflation adjustments relative to 2015, the final year available in my NASS price dataset. Write out so this is static and not dependent on external download
+
+```{r inflationTable, eval=FALSE}
+# adjust for inflation
+library(lubridate) 
+library(dplyr) 
+
+# download the consumer price index and get adjustments 
+monthly_cpi <- read.csv("http://research.stlouisfed.org/fred2/data/CPIAUCSL.csv",
+                        header = TRUE)
+monthly_cpi$cpi_year <- year(monthly_cpi$DATE)
+yearly_cpi <- monthly_cpi %>% group_by(cpi_year) %>% summarize(cpi = mean(VALUE))
+yearly_cpi$adj_factor_2015 <- yearly_cpi$cpi/yearly_cpi$cpi[yearly_cpi$cpi_year == 2015]
+# for posterity
+yearly_cpi$adj_factor_2016 <- yearly_cpi$cpi/yearly_cpi$cpi[yearly_cpi$cpi_year == 2016]
+yearly_cpi$adj_factor_2017 <- yearly_cpi$cpi/yearly_cpi$cpi[yearly_cpi$cpi_year == 2017]
+
+# write out
+nassdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass/price'
+write.csv(yearly_cpi, paste0(nassdir, '/cpi_priceAdjustments.csv'), 
+          row.names=F)
+```
+
+Price data was downloaded manually from the NASS quickstats tool (https://quickstats.nass.usda.gov/) for the following query: SURVEY - CROPS - FIELD CROPS - CORN/SOYBEANS/WHEAT/HAY/SORGHUM - PRICE RECEIVED - 
+
+* CORN, GRAIN - PRICE RECEIVED, MEASURED IN $ / BU
+* HAY, PRICE RECEIVED, MEASURED IN $ / TON (short ton)
+* SORGHUM, GRAIN - PRICE RECEIVED, MEASURED IN $ / CWT (hundredweight)
+* SOYBEANS - PRICE RECEIVED, MEASURED IN $ / BU
+* WHEAT - PRICE RECEIVED, MEASUTED IN $ / BU
+
+- TOTAL - NATIONAL - US TOTAL - 1996:2016 - ANNUAL - YEAR
+
+
+Here, I load the data and clean it to have consistent pricing across crops and years
+
+```{r nassPrice, eval=FALSE}
+# load nass
+nassdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass/price'
+price0 <- read.csv(paste0(nassdir, '/nass_prices_5crops_national_1996-2016.csv'))
+
+# load consumer price index adjustments
+cpi <- read.csv(paste0(nassdir, '/cpi_priceAdjustments.csv'))
+
+# make a units columns
+unitkey <- data.frame(Commodity = c('CORN','HAY','SORGHUM','SOYBEANS','WHEAT'),
+                      unit = c('BU','TON','CWT','BU','BU'))
+price0 <- merge(price0,unitkey)
+
+# remove silly columns
+price0 <- price0[,c('Commodity','Year','Value','unit')]
+
+# add the adjustment factor
+price <- merge(price0, cpi[,c('cpi_year','adj_factor_2015','adj_factor_2016')], 
+               by.x = 'Year', by.y = 'cpi_year')
+
+# adjust prices (note: matched trials at https://data.bls.gov/cgi-bin/cpicalc.pl)
+price$price_2015 <- price$Value / price$adj_factor_2015
+price$price_2016 <- price$Value / price$adj_factor_2016
+
+# plot it - unadjusted
+ggplot(data = price, aes(x=Year, y = Value)) +
+  geom_line() +
+  facet_wrap(~Commodity, scales='free_y') + theme_bw() +
+  ggtitle('Nomial (unadjusted) Crop Prices') 
+
+
+# plot it
+ggplot(data = price, aes(x=Year, y = price_2016)) +
+  geom_line() +
+  facet_wrap(~Commodity, scales='free_y') + theme_bw() +
+  ggtitle('Inflation-adjusted Crop Prices')
+
+# extract only corn
+cornprice <- price[price$Commodity == 'CORN',]
+
+ggplot(data = cornprice, aes(x=Year, y = price_2016)) +
+  geom_line() + theme_bw() +
+  ggtitle('Inflation-adjusted Corn Prices')
+
+# write out dataset
+write.csv(cornprice, paste0(derivedDir, '/price_nass_corn_1996-2016.csv'), 
+          row.names=F)
+```
+
+## Analyses
+
+### Load Data
+loads datasets produced/cleaned from other scripts
+
+```{r loadData}
+# usda nass annual corn price, $ / bushel
+cornprice <- read.csv(paste0(derivedDir, '/',cornFile))
+
+# irrigation volume ----------
+# full rrca
+volume.state <- read.csv(paste0(derivedDir, '/',RRCA.volume.file))
+# aggregate volume across states - sum
+volume <- aggregate(total_km3 ~ year, data = volume.state, FUN = 'sum', na.rm=T)
+
+# rrb portion of the rrca
+volume.state.rrb <- read.csv(paste0(derivedDir, '/',RRB.volume.file))
+# aggregate volume across states - sum
+volume.rrb <- aggregate(total_km3 ~ year, data = volume.state, FUN = 'sum', na.rm=T)
+
+```
+
+### load Irrigated Area and Precip
+Extract irrigated area and precip for regions of interests
+
+* RRCA domain irrigation and precip in 4.21_Figures_volumeVsArea_randFor... in the 'loadAreaData' chunk
+
+```{r irrData}
+# load REGIONAL AREA + precip data files ----------------------------------------
+cellArea <- 30*30 # m^2
+regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test5_regional_county_Stats'
+
+# get filenames
+files <- list.files(regionsDir,
+    pattern="*_test5_randFor_interannual_plusAncillary_REVISION_BOUNDARIES.csv")
+
+# read in to a single dataframe (function)
+loadStats <- function(fileList){
+  datOut = as.data.frame(do.call(rbind, lapply(fileList, function(x) {
+              csv1 <- read.csv(paste0(regionsDir,'/',x))
+              csv1$year <- as.numeric(substr(x, start=1,stop=4))
+              return(csv1)
+           })))  
+  # convert cell count to area
+  datOut$irrigated_m2 <- datOut$X1 * cellArea
+  datOut$irrigated_km2 <- datOut$irrigated_m2 / 1000000
+  return(datOut)
+}
+
+# load
+all1 = loadStats(files)
+# remove county data 
+all1 <- all1[!grepl('county', all1$masterid),]
+# drop a bunch of columns
+all <- all1[,c('masterid','year','irrigated_km2','pr_ann')]
+
+# extract regions of interest
+regionsWanted_rrbrrca <- c('RRCARRB_KS','RRCARRB_CO','RRCARRB_NE')
+areappt.rrbstates <- all[all$masterid %in% regionsWanted_rrbrrca,]
+
+# extract regions of interest
+areappt.rrb <- all[all$masterid == 'RRCARRB_intersection',]
+```
+
+### Merge datasets together
+
+```{r mergeData}
+# merge price
+areappt.price.rrb <- merge(areappt.rrb, cornprice[,c('Year','price_2016')], 
+                        by.x = 'year', by.y = 'Year')
+areappt.price.rrbstates <- merge(areappt.rrbstates, cornprice[,c('Year','price_2016')], 
+                        by.x = 'year', by.y = 'Year')
+
+# merge volume
+rrca.rrb <- merge(areappt.price.rrb,volume.rrb, all=T)
+
+# make state key
+areappt.price.rrbstates$key <- paste0(substr(areappt.price.rrbstates$masterid,9,10),
+                                      areappt.price.rrbstates$year)
+rrca.rrb.states <- merge(areappt.price.rrbstates, volume.state.rrb, all.x=T, by='key')
+
+# rename columns
+names(rrca.rrb) <- c('Year','masterid','Area_km2','Precip_mm','Price','Volume_km3')
+names(rrca.rrb.states)[c(2:6,9)] <- c('Year','masterid','Area_km2','Precip_mm',
+                                    'Price','Volume_km3') 
+rrca.rrb.states <- rrca.rrb.states[,c('Year','masterid','Area_km2','Precip_mm',
+                                    'Price','Volume_km3')]
+
+# add a price lag
+rrca.rrb$priceLag1 <- cornprice$price_2016[3:20]
+
+cornprice$priceLag1 <- c(NA,cornprice$price_2016[1:20]) # so merge has correct column name
+rrca.rrb.states <- merge(rrca.rrb.states,cornprice[,c('Year', 'priceLag1')],all.x=T)
+
+# add total irrigated area for the full study region
+rrca.rrb$area.union <- all[all$masterid == 'RRCA_RRB_Union','irrigated_km2']
+rrca.rrb$AArea_km2_else <- rrca.rrb$area.union - rrca.rrb$Area_km2
+```
+
+### Exploratory analyses: RRB of RRCA domain
+
+Average application depth: Divide irrigated pumping by area (average application depth); plot vs precip expressed in mm
+
+what proportion of water demand they are satisfying?
+
+```{r applicationDepth, fig.height=3, fig.width=3}
+# calculate depth of water applied
+rrca$Depth_m <- rrca$Volume_km3/rrca$Area_km2 * 1000
+
+# convert dpeth and precip to cm
+rrca$Depth_cm <- rrca$Depth_m * 100
+rrca$Precip_cm <- rrca$Precip_mm / 10
+
+ggplot(rrca, aes(Precip_mm, Depth_m)) +
+  geom_point() + theme_bw() +
+  stat_smooth(method = 'lm', se=F) + 
+  stat_smooth_func_all(geom="text",method="lm",hjust=0,parse=TRUE, 
+                 xpos = 250, ypos = .68, size=.5) +
+  ylab('Depth (m)') + xlab('Precip (mm)') +
+  theme(axis.text=element_text(size=11),
+               legend.text=element_text(size=11),
+               axis.title=element_text(size=13))
+
+
+depthlm <- lm(Depth_m ~ Precip_mm, data = rrca)
+summary(depthlm)
+```
+
+```{r applicationDepth_cm_noStats, fig.height = 3, fig.width = 3, dpi=600, dev=c('png','pdf')}
+
+depth <- ggplot(rrca, aes(Precip_cm, Depth_cm)) +
+  geom_point() + theme_bw() +
+  stat_smooth(method = 'lm', se=F, size=.5, color='black') + 
+  #stat_smooth_func_all(geom="text",method="lm",hjust=0,parse=TRUE, 
+  #               xpos = 25, ypos = 68) +
+  ylab('Depth (cm)') + xlab('Precipitation (cm)')  +
+  theme(axis.text=element_text(size=10),
+               legend.text=element_text(size=10),
+               axis.title=element_text(size=11),        
+            panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank())
+depth
+
+depthlm <- lm(Depth_cm ~ Precip_cm, data = rrca)
+summary(depthlm)
+```
+
+And plot all time series.
+Update 4/26/2017 - this goes back to only using RRCA boundaries
+
+
+```{r timeSeriesPlot_finalish, fig.height = 4, fig.width = 6, dpi=600, dev=c('png','pdf')}
+# data frame for plotting
+rrcaPlot <- rrca
+
+# items to plot
+plotUs <- c('Area_km2','Depth_cm','Precip_cm','Price')
+
+# gather
+plotdata <- gather_(rrcaPlot, key_col = 'variable', value_col = 'value',
+                          gather_cols = plotUs)
+
+# plots with trendlines no text
+ggplot(data = plotdata,
+      aes(x = Year, y = value, colour=variable)) +
+  geom_line() + geom_point() +
+  scale_colour_manual(values=c('black','red','blue','orange')) + 
+  facet_wrap(~variable, nrow=4, scales='free_y') +
+  stat_smooth(data = subset(plotdata, variable %in% 
+                              c('Area_km2','Depth_cm','Price')), 
+              method = 'lm', se=F, size=.5) +
+  scale_x_continuous(name = '', 
+                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
+  ylab('') +
+  theme_bw() + theme(legend.position = 'none',
+                     strip.background=element_blank(), # comment to add labels
+                     strip.text.x = element_blank(),   # comment to add labels
+                     text = element_text(size = 15))
+
+```
+
+Run a quick set of individual regressions on these time series
+
+```{r timeSeriesLMs}
+# run regressions by county
+lms <- plotdata %>% 
+  group_by(variable) %>% 
+  do(model = lm(value ~ Year, data = .))
+
+# tidy up with broom: model coefficients
+coeffs <- lms %>% tidy(model)
+coeffs <- coeffs[coeffs$term == 'Year',]
+coeffs
+
+# and model R2 values
+rsq <- lms %>% glance(model)
+rsq
+```
+
+#### redo with percent area
+Dave/Anthony suggested using percent of study area irrigated instead of absolute area
+
+```{r timeSeriesPlot_percent_finalish, fig.height = 4, fig.width = 6, dpi=600, dev=c('png','pdf')}
+# get percent of RRCA area irrigated
+rrca$AreaPercentRRCA <- (rrca$Area_km2/rrca$tAreaRRCA_km2) * 100
+
+# items to plot
+plotUs2 <- c('AreaPercentRRCA','Depth_cm','Precip_cm','Price')
+
+# gather
+plotdata2 <- gather_(rrca, key_col = 'variable', value_col = 'value',
+                          gather_cols = plotUs2)
+
+
+# plots with trendlines no text
+ptime <- ggplot(data = plotdata2,
+      aes(x = Year, y = value, colour=variable)) +
+  geom_line() + geom_point() +
+  scale_colour_manual(values=c('black','red','blue','orange')) + 
+  facet_wrap(~variable, nrow=4, scales='free_y') +
+  stat_smooth(data = subset(plotdata2, variable %in% 
+                              c('AreaPercentRRCA','Depth_cm','Price')), 
+              method = 'lm', se=F, size=.4) +
+  scale_x_continuous(name = '', 
+                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
+  ylab('') + xlab('Year') +
+  theme_bw() + theme(legend.position = 'none',
+                     strip.background=element_blank(), # comment to add labels
+                     strip.text.x = element_blank(),   # comment to add labels
+                      axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     axis.title=element_text(size=11),
+                             panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank())
+ptime
+```
+
+Run a quick set of individual regressions on these time series
+
+```{r timeSeriesLMs_percent}
+# run regressions by county
+lms <- plotdata2 %>% 
+  group_by(variable) %>% 
+  do(model = lm(value ~ Year, data = .))
+
+# tidy up with broom: model coefficients
+coeffs <- lms %>% tidy(model)
+coeffs <- coeffs[coeffs$term == 'Year',]
+coeffs
+
+# and model R2 values
+rsq <- lms %>% glance(model)
+rsq
+```
+
+#### Correlations
+Let's look at some preliminary correlations for the RRCA domain. 
+
+```{r corrPlots, fig.height=5, fig.width=5, dpi=600, dev=c('png','pdf')}
+# remove the full domain data and other columns not to include in cors
+nonsense <- c('AArea_km2_full', 'tAreaRRCA_km2', 'Depth_m', 'Precip_mm','AreaPercentRRCA')
+rrca2 <- rrca[,-which(names(rrca) %in% nonsense)]
+
+# give legible names
+names(rrca2) <- c('Year','Area','Price','Volume','Price_Lag','Depth','Precip')
+
+# order columns alphabetically
+rrca2 <- rrca2[,order(names(rrca2))]
+
+# cor plots
+varcor <- cor(rrca2, use='complete.obs')
+corrplot(varcor, method='color', addCoef.col='black', tl.col='black',
+         type = 'lower', 
+         col = colorRampPalette(brewer.pal(7,'RdBu'))(200))
+
+
+#ggcorr(rrca, palette = "RdBu", label = TRUE, digits=3)
+
+# sig levels
+corsig <- rcorr(as.matrix(rrca2[complete.cases(rrca2),]), type = 'pearson')
+options(scipen = 999)
+corsig$P
+```
+
+Interpretation:
+
+* Precip has inverse correlations with irrigation volume (significant) and irrigation area (non-significant)
+* Volume and area are negatively correlated (p = 0.077)
+* Price Lag 1 correlated with area
+* Depth negatively corrected with area, precip; positive with volume
+
+```{r scatterplots, fig.height=5.5, fig.width=8.5}
+# an extra function to add trendlines
+my_fn <- function(data, mapping, ...){
+  p <- ggplot(data = data, mapping = mapping) + 
+    geom_point() + 
+    geom_smooth(method=loess, fill="red", color="red", ...) +
+    geom_smooth(method=lm, fill="blue", color="blue", ...)
+  p
+}
+
+# scatterplot matrix
+ggpairs(rrca2, lower=list(continuous = my_fn)) 
+```
+
+Hm. A two step model? Predict application depth from precip; predict irrigated area from depth and price? Or a hierarchical model where depth comes from precip...
+
+
+### Auto-correlation
+
+
+```{r autocorrelation, fig.height = 5.5, fig.width=8, eval=FALSE}
+# test for autocorrelation in time series
+vars <- names(rrca2)
+
+# test all vars
+par(mfrow=c(3,3))
+acfList <- list()
+#names(acfList) <- vars
+for (var in vars){
+  acf(rrca2[,var], main = var, na.action = na.pass)
+}
+```
+
+Area and price are autocorrelated. Calculate first differences instead.
+
+```{r autocor2, fig.height = 5.5, fig.width = 6, eval=FALSE}
+# plot first differences: calculate
+rrca.firstdiff <- as.data.frame(matrix(, nrow = nrow(rrca2)-1, ncol=length(vars)))
+names(rrca.firstdiff) <- vars
+for (var in vars) {
+ rrca.firstdiff[,var] <- diff(ts(rrca2[,var]), differences=1)
+}
+
+rrca.firstdiff$year <- 2000:2016
+rrca.firstdiff <- rrca.firstdiff[ , -which(names(rrca.firstdiff) %in% c('Price'))]
+
+# longify
+
+firstdiff <- gather_(rrca.firstdiff, key_col = 'variable', 
+                     value_col = 'value',
+                     c('Area','Depth','Precip','Price_Lag'))
+
+ggplot(data = firstdiff,
+      aes(x = year, y = value, colour=variable)) +
+  geom_line() + geom_point() +
+  scale_colour_manual(values=c('black','red','blue','orange')) + 
+  facet_wrap(~variable, nrow=5, scales='free_y') +
+  scale_x_continuous(name = '', 
+                     breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+                     labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
+  ylab('') + ggtitle('first difference') +
+  theme_bw() + theme(legend.position = 'none',
+                     strip.background=element_blank(), # comment to add labels
+                     strip.text.x = element_blank(),   # comment to add labels
+                     text = element_text(size = 16))
+```
+
+
+
+### CaRT
+Use a CART to analysis, since robust to autocorrelation and we don't have long enough time series for robust time series analysis.
+
+I picked 'ctree' function the party package because of the nice-ish output on an R Blogger's post, but Andy subsequently suggested it as well. Look at that!
+
+From 'party' package
+
+```{r cart, fig.height = 5, fig.width = 5, dpi=600, dev=c('png','pdf')}
+# rrca domain dataset - complete across variables
+rrca3 <- rrca[complete.cases(rrca),]
+
+# remove the full domain data and other columns not to include in cors
+nonsense <- c('AArea_km2_full', 'tAreaRRCA_km2', 'Depth_m', 'Precip_mm','Area_km2')
+rrca3 <- rrca3[,-which(names(rrca3) %in% nonsense)]
+
+# give legible names
+names(rrca3) <- c('Year','Price','Volume','Price_Lag','Depth','Precip','Area')
+
+# new cart, RRCA area ---------------------------------------------
+ # control tree
+controls <- ctree_control(minsplit = 3, minbucket = 3, mincriterion = .85)
+
+# run tree
+ct <- ctree(Area ~ Precip + Price_Lag, data = rrca3, 
+            controls = controls)
+plot(ct, main="Conditional Inference Tree")
+
+# predict on same data
+predicted <- predict(ct)
+ghettoR2 <- cor(as.vector(predicted), rrca3$Area)^2
+```
+
+Visualize these splits in space
+
+```{r heatmapCart, fig.height=3, fig.width = 3.5}
+ggplot(rrca3,
+       aes(x=Precip, y = Price_Lag, colour = Area)) +
+  geom_point(size = 3) + 
+  geom_hline(yintercept = 3.924, colour='red') + 
+  geom_segment(aes(x=46.07, xend = 46.07, y=3.924, yend=max(Price_Lag)), colour = 'black') + 
+  ylab('Price Lag ($/bushel)') + xlab('Precip. (cm)') + 
+  theme_bw()
+         
+```
+
+Visualize differently
+```{r cartplot2, fig.height=3, fig.width = 3.5, dpi=600, dev=c('png','pdf')}
+# add a factor variable based on price split
+rrca3$PriceSplit <- NA
+rrca3[rrca3$Price_Lag > 3.924,'PriceSplit'] <- 'High'
+rrca3[is.na(rrca3$PriceSplit),'PriceSplit'] <- 'Low'
+
+pcart <- ggplot(rrca3,
+       aes(x=Precip, y = Area, colour = PriceSplit)) +
+  geom_point() + 
+  geom_smooth(method=lm, se=F, size=.5) +
+  scale_colour_manual(values=c('#cc4c02','#fe9929'),
+                      name='Price Split') +
+  ylab(expression(paste('Area (',km^2,')',sep=''))) + 
+  xlab('Precipitation (cm)') + 
+  theme_bw() + theme(axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     legend.title = element_text(size=10),
+                     axis.title=element_text(size=11),
+                     legend.position=c(0.2,.8),
+                    panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank())
+pcart
+
+# run regressions by county
+lms <- rrca3 %>% 
+  group_by(PriceSplit) %>% 
+  do(model = lm(Area ~ Precip, data = .))
+
+# and model R2 values
+rsq <- lms %>% glance(model)
+rsq
+```
+
+## Combo Figs
+grid layout ref http://www.sthda.com/english/wiki/ggplot2-easy-way-to-mix-multiple-graphs-on-the-same-page-r-software-and-data-visualization
+
+```{r precipTrendsCombo, fig.height=3, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
+grid.newpage()
+grid.draw(cbind(ggplotGrob(depth), ggplotGrob(pcart), size = "last"))
+```
+
+```{r fig3Combo_noGrid, fig.height=6.5, fig.width = 6, dpi=600, dev=c('png','pdf')}
+# grid.newpage()
+# # Create layout : nrow = 2, ncol = 2
+# pushViewport(viewport(layout = grid.layout(2,2)))
+#              
+# # A helper function to define a region on the layout
+# define_region <- function(row, col){
+#   viewport(layout.pos.row = row, layout.pos.col = col)
+# } 
+# # Arrange the plots
+# print(ptime, vp=define_region(1, 1:2))
+# print(depth, vp = define_region(2, 1))
+# print(pcart, vp = define_region(2, 2))  
+
+grid.arrange(ptime, depth, pcart, layout_matrix = rbind(c(1,1), c(2,3)),
+             heights=c(1.45,1))
+```
+
+

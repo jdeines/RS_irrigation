@@ -125,10 +125,12 @@ ggplot(data=allIrr.years.long,
   theme_bw() +
   ggtitle('Total Irrigation by Type, RRCA')
 
-# export the cleaned dataset that retains state and type
+# export the cleaned datasets that retains state and type
 derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
 #write.csv(irrStates.RRCA.km3, row.names=F,
 #          paste0(derivedDir, '/RRCA_fullModel_irrigation_volume.csv'))
+#write.csv(irrStates.RRB.km3, row.names=F,
+#          paste0(derivedDir, '/RRB_byState_irrigation_volume.csv'))
 ```
 
 Make a 'master data' file for the RRCA boundary
