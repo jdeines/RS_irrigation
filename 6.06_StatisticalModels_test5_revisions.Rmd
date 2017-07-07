@@ -337,7 +337,9 @@ ggplot(data = plotdata,
   theme_bw() + theme(legend.position = 'none',
                      strip.background=element_blank(), # comment to add labels
                      strip.text.x = element_blank(),   # comment to add labels
-                     text = element_text(size = 15))
+                     text = element_text(size = 15),
+                                          panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank())
 
 ```
 
@@ -375,31 +377,49 @@ area.rrca.rrb <- sum(poly.rrca.rrb.state$areakm2)
 
 # full rrca rrb union
 poly.union <- readOGR(gisDir, 'RRCA_RRB_union_aea', verbose = F)
-area.rrca.rrb <- sum(poly.rrca.rrb.state$areakm2)
+area.union <- poly.union$areakm2
+
+# non rrca/rrb intersect union
+elseArea <- area.union - area.rrca.rrb
 ```
 
+and plot percentages
 
 ```{r timeSeriesPlot_percent_finalish_rrcarrb, fig.height = 4, fig.width = 6, dpi=600, dev=c('png','pdf')}
-# get percent of RRCA area irrigated
-rrca$AreaPercentRRCA <- (rrca$Area_km2/rrca$tAreaRRCA_km2) * 100
+# get percent of RRB*RRCA area irrigated
+rrca.rrb$AreaPercentIn <- (rrca.rrb$Area_km2/area.rrca.rrb) * 100
+
+# get percetn of non RRB*RRCA area irrigated
+rrca.rrb$AreaPercentOut <- (rrca.rrb$Area_km2_else/elseArea) * 100
 
 # items to plot
-plotUs2 <- c('AreaPercentRRCA','Depth_cm','Precip_cm','Price')
+names(rrca.rrb)[6] <- 'dVolume_km3'
+
+# items to plot
+plotUs2 <- c('AreaPercentIn','dVolume_km3','Precip_cm','Price')
 
 # gather
-plotdata2 <- gather_(rrca, key_col = 'variable', value_col = 'value',
+plotdata2 <- gather_(rrca.rrb, key_col = 'variable', value_col = 'value',
                           gather_cols = plotUs2)
 
 
-# plots with trendlines no text
+# plots with trendlines no text, no outside region line
 ptime <- ggplot(data = plotdata2,
       aes(x = Year, y = value, colour=variable)) +
   geom_line() + geom_point() +
-  scale_colour_manual(values=c('black','red','blue','orange')) + 
+    scale_colour_manual(values=c('black','red','blue','orange')) + 
   facet_wrap(~variable, nrow=4, scales='free_y') +
   stat_smooth(data = subset(plotdata2, variable %in% 
-                              c('AreaPercentRRCA','Depth_cm','Price')), 
+                              c('AreaPercentIn','Price')), 
               method = 'lm', se=F, size=.4) +
+  # add second line to panel a
+  # geom_line(data = data.frame(rrca.rrb,variable='AreaPercentIn'), 
+  #           aes(x = Year, y = AreaPercentOut), color='gray55') +
+  # geom_point(data = data.frame(rrca.rrb,variable='AreaPercentIn'), 
+  #           aes(x = Year, y = AreaPercentOut),color='gray55') +
+  # stat_smooth(data = data.frame(rrca.rrb,variable='AreaPercentIn'), 
+  #           aes(x = Year, y = AreaPercentOut), method='lm', 
+  #           se=F,size=.5, color='gray55') +
   scale_x_continuous(name = '', 
                   breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
                  labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
@@ -413,6 +433,38 @@ ptime <- ggplot(data = plotdata2,
                              panel.grid.major = element_blank(),
              panel.grid.minor = element_blank())
 ptime
+
+# plots with trendlines no text, with outside region line
+ptime2 <- ggplot(data = plotdata2,
+      aes(x = Year, y = value, colour=variable)) +
+ # add second line to panel a
+  geom_line(data = data.frame(rrca.rrb,variable='AreaPercentIn'),
+            aes(x = Year, y = AreaPercentOut), color='gray55') +
+  geom_point(data = data.frame(rrca.rrb,variable='AreaPercentIn'),
+            aes(x = Year, y = AreaPercentOut),color='gray55') +
+  stat_smooth(data = data.frame(rrca.rrb,variable='AreaPercentIn'),
+            aes(x = Year, y = AreaPercentOut), method='lm',
+            se=F,size=.5, color='gray55') +
+   geom_line() + geom_point() +
+    scale_colour_manual(values=c('black','red','blue','orange')) + 
+  facet_wrap(~variable, nrow=4, scales='free_y') +
+  stat_smooth(data = subset(plotdata2, variable %in% 
+                              c('AreaPercentIn','Price')), 
+              method = 'lm', se=F, size=.4) +
+  
+  scale_x_continuous(name = '', 
+                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
+  ylab('') + xlab('Year') +
+  theme_bw() + theme(legend.position = 'none',
+                     strip.background=element_blank(), # comment to add labels
+                     strip.text.x = element_blank(),   # comment to add labels
+                      axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     axis.title=element_text(size=11),
+                             panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank())
+ptime2
 ```
 
 Run a quick set of individual regressions on these time series
@@ -431,33 +483,39 @@ coeffs
 # and model R2 values
 rsq <- lms %>% glance(model)
 rsq
+
+# Unioned area outside of the RRB/RRCA intersection
+summary(lm(AreaPercentOut ~ Year,data=rrca.rrb))
 ```
 
 #### Correlations
 Let's look at some preliminary correlations for the RRCA domain. 
 
-```{r corrPlots, fig.height=5, fig.width=5, dpi=600, dev=c('png','pdf')}
+```{r corrPlots_rrbrrca, fig.height=5, fig.width=5, dpi=600, dev=c('png','pdf')}
+# dataset to use
+rrcarrb <- rrca.rrb
+
 # remove the full domain data and other columns not to include in cors
-nonsense <- c('AArea_km2_full', 'tAreaRRCA_km2', 'Depth_m', 'Precip_mm','AreaPercentRRCA')
-rrca2 <- rrca[,-which(names(rrca) %in% nonsense)]
+nonsense <- c('masterid', 'Depth_m', 'Precip_mm','area.union', 'Area_km2_else',
+              'AreaPercentIn','AreaPercentOut')
+rrcarrb2 <- rrcarrb[,-which(names(rrcarrb) %in% nonsense)]
 
 # give legible names
-names(rrca2) <- c('Year','Area','Price','Volume','Price_Lag','Depth','Precip')
+names(rrcarrb2) <- c('Year','Area','Price','Volume','Price_Lag','Depth','Precip')
 
 # order columns alphabetically
-rrca2 <- rrca2[,order(names(rrca2))]
+rrcarrb2 <- rrcarrb2[,order(names(rrcarrb2))]
 
 # cor plots
-varcor <- cor(rrca2, use='complete.obs')
+varcor <- cor(rrcarrb2, use='complete.obs')
 corrplot(varcor, method='color', addCoef.col='black', tl.col='black',
          type = 'lower', 
          col = colorRampPalette(brewer.pal(7,'RdBu'))(200))
 
 
-#ggcorr(rrca, palette = "RdBu", label = TRUE, digits=3)
 
 # sig levels
-corsig <- rcorr(as.matrix(rrca2[complete.cases(rrca2),]), type = 'pearson')
+corsig <- rcorr(as.matrix(rrcarrb2[complete.cases(rrcarrb2),]), type = 'pearson')
 options(scipen = 999)
 corsig$P
 ```
@@ -469,7 +527,7 @@ Interpretation:
 * Price Lag 1 correlated with area
 * Depth negatively corrected with area, precip; positive with volume
 
-```{r scatterplots, fig.height=5.5, fig.width=8.5}
+```{r scatterplots_rrbrrca, fig.height=5.5, fig.width=8.5}
 # an extra function to add trendlines
 my_fn <- function(data, mapping, ...){
   p <- ggplot(data = data, mapping = mapping) + 
@@ -480,62 +538,10 @@ my_fn <- function(data, mapping, ...){
 }
 
 # scatterplot matrix
-ggpairs(rrca2, lower=list(continuous = my_fn)) 
+ggpairs(rrcarrb2, lower=list(continuous = my_fn)) 
 ```
 
 Hm. A two step model? Predict application depth from precip; predict irrigated area from depth and price? Or a hierarchical model where depth comes from precip...
-
-
-### Auto-correlation
-
-
-```{r autocorrelation, fig.height = 5.5, fig.width=8, eval=FALSE}
-# test for autocorrelation in time series
-vars <- names(rrca2)
-
-# test all vars
-par(mfrow=c(3,3))
-acfList <- list()
-#names(acfList) <- vars
-for (var in vars){
-  acf(rrca2[,var], main = var, na.action = na.pass)
-}
-```
-
-Area and price are autocorrelated. Calculate first differences instead.
-
-```{r autocor2, fig.height = 5.5, fig.width = 6, eval=FALSE}
-# plot first differences: calculate
-rrca.firstdiff <- as.data.frame(matrix(, nrow = nrow(rrca2)-1, ncol=length(vars)))
-names(rrca.firstdiff) <- vars
-for (var in vars) {
- rrca.firstdiff[,var] <- diff(ts(rrca2[,var]), differences=1)
-}
-
-rrca.firstdiff$year <- 2000:2016
-rrca.firstdiff <- rrca.firstdiff[ , -which(names(rrca.firstdiff) %in% c('Price'))]
-
-# longify
-
-firstdiff <- gather_(rrca.firstdiff, key_col = 'variable', 
-                     value_col = 'value',
-                     c('Area','Depth','Precip','Price_Lag'))
-
-ggplot(data = firstdiff,
-      aes(x = year, y = value, colour=variable)) +
-  geom_line() + geom_point() +
-  scale_colour_manual(values=c('black','red','blue','orange')) + 
-  facet_wrap(~variable, nrow=5, scales='free_y') +
-  scale_x_continuous(name = '', 
-                     breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
-                     labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
-  ylab('') + ggtitle('first difference') +
-  theme_bw() + theme(legend.position = 'none',
-                     strip.background=element_blank(), # comment to add labels
-                     strip.text.x = element_blank(),   # comment to add labels
-                     text = element_text(size = 16))
-```
-
 
 
 ### CaRT
@@ -545,36 +551,35 @@ I picked 'ctree' function the party package because of the nice-ish output on an
 
 From 'party' package
 
-```{r cart, fig.height = 5, fig.width = 5, dpi=600, dev=c('png','pdf')}
-# rrca domain dataset - complete across variables
-rrca3 <- rrca[complete.cases(rrca),]
+```{r cart_rrbrrca, fig.height = 5, fig.width = 5, dpi=600, dev=c('png','pdf')}
+# add percent area back in, to do it that way
+rrcarrb2$AreaP <- rrcarrb$AreaPercentIn
 
-# remove the full domain data and other columns not to include in cors
-nonsense <- c('AArea_km2_full', 'tAreaRRCA_km2', 'Depth_m', 'Precip_mm','Area_km2')
-rrca3 <- rrca3[,-which(names(rrca3) %in% nonsense)]
+# rrcarrb domain dataset - complete across variables
+rrcarrb3 <- rrcarrb2[complete.cases(rrcarrb2),]
 
-# give legible names
-names(rrca3) <- c('Year','Price','Volume','Price_Lag','Depth','Precip','Area')
+# add percent area back in, to do it that way
 
 # new cart, RRCA area ---------------------------------------------
  # control tree
 controls <- ctree_control(minsplit = 3, minbucket = 3, mincriterion = .85)
 
 # run tree
-ct <- ctree(Area ~ Precip + Price_Lag, data = rrca3, 
+ct <- ctree(AreaP ~ Precip + Price_Lag, data = rrcarrb3, 
             controls = controls)
 plot(ct, main="Conditional Inference Tree")
 
 # predict on same data
 predicted <- predict(ct)
-ghettoR2 <- cor(as.vector(predicted), rrca3$Area)^2
+ghettoR2 <- cor(as.vector(predicted), rrcarrb3$AreaP)^2
+ghettoR2
 ```
 
 Visualize these splits in space
 
-```{r heatmapCart, fig.height=3, fig.width = 3.5}
-ggplot(rrca3,
-       aes(x=Precip, y = Price_Lag, colour = Area)) +
+```{r heatmapCart_rrbrrca, fig.height=3, fig.width = 3.5}
+ggplot(rrcarrb3,
+       aes(x=Precip, y = Price_Lag, colour = AreaP)) +
   geom_point(size = 3) + 
   geom_hline(yintercept = 3.924, colour='red') + 
   geom_segment(aes(x=46.07, xend = 46.07, y=3.924, yend=max(Price_Lag)), colour = 'black') + 
@@ -584,19 +589,19 @@ ggplot(rrca3,
 ```
 
 Visualize differently
-```{r cartplot2, fig.height=3, fig.width = 3.5, dpi=600, dev=c('png','pdf')}
+```{r cartplot2_rrbrrca, fig.height=3, fig.width = 3.5, dpi=600, dev=c('png','pdf')}
 # add a factor variable based on price split
-rrca3$PriceSplit <- NA
-rrca3[rrca3$Price_Lag > 3.924,'PriceSplit'] <- 'High'
-rrca3[is.na(rrca3$PriceSplit),'PriceSplit'] <- 'Low'
+rrcarrb3$PriceSplit <- NA
+rrcarrb3[rrcarrb3$Price_Lag > 3.92,'PriceSplit'] <- 'High'
+rrcarrb3[is.na(rrcarrb3$PriceSplit),'PriceSplit'] <- 'Low'
 
-pcart <- ggplot(rrca3,
-       aes(x=Precip, y = Area, colour = PriceSplit)) +
+pcart <- ggplot(rrcarrb3,
+       aes(x=Precip, y = AreaP, colour = PriceSplit)) +
   geom_point() + 
   geom_smooth(method=lm, se=F, size=.5) +
   scale_colour_manual(values=c('#cc4c02','#fe9929'),
                       name='Price Split') +
-  ylab(expression(paste('Area (',km^2,')',sep=''))) + 
+  ylab('Percent Area Irrigated') + 
   xlab('Precipitation (cm)') + 
   theme_bw() + theme(axis.text=element_text(size=10),
                      legend.text=element_text(size=10),
@@ -607,8 +612,8 @@ pcart <- ggplot(rrca3,
              panel.grid.minor = element_blank())
 pcart
 
-# run regressions by county
-lms <- rrca3 %>% 
+# run regressions 
+lms <- rrcarrb3 %>% 
   group_by(PriceSplit) %>% 
   do(model = lm(Area ~ Precip, data = .))
 
@@ -620,12 +625,12 @@ rsq
 ## Combo Figs
 grid layout ref http://www.sthda.com/english/wiki/ggplot2-easy-way-to-mix-multiple-graphs-on-the-same-page-r-software-and-data-visualization
 
-```{r precipTrendsCombo, fig.height=3, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
+```{r precipTrendsCombo_rrbrrca, fig.height=3, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
 grid.newpage()
 grid.draw(cbind(ggplotGrob(depth), ggplotGrob(pcart), size = "last"))
 ```
 
-```{r fig3Combo_noGrid, fig.height=6.5, fig.width = 6, dpi=600, dev=c('png','pdf')}
+```{r fig3Combo_noGrid_rrbrrca, fig.height=6.5, fig.width = 6, dpi=600, dev=c('png','pdf')}
 # grid.newpage()
 # # Create layout : nrow = 2, ncol = 2
 # pushViewport(viewport(layout = grid.layout(2,2)))
@@ -639,8 +644,9 @@ grid.draw(cbind(ggplotGrob(depth), ggplotGrob(pcart), size = "last"))
 # print(depth, vp = define_region(2, 1))
 # print(pcart, vp = define_region(2, 2))  
 
-grid.arrange(ptime, depth, pcart, layout_matrix = rbind(c(1,1), c(2,3)),
+grid.arrange(ptime2, depth, pcart, layout_matrix = rbind(c(1,1), c(2,3)),
              heights=c(1.45,1))
 ```
+
 
 
