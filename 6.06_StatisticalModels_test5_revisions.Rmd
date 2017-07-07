@@ -31,6 +31,7 @@ library(Hmisc)
 library(party) #carts
 source('functions/stat_smooth_func_all.R')
 library(RColorBrewer)
+library(rgdal)
 ```
 
 ## User Vars
@@ -238,7 +239,7 @@ rrca.rrb.states <- merge(rrca.rrb.states,cornprice[,c('Year', 'priceLag1')],all.
 
 # add total irrigated area for the full study region
 rrca.rrb$area.union <- all[all$masterid == 'RRCA_RRB_Union','irrigated_km2']
-rrca.rrb$AArea_km2_else <- rrca.rrb$area.union - rrca.rrb$Area_km2
+rrca.rrb$Area_km2_else <- rrca.rrb$area.union - rrca.rrb$Area_km2
 ```
 
 ### Exploratory analyses: RRB of RRCA domain
@@ -247,34 +248,17 @@ Average application depth: Divide irrigated pumping by area (average application
 
 what proportion of water demand they are satisfying?
 
-```{r applicationDepth, fig.height=3, fig.width=3}
+```{r applicationDepth_cm_noStats_rrbrrca, fig.height = 3, fig.width = 3, dpi=600, dev=c('png','pdf')}
 # calculate depth of water applied
-rrca$Depth_m <- rrca$Volume_km3/rrca$Area_km2 * 1000
+rrca.rrb$Depth_m <- rrca.rrb$Volume_km3/rrca.rrb$Area_km2 * 1000
 
 # convert dpeth and precip to cm
-rrca$Depth_cm <- rrca$Depth_m * 100
-rrca$Precip_cm <- rrca$Precip_mm / 10
+rrca.rrb$Depth_cm <- rrca.rrb$Depth_m * 100
+rrca.rrb$Precip_cm <- rrca.rrb$Precip_mm / 10
 
-ggplot(rrca, aes(Precip_mm, Depth_m)) +
-  geom_point() + theme_bw() +
-  stat_smooth(method = 'lm', se=F) + 
-  stat_smooth_func_all(geom="text",method="lm",hjust=0,parse=TRUE, 
-                 xpos = 250, ypos = .68, size=.5) +
-  ylab('Depth (m)') + xlab('Precip (mm)') +
-  theme(axis.text=element_text(size=11),
-               legend.text=element_text(size=11),
-               axis.title=element_text(size=13))
-
-
-depthlm <- lm(Depth_m ~ Precip_mm, data = rrca)
-summary(depthlm)
-```
-
-```{r applicationDepth_cm_noStats, fig.height = 3, fig.width = 3, dpi=600, dev=c('png','pdf')}
-
-depth <- ggplot(rrca, aes(Precip_cm, Depth_cm)) +
-  geom_point() + theme_bw() +
-  stat_smooth(method = 'lm', se=F, size=.5, color='black') + 
+depth <- ggplot(rrca.rrb, aes(Precip_cm, Depth_cm)) +
+  geom_point(color = 'chartreuse3') + theme_bw() +
+  stat_smooth(method = 'lm', se=F, size=.5, color='chartreuse3') + 
   #stat_smooth_func_all(geom="text",method="lm",hjust=0,parse=TRUE, 
   #               xpos = 25, ypos = 68) +
   ylab('Depth (cm)') + xlab('Precipitation (cm)')  +
@@ -285,20 +269,46 @@ depth <- ggplot(rrca, aes(Precip_cm, Depth_cm)) +
              panel.grid.minor = element_blank())
 depth
 
-depthlm <- lm(Depth_cm ~ Precip_cm, data = rrca)
+depthlm <- lm(Depth_cm ~ Precip_cm, data = rrca.rrb)
 summary(depthlm)
+
+```
+
+by state?
+
+```{r applicationDepth_cm_noStats_rrbrrcaState, fig.height = 3, fig.width = 7, dpi=600, dev=c('png','pdf')}
+# calculate depth of water applied
+rrca.rrb.states$Depth_m <- rrca.rrb.states$Volume_km3/rrca.rrb.states$Area_km2 * 1000
+
+# convert dpeth and precip to cm
+rrca.rrb.states$Depth_cm <- rrca.rrb.states$Depth_m * 100
+rrca.rrb.states$Precip_cm <- rrca.rrb.states$Precip_mm / 10
+
+depth.state <- ggplot(rrca.rrb.states, aes(Precip_cm, Depth_cm)) +
+  geom_point(color = 'chartreuse3') + theme_bw() +
+  facet_wrap(~masterid)+
+  stat_smooth(method = 'lm', se=F, size=.5, color='chartreuse3') + 
+  stat_smooth_func_all(geom="text",method="lm",hjust=0,parse=TRUE, 
+                 xpos = 20, ypos = 20) +
+  ylab('Depth (cm)') + xlab('Precipitation (cm)')  +
+  theme(axis.text=element_text(size=10),
+               legend.text=element_text(size=10),
+               axis.title=element_text(size=11),        
+            panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank())
+depth.state
 ```
 
 And plot all time series.
-Update 4/26/2017 - this goes back to only using RRCA boundaries
 
-
-```{r timeSeriesPlot_finalish, fig.height = 4, fig.width = 6, dpi=600, dev=c('png','pdf')}
+```{r timeSeriesPlot_finalish_rrbrrca, fig.height = 4, fig.width = 6, dpi=600, dev=c('png','pdf')}
 # data frame for plotting
-rrcaPlot <- rrca
+rrcaPlot <- rrca.rrb
 
 # items to plot
-plotUs <- c('Area_km2','Depth_cm','Precip_cm','Price')
+names(rrcaPlot)[6] <- 'dVolume_km3'
+plotUs <- c('Area_km2','dVolume_km3','Precip_cm','Price')
+#plotUs <- c('AArea_km2_else','Volume_km3','Precip_cm','Price')
 
 # gather
 plotdata <- gather_(rrcaPlot, key_col = 'variable', value_col = 'value',
@@ -308,10 +318,17 @@ plotdata <- gather_(rrcaPlot, key_col = 'variable', value_col = 'value',
 ggplot(data = plotdata,
       aes(x = Year, y = value, colour=variable)) +
   geom_line() + geom_point() +
+  geom_line(data = data.frame(rrca.rrb,variable='Area_km2'), 
+            aes(x = Year, y = Area_km2_else), color='gray55') +
+  geom_point(data = data.frame(rrca.rrb,variable='Area_km2'), 
+            aes(x = Year, y = Area_km2_else),color='gray55') +
+  stat_smooth(data = data.frame(rrca.rrb,variable='Area_km2'), 
+            aes(x = Year, y = Area_km2_else), method='lm', 
+            se=F,size=.5, color='gray55') +
   scale_colour_manual(values=c('black','red','blue','orange')) + 
-  facet_wrap(~variable, nrow=4, scales='free_y') +
+  facet_wrap(~variable, nrow=5, scales='free_y') +
   stat_smooth(data = subset(plotdata, variable %in% 
-                              c('Area_km2','Depth_cm','Price')), 
+                              c('Area_km2','Price')), 
               method = 'lm', se=F, size=.5) +
   scale_x_continuous(name = '', 
                   breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
@@ -340,12 +357,29 @@ coeffs
 # and model R2 values
 rsq <- lms %>% glance(model)
 rsq
+
+# Unioned area outside of the RRB/RRCA intersection
+summary(lm(Area_km2_else ~ Year,data=rrca.rrb))
 ```
 
 #### redo with percent area
 Dave/Anthony suggested using percent of study area irrigated instead of absolute area
 
-```{r timeSeriesPlot_percent_finalish, fig.height = 4, fig.width = 6, dpi=600, dev=c('png','pdf')}
+Get relevant boundary areas
+```{r getAreas}
+gisDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
+
+# rrb rrca intersection
+poly.rrca.rrb.state <- readOGR(gisDir, 'RRCA-RRB_interesection_byState_aea', verbose = F)
+area.rrca.rrb <- sum(poly.rrca.rrb.state$areakm2)
+
+# full rrca rrb union
+poly.union <- readOGR(gisDir, 'RRCA_RRB_union_aea', verbose = F)
+area.rrca.rrb <- sum(poly.rrca.rrb.state$areakm2)
+```
+
+
+```{r timeSeriesPlot_percent_finalish_rrcarrb, fig.height = 4, fig.width = 6, dpi=600, dev=c('png','pdf')}
 # get percent of RRCA area irrigated
 rrca$AreaPercentRRCA <- (rrca$Area_km2/rrca$tAreaRRCA_km2) * 100
 
