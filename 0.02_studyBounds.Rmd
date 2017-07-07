@@ -87,7 +87,7 @@ legend('bottom',legend = c('original','10 percent','10 km','union'),
 #plot(unioned, add=T)
 ```
 
-### County Analyses
+## County Analyses
 See how buffer choices affect the number of fully included counties
 
 ```{r countyCheck}
@@ -182,7 +182,7 @@ write.csv(fips, paste0(outDir,'/boundary_options_fips_for_contained_countyies.cs
           row.names=F)
 ```
 
-### Areal Comparisons
+## Areal Comparisons
 Compare study areas (since mapping a large area is part of our novelty). Calculates are in AEA conus, as maps are presented
 
 ```{r areas}
@@ -203,11 +203,14 @@ gArea(bufferSmall2) * 1e-6
 
 # large buffer (10 percent of union width, ish)
 gArea(buffer10p) * 1e-6
+
+# RRB/RRCA intersection
+gArea(raster::intersect(bound, rrb))*1e-6
 ```
 
 
 
-### EXport
+## EXport
 including breaking down some regions by state
 
 ```{r export}
@@ -217,16 +220,21 @@ outDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_
 # boundary options ---------------------------------------------------------
 # rrca/rrb union (main study area)
 unioned$masterID <- 'RRCA_RRB_Union'
-#writeOGR(unioned, outDir, 'RRCA_RRB_union_aea', driver='ESRI Shapefile')
+unioned$areakm2 <- gArea(unioned, byid=T) * 1e-6
+unioned <- unioned[,c('masterID','areakm2')]
+#writeOGR(unioned, outDir, 'RRCA_RRB_union_aea', driver='ESRI Shapefile', overwrite=T)
 
 # manually created RRCA bound to Dropbox
 bound$masterID <- 'RRCA_modifiedBorders'
-bound <- bound[,c('masterID')]
-#writeOGR(bound, outDir, 'RRCA_modified_aea', driver='ESRI Shapefile')
+bound$areakm2 <- gArea(bound, byid=T) * 1e-6
+bound <- bound[,c('masterID','areakm2')]
+#writeOGR(bound, outDir, 'RRCA_modified_aea', driver='ESRI Shapefile', overwrite=T)
 
 # RRB to Dropbox for completeness
 rrb$masterID <- 'RRB_basin'
-#writeOGR(rrb, outDir, 'RRB_aea', driver='ESRI Shapefile')
+rrb$areakm2 <- gArea(rrb, byid=T) * 1e-6
+rrb <- rrb[,c('masterID','areakm2')]
+#writeOGR(rrb, outDir, 'RRB_aea', driver='ESRI Shapefile', overwrite=T)
 
 # sub-regions by state ----------------------------------------------------
 # manual moddified RRCA (hpa + RRCA) -----------------
@@ -236,10 +244,11 @@ states <- spTransform(states, CRS(aeaProj))
 rrcastates <- raster::intersect(states, bound)
 rrcastates <- rrcastates[,c('STATE_NAME','STATE_FIPS','STATE_ABBR')]
 rrcastates$masterID <- as.factor(c('RRCA_mod_NE', 'RRCA_mod_CO','RRCA_mod_KS'))
+rrcastates$areakm2 <- gArea(rrcastates, byid=T) * 1e-6
 spplot(rrcastates, 'masterID')
 
 
-#writeOGR(rrcastates, outDir, 'RRCA_modified_byState_aea', driver='ESRI Shapefile')
+#writeOGR(rrcastates, outDir, 'RRCA_modified_byState_aea', driver='ESRI Shapefile', overwrite=T)
 
 # RRB by state --------------------
 rrbstates <- raster::intersect(states, rrb)
@@ -323,6 +332,8 @@ plot(rrcastates[rrcastates$STATE_ABBR == 'CO',], add=T, col='green4')
 plot(rrca.rrb.states[rrca.rrb.states$STATE_ABBR == 'CO',], add=T, col='green')
 plot(NEplatte3, add=T, col='yellow')
 ```
+
+
 
 
 ## 4 km/ 8 km grids for trend analyses
