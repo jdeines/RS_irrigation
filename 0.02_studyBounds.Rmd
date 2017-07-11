@@ -224,6 +224,17 @@ unioned$areakm2 <- gArea(unioned, byid=T) * 1e-6
 unioned <- unioned[,c('masterID','areakm2')]
 #writeOGR(unioned, outDir, 'RRCA_RRB_union_aea', driver='ESRI Shapefile', overwrite=T)
 
+# rrca/rrb by state
+stateDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile'
+states <- readOGR(stateDir, 'States', verbose=F)
+states <- spTransform(states, CRS(aeaProj))
+unionState <- raster::intersect(unioned, states)
+unionState$masterID <- c('Union_NE','Union_CO','Union_KS')
+unionState$areakm2 <- gArea(unionState, byid=T) * 1e-6
+unionState <- unionState[,c('masterID','areakm2','STATE_ABBR')]
+#writeOGR(unionState, outDir, 'RRCA_RRB_union_byState_aea', driver='ESRI Shapefile', overwrite=T)
+
+
 # manually created RRCA bound to Dropbox
 bound$masterID <- 'RRCA_modifiedBorders'
 bound$areakm2 <- gArea(bound, byid=T) * 1e-6
@@ -238,9 +249,7 @@ rrb <- rrb[,c('masterID','areakm2')]
 
 # sub-regions by state ----------------------------------------------------
 # manual moddified RRCA (hpa + RRCA) -----------------
-stateDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile'
-states <- readOGR(stateDir, 'States', verbose=F)
-states <- spTransform(states, CRS(aeaProj))
+
 rrcastates <- raster::intersect(states, bound)
 rrcastates <- rrcastates[,c('STATE_NAME','STATE_FIPS','STATE_ABBR')]
 rrcastates$masterID <- as.factor(c('RRCA_mod_NE', 'RRCA_mod_CO','RRCA_mod_KS'))
