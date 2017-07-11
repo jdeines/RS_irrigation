@@ -252,6 +252,20 @@ image.plot(z=0:18,add=F,legend.only=T,  col=c(backgroundcolor,matlab),
 #grid.text('Years Irrigated',x=unit(0.975, "npc"),y=unit(0.5, 'npc'), rot=-90, gp=gpar(fontsize=18))
 ```
 
+and a lighter gray to help the outlines pop
+
+```{r freqMap_matlab2_bottom_matlab_lightgray, fig.width = 7, fig.height = 5, dpi=600, dev=c('png','pdf')}
+
+backgroundcolor2 <- 'gray50'
+
+#with borders
+spplot(freq2, col.regions = c(backgroundcolor2,matlab), maxpixels = 2000000,
+       sp.layout=list(scale, text1, text2), #, arrow), 
+       par.settings=list(axis.line=list(col=NA)), 
+       colorkey=F) +
+  latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=1.5)) + 
+  latticeExtra::layer(sp.polygons(rrca, lwd=1.5)) 
+```
 
 Integrated colorbar on right (retains map frame border)
 
@@ -315,6 +329,23 @@ spplot(freq_inset1, col.regions = c(backgroundcolor,matlab), maxpixels = 200000,
   latticeExtra::layer(sp.polygons(scale.sp, fill='white', col='black'))
 ```
 
+inset with lighter backgrounds
+
+```{r inset1_freqMap_matlab_lightgray, fig.width = 2.5, fig.height = 3.2, dpi=600, dev=c('png','pdf')}
+
+# color ramp 
+spplot(freq_inset1, col.regions = c(backgroundcolor2,matlab), maxpixels = 200000,
+       par.settings = list(layout.widths=list(right.padding=4.5)),
+      # sp.layout=list(text1),
+       colorkey=list(space = 'bottom',
+                     cex = 1.2,
+                     at=c(0:18), 
+                     labels=c('0','','','3','','','6','','','9',
+                              '','','12','','','15','','','18'),
+                     width = .85,
+                     tck = .7)) +
+  latticeExtra::layer(sp.polygons(scale.sp, fill='white', col='black'))
+```
 
 ```{r inset2_freqMap, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE, eval=FALSE}
 # load full raster
@@ -375,6 +406,23 @@ spplot(early_inset1, col.regions = c(yearramp), maxpixels = 200000,
   #layer(sp.polygons(extent, fill=backgroundcolor), under=T)
 ```
 
+```{r inset1_early_lightgray, fig.width = 2.5, fig.height = 3.2, dpi=600, dev=c('png','pdf'), cache=FALSE}
+
+# color ramp 
+spplot(early_inset1, col.regions = c(yearramp), maxpixels = 200000,
+       par.settings = list(layout.widths=list(right.padding=4.5),
+                           panel.background=list(col=backgroundcolor2)),
+       #sp.layout=list(scale, text1, text2),
+       colorkey=list(space = 'bottom',
+                     cex = 1.2,
+                     at=c(1999:2016),
+                     labels=c('','2000','','','','','2005','','','',
+                              '','2010','','','','','2015',''),
+                     width = .85,
+                     tck = .7)) #+
+  #layer(sp.polygons(extent, fill=backgroundcolor), under=T)
+```
+
 ```{r inset2_early, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE, eval=FALSE}
 # load full raster
 early_inset2 <- raster(paste0(rasDir,'/',earlyInset2.name))
@@ -424,6 +472,20 @@ late_inset1[late_inset1 == 0] <- NA
 spplot(late_inset1, col.regions = c(yearramp), maxpixels = 200000,
        par.settings = list(layout.widths=list(right.padding=4.5),
                            panel.background=list(col=backgroundcolor)),
+             colorkey=list(space = 'bottom',
+                     cex = 1.2,
+                     at=c(1999:2016),
+                     labels=c('','2000','','','','','2005','','','',
+                              '','2010','','','','','2015',''),
+                     width = .85,
+                     tck = .7)) #+
+```
+
+```{r inset1_late_lightgray, fig.width = 2.5, fig.height = 3.2, dpi=600, dev=c('png','pdf'), cache=FALSE}
+# color ramp 
+spplot(late_inset1, col.regions = c(yearramp), maxpixels = 200000,
+       par.settings = list(layout.widths=list(right.padding=4.5),
+                           panel.background=list(col=backgroundcolor2)),
              colorkey=list(space = 'bottom',
                      cex = 1.2,
                      at=c(1999:2016),
