@@ -151,6 +151,9 @@ palMax <- .6
 
 We decided to keep it in actual area/km, not percents
 
+- add states
+- 
+
 ```{r gridRegress4, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
 extentDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
 extentName <- 'RRCA_RRB_union_aea'
