@@ -648,5 +648,23 @@ grid.arrange(ptime2, depth, pcart, layout_matrix = rbind(c(1,1), c(2,3)),
              heights=c(1.45,1))
 ```
 
+# no extra line
 
+```{r fig3Combo_noGrid_rrbrrcaOnly, fig.height=6.5, fig.width = 6, dpi=600, dev=c('png','pdf')}
+# grid.newpage()
+# # Create layout : nrow = 2, ncol = 2
+# pushViewport(viewport(layout = grid.layout(2,2)))
+#              
+# # A helper function to define a region on the layout
+# define_region <- function(row, col){
+#   viewport(layout.pos.row = row, layout.pos.col = col)
+# } 
+# # Arrange the plots
+# print(ptime, vp=define_region(1, 1:2))
+# print(depth, vp = define_region(2, 1))
+# print(pcart, vp = define_region(2, 2))  
+
+grid.arrange(ptime, depth, pcart, layout_matrix = rbind(c(1,1), c(2,3)),
+             heights=c(1.45,1))
+```
 
