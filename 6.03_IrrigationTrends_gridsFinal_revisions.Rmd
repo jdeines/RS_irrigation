@@ -140,11 +140,15 @@ poly4.union <- raster::intersect(poly4, unioned)
 # plot specs
 originalPalette <- matlab.like(16)
 
-colchange <- c("#a50026","#d73027","#f46d43","#fdae61","#fed569","antiquewhite3",
+colchange <- c("#a50026","#d73027","#f46d43","#fdae61","#fed569",
                "#abd9e9","#92c5de","#74add1","#4575b4","#313695")
 
+blueRamp <- colorRampPalette(rev(c("#abd9e9","#92c5de","#74add1",
+                                   "#4575b4","#313695")))
+redRamp <- colorRampPalette(rev(c("#a50026","#d73027","#f46d43",
+                                  "#fdae61","#fed569")))                             
 # set palette in plots
-origPal <- rev(colchange)
+origPal <- colorRampPalette(rev(colchange))
 palMin <- -.6
 palMax <- .6 
 ```
@@ -161,21 +165,48 @@ rrb <- 'RRB_aea'
 rrbpoly <- readOGR(extentDir, rrb, verbose=F)
 rrca <- readOGR(extentDir, 'RRCA_modified_aea', verbose=F)
 
+states <- readOGR('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile', 'States', verbose=F)
+states <- states[states$STATE_ABBR %in% c('CO','NE','KS'),]
+states <- spTransform(states, CRS(proj4string(rrca)))
+
+colorbreaks <- 200
+biPal <- c(blueRamp(colorbreaks/2),redRamp(colorbreaks/2))
+
 # plot! - absolute area
-spplot(poly4.union, 'sigCoeffs', col.regions=origPal,
-       at=seq(palMin,palMax,(-palMin+palMax)/11),
-       colorkey=list(space='bottom'), col=NA,
-       main = 'Absolute area, 4 km grid, sig only') +
+spplot(poly4.union, 'sigCoeffs', col.regions=biPal, col=NA,
+       at=seq(palMin,palMax,(-palMin+palMax)/colorbreaks),
+              #main = 'Absolute area, 4 km grid, sig only',
+       colorkey=list(space='bottom',
+                     labels=list(
+                       labels = c('-0.6','-0.4','-0.2','0','0.2','0.4','0.6')))) +
   latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=.8)) + 
-  latticeExtra::layer(sp.polygons(rrca,lwd=.8)) 
+  latticeExtra::layer(sp.polygons(rrca,lwd=.8)) +
+  latticeExtra::layer(sp.polygons(states, lwd=1, col='gray40')) #+ 
+ # latticeExtra::layer(sp.polygons(unioned, fill = 'gray80', col=NA), under=T)
+
+# gray background
+spplot(poly4.union, 'sigCoeffs', col.regions=biPal, col=NA,
+       at=seq(palMin,palMax,(-palMin+palMax)/colorbreaks),
+              #main = 'Absolute area, 4 km grid, sig only',
+       colorkey=list(space='bottom',
+                     labels=list(
+                       labels = c('-0.6','-0.4','-0.2','0','0.2','0.4','0.6')))) +
+  latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=.8)) + 
+  latticeExtra::layer(sp.polygons(rrca,lwd=.8)) +
+  latticeExtra::layer(sp.polygons(states, lwd=1, col='gray30')) + 
+  latticeExtra::layer(sp.polygons(unioned, fill = 'gray50', col=NA), under=T)
 
 # plot: all cells
-spplot(poly4.union, 'estimate', col.regions=origPal,
-       at=seq(palMin,palMax,(-palMin+palMax)/11),
-       colorkey=list(space='bottom'), col=NA,
-       main = 'Absolute area, 4 km grid, any sig') +
+spplot(poly4.union, 'estimate', col.regions=biPal, col=NA,
+       at=seq(palMin,palMax,(-palMin+palMax)/colorbreaks),
+              #main = 'Absolute area, 4 km grid, sig only',
+       colorkey=list(space='bottom',
+                     labels=list(
+                       labels = c('-0.6','-0.4','-0.2','0','0.2','0.4','0.6')))) +
   latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=.8)) + 
-  latticeExtra::layer(sp.polygons(rrca,lwd=.8)) 
+  latticeExtra::layer(sp.polygons(rrca,lwd=.8)) +
+  latticeExtra::layer(sp.polygons(states, lwd=1, col='gray40')) #+ 
+ # latticeExtra::layer(sp.polygons(unioned, fill = 'gray80', col=NA), under=T)
 ``` 
 
 ### Novel/Retired Irrigated Area by year
@@ -266,9 +297,16 @@ Dave and Anthony requested a plot with cumulative novel and retired areas
 ```{r fullExtent_novelRetired_cumulative_nogrid_allRegions, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
 # extract regions to plot
 regionsWanted <- c('RRB_KS_lowerBasin','Platte-NE_RRCA','RRB_KS_upperBasin',
-                   'RRB_CO_basin','RRB_NE_basin','RRCA_mod_CO', 'RRCA_mod_KS')
+                   'RRB_CO_basin','RRB_NE_basin','RRCA_mod_KS','RRCA_RRB_union',
+                   'RRCA_modifiedBorders','RRB_basin')
 
-regions <- combined[combined$masterid %in% regionsWanted,]
+regions0 <- combined[combined$masterid %in% regionsWanted,
+                     c('masterid','year','area_km2','dataset')]
+
+
+# switch to wide format in order to calculate non-RRB portion of KS RRCA
+regions.wide <- spread(regions0, masterid, area_km2)
+
 
 # make a cumulative sum column by dataset type
 regions <- regions %>%
