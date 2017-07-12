@@ -334,7 +334,7 @@ plot(NEplatte3)
 # #writeOGR(KS.gw.up3, outDir, 'RRCA-KS-upperOnly_aea', driver='ESRI Shapefile')
 ```
 
-```{r subregionPlot, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
+```{r subregionPlot_3.25in, fig.width = 3.25, fig.height = 3, dpi=600, dev=c('png','pdf')}
 # colors
 NEbasin <- '#a6cee3' # light blue
 platte <- '#1f78b4' # darker blue
@@ -362,7 +362,15 @@ plot(rrcastates[rrcastates$STATE_ABBR == 'CO',], add=T, col=COall)
 plot(rrbstates3[rrbstates3$STATE_ABBR == 'CO',], add=T, col = CObasin)
 plot(NEplatte3, add=T, col=platte)
 
-legend('bottom', legend = c('CO RRB', 'CO GRB', 'NE RRB', 'NE Platte',
+```
+
+```{r subregionPlot_4colLegend, fig.width = 5, fig.height = 2, dpi=600, dev=c('png','pdf')}
+
+# legend  ---------------------
+par(mar = c(0,0,0,0))
+plot(rrbstates3, col=NA, border=NA)
+
+legend('top', legend = c('CO RRB', 'CO GRB', 'NE RRB', 'NE Platte',
                             'KS RRB', 'KS RRCA', 'KS Lower'),
        fill = c(CObasin, COall, NEbasin, platte, KSbasinUP, KSrrca, KSlower),
        border = 'black',
@@ -465,30 +473,30 @@ poly4 <- gridToPoly(grid4km, uneven)
 plot(poly4, main = '4 km polygons')
 plot(poly4[poly4$contained == TRUE,], add=T, col='red')
 plot(unioned, add=T)
-writeOGR(poly4, boundDir, 'Polynet_4km_aea', driver='ESRI Shapefile')
+#writeOGR(poly4, boundDir, 'Polynet_4km_aea', driver='ESRI Shapefile')
 
 # 8 k
 poly8 <- gridToPoly(grid8km, uneven)
 plot(poly8, main = '8 km polygons')
 plot(poly8[poly8$contained == TRUE,], add=T, col='red')
 plot(unioned, add=T)
-writeOGR(poly8, boundDir, 'Polynet_8km_aea', driver='ESRI Shapefile')
+#writeOGR(poly8, boundDir, 'Polynet_8km_aea', driver='ESRI Shapefile')
 
 # 12 k
 poly12 <- gridToPoly(grid12km, uneven)
 plot(poly12, main = '12 km polygons')
 plot(poly12[poly12$contained == TRUE,], add=T, col='red')
 plot(unioned, add=T)
-writeOGR(poly12, boundDir, 'Polynet_12km_aea', driver='ESRI Shapefile',
-         layer_options = 'RESIZE=YES')
+#writeOGR(poly12, boundDir, 'Polynet_12km_aea', driver='ESRI Shapefile',
+#         layer_options = 'RESIZE=YES')
 
 # 20 km
 poly20 <- gridToPoly(grid20km, uneven)
 plot(poly20, main = '20 km polygons')
 plot(poly20[poly20$contained == TRUE,], add=T, col='red')
 plot(unioned, add=T)
-writeOGR(poly20, boundDir, 'Polynet_20km_aea', driver='ESRI Shapefile',
-         layer_options = 'RESIZE=YES')
+#writeOGR(poly20, boundDir, 'Polynet_20km_aea', driver='ESRI Shapefile',
+#         layer_options = 'RESIZE=YES')
 
 ```
 
