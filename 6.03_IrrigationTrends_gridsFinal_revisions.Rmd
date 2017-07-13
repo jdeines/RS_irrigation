@@ -22,7 +22,7 @@ opts_chunk$set(cache=TRUE, cache.path = 'cache/6.03_gridTrends/',
 
 **R Packages Needed**
 
-```{r packages, message=FALSE, echo=TRUE}
+```{r packages, message=FALSE, echo=TRUE,cache=FALSE}
 library(rgdal)
 library(rgeos)
 library(latticeExtra)
@@ -30,6 +30,8 @@ library(tidyverse) # for ggplot2, tidyr, dplyr
 library(broom)
 library(colorRamps)
 source('functions/stat_smooth_func_all.R')
+library(gridExtra)
+library(grid)
 ```
 
 ## Load Data
@@ -44,7 +46,7 @@ regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test5_regiona
 
 # regional areas -----------------------------------------------
 # get filenames
-files <- list.files(regionsDir, pattern="*_test5_randFor_interannual_plusAncillary_REVISION_BOUNDARIES.csv")
+files <- list.files(regionsDir, pattern="*_test5_randFor_interannual_plusAncillary_REVISION_BOUNDARIES_ksSplit.csv")
 
 # read in to a single dataframe
 loadStats <- function(fileList){
@@ -155,8 +157,6 @@ palMax <- .6
 
 We decided to keep it in actual area/km, not percents
 
-- add states
-- 
 
 ```{r gridRegress4, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
 extentDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
@@ -217,8 +217,8 @@ cellArea <- 30*30 # m^2
 yearsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/earliestLatestTable'
 
 # load 
-early <- read.csv(paste0(yearsDir, '/', 'test5_randFor_earliest_revisionBoundaries_regionCounts.csv'))
-late <- read.csv(paste0(yearsDir, '/', 'test5_randFor_latest_revisionBoundaries_regionCounts.csv'))
+early <- read.csv(paste0(yearsDir, '/', 'test5_randFor_earliest_revisionBoundaries_ksSplit_regionCounts.csv'))
+late <- read.csv(paste0(yearsDir, '/', 'test5_randFor_latest_revisionBoundaries_ksSplit_regionCounts.csv'))
 
 # remove county data
 early <- early[!grepl('county', early$masterid),]
@@ -294,19 +294,27 @@ ggplot(data = combined[grepl('full', combined$masterid),],
 
 Dave and Anthony requested a plot with cumulative novel and retired areas
 
-```{r fullExtent_novelRetired_cumulative_nogrid_allRegions, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
+```{r novelRetired_cumulative_9regions, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
 # extract regions to plot
 regionsWanted <- c('RRB_KS_lowerBasin','Platte-NE_RRCA','RRB_KS_upperBasin',
-                   'RRB_CO_basin','RRB_NE_basin','RRCA_mod_KS','RRCA_RRB_union',
-                   'RRCA_modifiedBorders','RRB_basin')
+                   'RRB_CO_basin','RRB_NE_basin','RRCA_mod_KS_main',
+                   'RRCA_RRB_Union','RRCA_modifiedBorders','RRB_basin')
 
 regions0 <- combined[combined$masterid %in% regionsWanted,
                      c('masterid','year','area_km2','dataset')]
 
-
-# switch to wide format in order to calculate non-RRB portion of KS RRCA
+# make wide to calculate RRCS KS withouth RRB
 regions.wide <- spread(regions0, masterid, area_km2)
-
+regions.wide$KS_non_RRB <- regions.wide$RRCA_mod_KS_main -
+                      regions.wide$RRB_KS_upperBasin
+# back to long
+gathercols <- c('RRB_KS_lowerBasin','Platte-NE_RRCA','RRB_KS_upperBasin',
+                   'RRB_CO_basin','RRB_NE_basin','KS_non_RRB',
+                   'RRCA_RRB_Union','RRCA_modifiedBorders','RRB_basin',
+                'RRCA_mod_KS_main')
+regions <- gather_(regions.wide, 'masterid', 'area_km2', 
+                   gather_cols=gathercols)
+regions <- regions[regions$masterid != 'RRCA_mod_KS_main',]
 
 # make a cumulative sum column by dataset type
 regions <- regions %>%
@@ -320,88 +328,45 @@ regions[regions$dataset == 'total','toPlot'] <- regions[regions$dataset == 'tota
 regions[regions$dataset == 'novel','toPlot'] <- regions[regions$dataset == 'novel','cumArea_km2']
 regions[regions$dataset == 'retired','toPlot'] <- regions[regions$dataset == 'retired','cumArea_km2']
 
+# rename masterid's to control order
+idKey <- data.frame(masterid = c('RRB_KS_lowerBasin','Platte-NE_RRCA',
+                                 'RRB_KS_upperBasin','RRB_CO_basin',
+                                 'RRB_NE_basin',
+                                 'KS_non_RRB', 'RRCA_RRB_Union',
+                                 'RRCA_modifiedBorders', 'RRB_basin'),
+                   masterid2 = c('gRRB_KS_lowerBasin', 'iPlatte-NE_RRCA',
+                                 'fRRB_KS_upperBasin',
+                   'dRRB_CO_basin', 'eRRB_NE_basin', 'hKS_non_RRB',
+                   'aRRCA_RRB_Union', 'cRRCA_modifiedBorders', 'bRRB_basin'),
+                   rowname = c('three','three','two','two','two','three',
+                               'one','one','one'))
+regions <- merge(regions, idKey)
+
 # plotty plot
-labels <- c(`RRB_KS_lowerBasin` = 'KS RRB (lower)',
-            `Platte-NE_RRCA` = 'Platte RRCA',
-            `RRB_KS_upperBasin` = 'KS RRB (upper)',
-            `RRB_CO_basin` = 'CO RRB',
-            `RRB_NE_basin` = 'NE RRB',
-            `RRCA_mod_CO` = 'CO RRCA',
-            `RRCA_mod_KS` = 'KS RRCA')
+labels <- c(`gRRB_KS_lowerBasin` = 'KS RRB (lower)',
+            `iPlatte-NE_RRCA` = 'Platte RRCA',
+            `fRRB_KS_upperBasin` = 'KS RRB (upper)',
+            `dRRB_CO_basin` = 'CO RRB',
+            `eRRB_NE_basin` = 'NE RRB',
+            `hKS_non_RRB` = 'KS RRCA',
+            `aRRCA_RRB_Union` = 'GRB (all areas)',
+            `cRRCA_modifiedBorders` = 'RRCA',
+            `bRRB_basin` = 'RRB (full basin)')
 
-## legend at the top
-# ggplot(data = stateExtent,
-#        aes(x = year, y = toPlot, colour = dataset)) + 
-#     facet_wrap( ~ masterID, labeller = as_labeller(labels)) +
-#     geom_line() + geom_point() +
-#     ylab(expression(paste("Irrigated Area (", km^2,")"))) +
-#     xlab('Year') + #ggtitle('Full Region by State') +
-#     scale_color_discrete(breaks=c('total','novel','retired'),
-#                          labels=c('total', 'cumulative novel',
-#                                   'cumulative retired')) +
-#     guides(color=guide_legend(title=NULL)) +
-#     theme_bw() +
-#     theme(legend.position = 'top') 
-
-ggplot(data = regions,
+# plot
+ggplot(data = regions,#[regions$rowname != 'one',],
        aes(x = year, y = toPlot, colour = dataset)) + 
-    facet_wrap( ~ masterid, labeller = as_labeller(labels)) +
+    facet_wrap( ~ masterid2, labeller = as_labeller(labels)) +
     geom_line() + geom_point() +
     ylab(expression(paste("Irrigated Area (", km^2,")"))) +
-    xlab('Year') + #ggtitle('Full Region by State') +
+    xlab('') + #ggtitle('Full Region by State') +
     scale_color_manual(breaks=c('total','novel','retired'),
                          labels=c('total', 'cumulative novel',
                                   'cumulative retired'),
                          values=c('red','blue','black')) +
     guides(color=guide_legend(title=NULL)) +
     theme_bw() +
-    theme(legend.position = c(.85,.18),
-          axis.text=element_text(size=10),
-                     legend.text=element_text(size=10),
-                     legend.title = element_text(size=10),
-                     axis.title=element_text(size=11),
-           panel.grid.major = element_blank(),
-             panel.grid.minor = element_blank())
-
-# large regions
-regionsWanted1 <- c('RRCA_RRB_Union','RRCA_modifiedBorders','RRB_basin',
-                   'RRCARRB_intersection','rrcaRrbBuffExtent')
-largeRegions <- combined[combined$masterid %in% regionsWanted1,]
-
-# make a cumulative sum column by dataset type
-largeRegions <- largeRegions %>%
-  group_by(masterid, dataset) %>%
-  arrange(year) %>%
-  mutate(cumArea_km2 = cumsum(area_km2))
-
-# make a column to plot that has raw data for total, cumulative for novel/retired
-largeRegions$toPlot <- NA
-largeRegions[largeRegions$dataset == 'total','toPlot'] <- largeRegions[largeRegions$dataset == 'total','area_km2']
-largeRegions[largeRegions$dataset == 'novel','toPlot'] <- largeRegions[largeRegions$dataset == 'novel','cumArea_km2']
-largeRegions[largeRegions$dataset == 'retired','toPlot'] <- largeRegions[largeRegions$dataset == 'retired','cumArea_km2']
-
-# plotty plot
-labels2 <- c(`RRCA_RRB_Union` = 'RRCA + RRB',
-            `RRCA_modifiedBorders` = 'RRCA',
-            `RRB_basin` = 'RRB basin',
-            `RRCARRB_intersection` = 'RRCA RRB clip',
-            `rrcaRrbBuffExtent` = 'Full Buffered')
-
-
-
-ggplot(data = largeRegions,
-       aes(x = year, y = toPlot, colour = dataset)) + 
-    facet_wrap( ~ masterid, labeller = as_labeller(labels2)) +
-    geom_line() + geom_point() +
-    ylab(expression(paste("Irrigated Area (", km^2,")"))) +
-    xlab('Year') + #ggtitle('Full Region by State') +
-    scale_color_manual(breaks=c('total','novel','retired'),
-                         labels=c('total', 'cumulative novel',
-                                  'cumulative retired'),
-                         values=c('red','blue','black')) +
-    guides(color=guide_legend(title=NULL)) +
-    theme_bw() +
-    theme(legend.position = c(.85,.25),
+    theme(legend.position = c(.5,.17),
           axis.text=element_text(size=10),
                      legend.text=element_text(size=10),
                      legend.title = element_text(size=10),
@@ -410,8 +375,133 @@ ggplot(data = largeRegions,
              panel.grid.minor = element_blank())
 ```
 
+Break into two pieces to set y scales different for top row
+
+```{r novelRetired_cumulative_largeregions, fig.width = 6.5, fig.height=2.5, dpi=600, dev=c('png','pdf'), cache=FALSE}
+toprow <- ggplot(data = regions[regions$rowname == 'one',],
+       aes(x = year, y = toPlot, colour = dataset)) + 
+    facet_wrap( ~ masterid2, labeller = as_labeller(labels)) +
+    geom_line() + geom_point() +
+    ylab('') +
+    xlab('') + #ggtitle('Full Region by State') +
+    scale_color_manual(breaks=c('total','novel','retired'),
+                         labels=c('total', 'cumulative novel',
+                                  'cumulative retired'),
+                         values=c('red','blue','black')) +
+    theme_bw() +
+    theme(legend.position = 'none',
+          axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     legend.title = element_text(size=10),
+                     axis.title=element_text(size=11),
+           panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank(),
+          axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        text = element_text(size = 11))
+toprow
+```
+
+bottom rows
+
+```{r novelRetired_cumulative_6regions, fig.width = 6.5, fig.height=4, dpi=600, dev=c('png','pdf'), cache=FALSE}
+library(gridExtra)
+library(grid)
+botrow <- ggplot(data = regions[regions$rowname != 'one',],
+       aes(x = year, y = toPlot, colour = dataset)) + 
+    facet_wrap( ~ masterid2, labeller = as_labeller(labels)) +
+    geom_line() + geom_point() +
+    ylab('') +
+    xlab('') + #ggtitle('Full Region by State') +
+    scale_color_manual(breaks=c('total','novel','retired'),
+                         labels=c('total', 'cumulative gained',
+                                  'cumulative lost'),
+                         values=c('red','blue','black')) +
+    guides(color=guide_legend(title=NULL)) +
+    theme_bw() +
+    theme(legend.position = c(.5,.263),
+          axis.text= element_text(size=10),
+          legend.text=element_text(size=10),
+          legend.title = element_text(size=10),
+          axis.title=element_text(size=11),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank())
+botrow
+
+# dummy plot
+NEbasin <- '#a6cee3' # light blue
+platte <- '#1f78b4' # darker blue
+
+CObasin <- '#b2df8a' # light green
+COall <- '#33a02c' # darker green
+
+KSbasinUP <- '#762a83' # medium purple
+KSrrca <- '#c2a5cf' # light purple
+KSlower <- '#40004b' # dark purple
+
+dummy <- ggplot(data = regions[regions$rowname != 'one',],
+       aes(x = year, y = toPlot, colour = dataset)) + 
+    facet_wrap( ~ masterid2, labeller = as_labeller(labels), nrow=2)  +
+  scale_fill_manual(values = c(CObasin, NEbasin, KSbasinUP,
+                               KSlower, KSrrca, platte)) +
+  geom_rect(aes(fill=masterid2), color='black',
+            xmin=-Inf, xmax = Inf, ymin = -Inf, ymax=Inf) + 
+  theme_minimal() + theme(text = element_text(size = 11))
+
+# gtable stuff
+g1 <- ggplotGrob(botrow)
+g2 <- ggplotGrob(dummy)
+
+gtable_select <- function (x, ...) 
+{
+  matches <- c(...)
+  x$layout <- x$layout[matches, , drop = FALSE]
+  x$grobs <- x$grobs[matches]
+  x
+}
+
+panels <- grepl(pattern="panel", g2$layout$name)
+strips <- grepl(pattern="strip-t", g2$layout$name)
+g2$layout$t[panels] <- g2$layout$t[panels] - 1
+g2$layout$b[panels] <- g2$layout$b[panels] - 1
+
+new_strips <- gtable_select(g2, panels | strips)
+#grid.newpage()
+#grid.draw(new_strips)
+
+gtable_stack <- function(g1, g2){
+  g1$grobs <- c(g1$grobs, g2$grobs)
+  g1$layout <- transform(g1$layout, z= z-max(z), name="g2")
+  g1$layout <- rbind(g1$layout, g2$layout)
+  g1
+}
+## ideally you'd remove the old strips, for now they're just covered
+new_plot <- gtable_stack(g1, new_strips)
+grid.newpage()
+grid.draw(new_plot)
+```
+
+
+```{r novelRetired_cumulative_comboregions_colors, fig.width = 6.5, dpi=600, dev=c('png','pdf'), cache=FALSE}
+library(gridExtra)
+library(grid)
+# plot with colors
+grid.newpage()
+grid.draw(rbind(ggplot2::ggplotGrob(toprow), new_plot, size = "last"))
+```
+
+```{r novelRetired_cumulative_comboregions, fig.width = 6.5, dpi=600, dev=c('png','pdf'), cache=FALSE}
+library(gridExtra)
+library(grid)
+# plot without colors
+grid.newpage()
+grid.draw(rbind(ggplot2::ggplotGrob(toprow), ggplot2::ggplotGrob(botrow), size = "last"))
+```
+
+             
 And a plot of just retired/novel fields over time
-Not run do to changes away from 'stateExtent' variable
+Not run due to changes away from 'stateExtent' variable
 
 ```{r fullExtent_novelRetired_alone, fig.height = 2.5, fig.width = 6.5, eval=FALSE}
 # remove total from dataset
@@ -435,8 +525,6 @@ ggplot(data = stateExtent2,
 
 #### Numerical breakdowns
 Growth as a percentage of irrigated area, net new fields compared to irrigated area increases...
-
-NEEDS TO BE RE-DONE WITH FINAL FIGURE 4 REGIONS
 
 ```{r numerology, eval=FALSE}
 stateData <- combined[grepl('full', combined$masterid),]
