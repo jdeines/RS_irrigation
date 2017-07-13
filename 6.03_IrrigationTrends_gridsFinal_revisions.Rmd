@@ -148,7 +148,13 @@ colchange <- c("#a50026","#d73027","#f46d43","#fdae61","#fed569",
 blueRamp <- colorRampPalette(rev(c("#abd9e9","#92c5de","#74add1",
                                    "#4575b4","#313695")))
 redRamp <- colorRampPalette(rev(c("#a50026","#d73027","#f46d43",
-                                  "#fdae61","#fed569")))                             
+                                  "#fdae61","#fed569"))) 
+
+# actual blue and red ramp
+redRamp2 <- colorRampPalette(c('#fddbc7','#f4a582','#d6604d','#b2182b','#67001f'))
+blueRamp2 <- colorRampPalette(rev(c('#d1e5f0','#92c5de','#4393c3','#2166ac','#053061')))
+
+
 # set palette in plots
 origPal <- colorRampPalette(rev(colchange))
 palMin <- -.6
@@ -158,31 +164,19 @@ palMax <- .6
 We decided to keep it in actual area/km, not percents
 
 
-```{r gridRegress4, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
-extentDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
+```{r gridRegress4_redbluegray, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
 extentName <- 'RRCA_RRB_union_aea'
 rrb <- 'RRB_aea'
-rrbpoly <- readOGR(extentDir, rrb, verbose=F)
-rrca <- readOGR(extentDir, 'RRCA_modified_aea', verbose=F)
+rrbpoly <- readOGR(gisDir, rrb, verbose=F)
+rrca <- readOGR(gisDir, 'RRCA_modified_aea', verbose=F)
 
 states <- readOGR('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile', 'States', verbose=F)
 states <- states[states$STATE_ABBR %in% c('CO','NE','KS'),]
 states <- spTransform(states, CRS(proj4string(rrca)))
 
 colorbreaks <- 200
-biPal <- c(blueRamp(colorbreaks/2),redRamp(colorbreaks/2))
+biPal <- c(blueRamp2(colorbreaks/2),redRamp2(colorbreaks/2))
 
-# plot! - absolute area
-spplot(poly4.union, 'sigCoeffs', col.regions=biPal, col=NA,
-       at=seq(palMin,palMax,(-palMin+palMax)/colorbreaks),
-              #main = 'Absolute area, 4 km grid, sig only',
-       colorkey=list(space='bottom',
-                     labels=list(
-                       labels = c('-0.6','-0.4','-0.2','0','0.2','0.4','0.6')))) +
-  latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=.8)) + 
-  latticeExtra::layer(sp.polygons(rrca,lwd=.8)) +
-  latticeExtra::layer(sp.polygons(states, lwd=1, col='gray40')) #+ 
- # latticeExtra::layer(sp.polygons(unioned, fill = 'gray80', col=NA), under=T)
 
 # gray background
 spplot(poly4.union, 'sigCoeffs', col.regions=biPal, col=NA,
@@ -196,17 +190,30 @@ spplot(poly4.union, 'sigCoeffs', col.regions=biPal, col=NA,
   latticeExtra::layer(sp.polygons(states, lwd=1, col='gray30')) + 
   latticeExtra::layer(sp.polygons(unioned, fill = 'gray50', col=NA), under=T)
 
-# plot: all cells
-spplot(poly4.union, 'estimate', col.regions=biPal, col=NA,
-       at=seq(palMin,palMax,(-palMin+palMax)/colorbreaks),
-              #main = 'Absolute area, 4 km grid, sig only',
-       colorkey=list(space='bottom',
-                     labels=list(
-                       labels = c('-0.6','-0.4','-0.2','0','0.2','0.4','0.6')))) +
-  latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=.8)) + 
-  latticeExtra::layer(sp.polygons(rrca,lwd=.8)) +
-  latticeExtra::layer(sp.polygons(states, lwd=1, col='gray40')) #+ 
- # latticeExtra::layer(sp.polygons(unioned, fill = 'gray80', col=NA), under=T)
+# # plot! - absolute area, white background
+# spplot(poly4.union, 'sigCoeffs', col.regions=biPal, col=NA,
+#        at=seq(palMin,palMax,(-palMin+palMax)/colorbreaks),
+#               #main = 'Absolute area, 4 km grid, sig only',
+#        colorkey=list(space='bottom',
+#                      labels=list(
+#                        labels = c('-0.6','-0.4','-0.2','0','0.2','0.4','0.6')))) +
+#   latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=.8)) + 
+#   latticeExtra::layer(sp.polygons(rrca,lwd=.8)) +
+#   latticeExtra::layer(sp.polygons(states, lwd=1, col='gray40')) #+ 
+#  # latticeExtra::layer(sp.polygons(unioned, fill = 'gray80', col=NA), under=T)
+
+
+# # plot: all cells
+# spplot(poly4.union, 'estimate', col.regions=biPal, col=NA,
+#        at=seq(palMin,palMax,(-palMin+palMax)/colorbreaks),
+#               #main = 'Absolute area, 4 km grid, sig only',
+#        colorkey=list(space='bottom',
+#                      labels=list(
+#                        labels = c('-0.6','-0.4','-0.2','0','0.2','0.4','0.6')))) +
+#   latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=.8)) + 
+#   latticeExtra::layer(sp.polygons(rrca,lwd=.8)) +
+#   latticeExtra::layer(sp.polygons(states, lwd=1, col='gray40')) #+ 
+#  # latticeExtra::layer(sp.polygons(unioned, fill = 'gray80', col=NA), under=T)
 ``` 
 
 ### Novel/Retired Irrigated Area by year
@@ -294,6 +301,9 @@ ggplot(data = combined[grepl('full', combined$masterid),],
 
 Dave and Anthony requested a plot with cumulative novel and retired areas
 
+### Multiple regions, 1 scale
+crunch prep data and plot all regions together
+
 ```{r novelRetired_cumulative_9regions, fig.width = 6.5, dpi=600, dev=c('png','pdf')}
 # extract regions to plot
 regionsWanted <- c('RRB_KS_lowerBasin','Platte-NE_RRCA','RRB_KS_upperBasin',
@@ -334,21 +344,21 @@ idKey <- data.frame(masterid = c('RRB_KS_lowerBasin','Platte-NE_RRCA',
                                  'RRB_NE_basin',
                                  'KS_non_RRB', 'RRCA_RRB_Union',
                                  'RRCA_modifiedBorders', 'RRB_basin'),
-                   masterid2 = c('gRRB_KS_lowerBasin', 'iPlatte-NE_RRCA',
-                                 'fRRB_KS_upperBasin',
-                   'dRRB_CO_basin', 'eRRB_NE_basin', 'hKS_non_RRB',
+                   masterid2 = c('iRRB_KS_lowerBasin', 'fPlatte-NE_RRCA',
+                                 'hRRB_KS_upperBasin',
+                   'dRRB_CO_basin', 'eRRB_NE_basin', 'gKS_non_RRB',
                    'aRRCA_RRB_Union', 'cRRCA_modifiedBorders', 'bRRB_basin'),
                    rowname = c('three','three','two','two','two','three',
                                'one','one','one'))
 regions <- merge(regions, idKey)
 
 # plotty plot
-labels <- c(`gRRB_KS_lowerBasin` = 'KS RRB (lower)',
-            `iPlatte-NE_RRCA` = 'Platte RRCA',
-            `fRRB_KS_upperBasin` = 'KS RRB (upper)',
+labels <- c(`iRRB_KS_lowerBasin` = 'KS RRB (lower)',
+            `fPlatte-NE_RRCA` = 'Platte RRCA',
+            `hRRB_KS_upperBasin` = 'KS RRB (upper)',
             `dRRB_CO_basin` = 'CO RRB',
             `eRRB_NE_basin` = 'NE RRB',
-            `hKS_non_RRB` = 'KS RRCA',
+            `gKS_non_RRB` = 'KS RRCA',
             `aRRCA_RRB_Union` = 'GRB (all areas)',
             `cRRCA_modifiedBorders` = 'RRCA',
             `bRRB_basin` = 'RRB (full basin)')
@@ -361,8 +371,8 @@ ggplot(data = regions,#[regions$rowname != 'one',],
     ylab(expression(paste("Irrigated Area (", km^2,")"))) +
     xlab('') + #ggtitle('Full Region by State') +
     scale_color_manual(breaks=c('total','novel','retired'),
-                         labels=c('total', 'cumulative novel',
-                                  'cumulative retired'),
+                         labels=c('total', 'cumulative added',
+                                  'cumulative removed'),
                          values=c('red','blue','black')) +
     guides(color=guide_legend(title=NULL)) +
     theme_bw() +
@@ -375,6 +385,7 @@ ggplot(data = regions,#[regions$rowname != 'one',],
              panel.grid.minor = element_blank())
 ```
 
+### Multiple regions, 2 y scales
 Break into two pieces to set y scales different for top row
 
 ```{r novelRetired_cumulative_largeregions, fig.width = 6.5, fig.height=2.5, dpi=600, dev=c('png','pdf'), cache=FALSE}
@@ -403,7 +414,62 @@ toprow <- ggplot(data = regions[regions$rowname == 'one',],
 toprow
 ```
 
-bottom rows
+bottom rows: 
+
+#### create study region map key
+reproducing this here from 0.2 STudy Bounds in order to better integrate with the rest of the figure
+
+```{r subregionPlot_3.25in, fig.width = 3.25, fig.height = 3, dpi=600, dev=c('png','pdf')}
+# load necessary shapefiles
+# load spatial bits
+gisDir <- "C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES"
+NEplatte <- readOGR(gisDir, 'RRCA-nePlatte-noRRB_aea', verbose=F)
+rrbstates3 <- readOGR(gisDir, 'RRB_byState_KS_split_aea', verbose=F)
+rrca.rrb.states <- readOGR(gisDir, 'RRCA-RRB_interesection_byState_aea', verbose=F)
+rrcastates <- readOGR(gisDir, 'RRCA_modified_byState_aea', verbose=F)
+
+# colors
+NEbasin <- '#b2df8a' # light green
+platte <- '#33a02c' # darker green
+
+CObasin <- '#ffff99' # light yellow
+COall <- 'gold' # darker yellow
+
+KSbasinUP <- '#fdbf6f'#'light orange
+KSrrca <- '#f46d43'#'dark orange
+KSlower <- '#fb9a99' # ight red
+
+
+
+# crazy plot of main areas  ---------------------
+par(mar = c(0,0,0,0))
+plot(rrbstates3, border='white')
+plot(rrbstates3[rrbstates3$STATE_ABBR == 'NE',], add=T, 
+     col = NEbasin)
+plot(rrbstates3[rrbstates3$masterID == 'RRB_KS_lowerBasin',], add=T, col=KSlower)
+plot(rrcastates[rrcastates$masterID == 'RRCA_mod_KS_main',], add=T, 
+     col = KSrrca)
+plot(rrca.rrb.states[rrca.rrb.states$masterID == 'RRCARRB_KS_main',], add=T, 
+     col=KSbasinUP)
+plot(rrcastates[rrcastates$STATE_ABBR == 'CO',], add=T, col=COall)
+plot(rrbstates3[rrbstates3$STATE_ABBR == 'CO',], add=T, col = CObasin)
+plot(NEplatte, add=T, col=platte)
+```
+
+```{r subregionPlot_4colLegend, fig.width = 5, fig.height = 2, dpi=600, dev=c('png','pdf'), cache=FALSE}
+
+# legend  ---------------------
+par(mar = c(0,0,0,0))
+plot(rrbstates3, col=NA, border=NA)
+
+legend('top', legend = c('CO RRB', 'CO GRB', 'NE RRB', 'NE Platte',
+                            'KS RRB', 'KS RRCA', 'KS Lower'),
+       fill = c(CObasin, COall, NEbasin, platte, KSbasinUP, KSrrca, KSlower),
+       border = 'black',
+       bty='n', ncol = 4)
+
+```
+
 
 ```{r novelRetired_cumulative_6regions, fig.width = 6.5, fig.height=4, dpi=600, dev=c('png','pdf'), cache=FALSE}
 library(gridExtra)
@@ -415,8 +481,8 @@ botrow <- ggplot(data = regions[regions$rowname != 'one',],
     ylab('') +
     xlab('') + #ggtitle('Full Region by State') +
     scale_color_manual(breaks=c('total','novel','retired'),
-                         labels=c('total', 'cumulative gained',
-                                  'cumulative lost'),
+                         labels=c('total', 'cumulative added',
+                                  'cumulative removed'),
                          values=c('red','blue','black')) +
     guides(color=guide_legend(title=NULL)) +
     theme_bw() +
@@ -430,21 +496,11 @@ botrow <- ggplot(data = regions[regions$rowname != 'one',],
 botrow
 
 # dummy plot
-NEbasin <- '#a6cee3' # light blue
-platte <- '#1f78b4' # darker blue
-
-CObasin <- '#b2df8a' # light green
-COall <- '#33a02c' # darker green
-
-KSbasinUP <- '#762a83' # medium purple
-KSrrca <- '#c2a5cf' # light purple
-KSlower <- '#40004b' # dark purple
-
 dummy <- ggplot(data = regions[regions$rowname != 'one',],
        aes(x = year, y = toPlot, colour = dataset)) + 
     facet_wrap( ~ masterid2, labeller = as_labeller(labels), nrow=2)  +
-  scale_fill_manual(values = c(CObasin, NEbasin, KSbasinUP,
-                               KSlower, KSrrca, platte)) +
+  scale_fill_manual(values = c(CObasin, NEbasin, platte,
+                               KSrrca, KSbasinUP, KSlower))+
   geom_rect(aes(fill=masterid2), color='black',
             xmin=-Inf, xmax = Inf, ymin = -Inf, ymax=Inf) + 
   theme_minimal() + theme(text = element_text(size = 11))
