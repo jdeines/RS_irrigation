@@ -164,7 +164,7 @@ palMax <- .6
 We decided to keep it in actual area/km, not percents
 
 
-```{r gridRegress4_redbluegray, fig.width = 3.5, fig.height = 3, dpi=600, dev=c('png','pdf')}
+```{r gridRegress4_redbluegray, fig.width = 3.5, fig.height = 3, dpi=500, dev=c('png','pdf')}
 extentName <- 'RRCA_RRB_union_aea'
 rrb <- 'RRB_aea'
 rrbpoly <- readOGR(gisDir, rrb, verbose=F)
@@ -422,6 +422,7 @@ reproducing this here from 0.2 STudy Bounds in order to better integrate with th
 ```{r subregionPlot_3.25in, fig.width = 3.25, fig.height = 3, dpi=600, dev=c('png','pdf')}
 # load necessary shapefiles
 # load spatial bits
+x<-232
 gisDir <- "C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES"
 NEplatte <- readOGR(gisDir, 'RRCA-nePlatte-noRRB_aea', verbose=F)
 rrbstates3 <- readOGR(gisDir, 'RRB_byState_KS_split_aea', verbose=F)
@@ -581,6 +582,44 @@ ggplot(data = stateExtent2,
 
 #### Numerical breakdowns
 Growth as a percentage of irrigated area, net new fields compared to irrigated area increases...
+
+Numbers for boundaries for manuscript revisions
+```{r revisedNumerology}
+# largest change in the GRB (full study area, RRB union RRCA) - percent increase
+union <- all[all$masterid == 'RRCA_RRB_Union',]
+max(union$area_km2)/min(union$area_km2)*100-100
+
+# rate of change in union
+union$totalArea <- unioned$areakm2[1]
+union$percent <- union$area_km2/union$totalArea*100
+summary(lm(percent ~ year, data=union))
+
+# trend via Mirad ----------------------
+# load data
+regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test5_regional_county_Stats'
+files <- list.files(regionsDir, pattern="*_test5_randFor_MIRAD_revisionBounds.csv")
+all2 = as.data.frame(do.call(rbind, lapply(files, function(x) {
+              csv1 <- read.csv(paste0(regionsDir,'/',x))
+              csv1$year <- as.numeric(substr(x, start=1,stop=4))
+              return(csv1)
+            })))
+# convert cell count to area
+cellArea <- 250*250 # m^2
+all2$irrigated_m2 <- all2$X1 * cellArea
+all2$irrigated_km2 <- all2$irrigated_m2 / 1000000 
+
+# extract union  bound
+union.mirad <- all2[all2$masterid == 'RRCA_RRB_Union',]
+union.mirad$Percent<- union.mirad$irrigated_km2/ unioned$areakm2[1] * 100
+# model
+mirad.lm <- lm(Percent ~ year, data=union.mirad)
+summary(mirad.lm)
+
+
+```
+
+
+Submission boundary stuff
 
 ```{r numerology, eval=FALSE}
 stateData <- combined[grepl('full', combined$masterid),]
@@ -857,6 +896,7 @@ What would the trend be if you only had the MIRAD dataset to work from?
 cellArea <- 250*250 # m^2
 rrcaArea <- 79371.68 # km2
 studyArea <- 141603 # km2
+
 
 regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test5_regional_county_Stats'
 
