@@ -16,7 +16,7 @@ Derived datasets produced:
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
-opts_chunk$set(cache=TRUE, cache.path = 'cache/6.03_gridTrends/',
+opts_chunk$set(cache=FALSE, cache.path = 'cache/6.03_gridTrends/',
                fig.path='figure/6.03_irrTrends_test5annual_grids/softerCol/')
 ```
 
@@ -82,7 +82,7 @@ all4 <- loadStats(files4)[-1,]
 ### Gridded Trends
 run regressions to get change in area over time (slope) per grid cell. Three resolution options (4km, 8km, 12km)
 
-```{r gridRegress_fun}
+```{r gridRegress_fun, cache=TRUE}
 
 # function to get regression coefficients for each cell
 getSpatialRegression <- function(dataset, polygrid, p = 0.05, normalize=FALSE){
@@ -121,7 +121,7 @@ getSpatialRegression <- function(dataset, polygrid, p = 0.05, normalize=FALSE){
 
 ```
 
-```{r gridPrep}
+```{r gridPrep, cache=TRUE}
 # load spatial bits
 gisDir <- "C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES"
 grid4 <-  readOGR(gisDir, 'Polynet_4km_aea', verbose=F)
@@ -164,7 +164,7 @@ palMax <- .6
 We decided to keep it in actual area/km, not percents
 
 
-```{r gridRegress4_redbluegray, fig.width = 3.5, fig.height = 3, dpi=500, dev=c('png','pdf')}
+```{r gridRegress4_redbluegray, fig.width = 3.5, fig.height = 3, dpi=500, dev=c('png','pdf'), cache=TRUE}
 extentName <- 'RRCA_RRB_union_aea'
 rrb <- 'RRB_aea'
 rrbpoly <- readOGR(gisDir, rrb, verbose=F)
@@ -214,6 +214,36 @@ spplot(poly4.union, 'sigCoeffs', col.regions=biPal, col=NA,
 #   latticeExtra::layer(sp.polygons(rrca,lwd=.8)) +
 #   latticeExtra::layer(sp.polygons(states, lwd=1, col='gray40')) #+ 
 #  # latticeExtra::layer(sp.polygons(unioned, fill = 'gray80', col=NA), under=T)
+``` 
+
+bigger
+
+```{r gridRegress4_redbluegray_bigger, fig.width = 4.5, fig.height = 4, dpi=500, dev=c('png','pdf'), cache=TRUE}
+extentName <- 'RRCA_RRB_union_aea'
+rrb <- 'RRB_aea'
+rrbpoly <- readOGR(gisDir, rrb, verbose=F)
+rrca <- readOGR(gisDir, 'RRCA_modified_aea', verbose=F)
+
+states <- readOGR('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile', 'States', verbose=F)
+states <- states[states$STATE_ABBR %in% c('CO','NE','KS'),]
+states <- spTransform(states, CRS(proj4string(rrca)))
+
+colorbreaks <- 200
+biPal <- c(blueRamp2(colorbreaks/2),redRamp2(colorbreaks/2))
+
+
+# gray background
+spplot(poly4.union, 'sigCoeffs', col.regions=biPal, col=NA,
+       at=seq(palMin,palMax,(-palMin+palMax)/colorbreaks),
+              #main = 'Absolute area, 4 km grid, sig only',
+       colorkey=list(space='bottom',
+                     labels=list(
+                       labels = c('-0.6','-0.4','-0.2','0','0.2','0.4','0.6')))) +
+  latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=.8)) + 
+  latticeExtra::layer(sp.polygons(rrca,lwd=.8)) +
+  latticeExtra::layer(sp.polygons(states, lwd=1, col='gray30')) + 
+  latticeExtra::layer(sp.polygons(unioned, fill = 'gray50', col=NA), under=T)
+
 ``` 
 
 ### Novel/Retired Irrigated Area by year
@@ -367,7 +397,11 @@ labels <- c(`iRRB_KS_lowerBasin` = 'KS RRB (lower)',
 
 # line colors: softer
 primary <- c('red','blue','black')
-softer <- c('#d6604d','#4393c3','gray40')
+softer <- c('#d6604d','#4393c3','gray10')
+
+redRamp2
+
+softer <- c(redRamp2(20)[11],blueRamp2(20)[6],'gray10')
 
 ggplot(data = regions,#[regions$rowname != 'one',],
        aes(x = year, y = toPlot, colour = dataset)) + 
@@ -412,6 +446,8 @@ toprow <- ggplot(data = regions[regions$rowname == 'one',],
                      axis.title=element_text(size=11),
            panel.grid.major = element_blank(),
              panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = 'transparent', colour = NA),
+          plot.background = element_rect(fill = 'transparent', colour = NA),
           axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank(),
@@ -433,16 +469,32 @@ rrbstates3 <- readOGR(gisDir, 'RRB_byState_KS_split_aea', verbose=F)
 rrca.rrb.states <- readOGR(gisDir, 'RRCA-RRB_interesection_byState_aea', verbose=F)
 rrcastates <- readOGR(gisDir, 'RRCA_modified_byState_aea', verbose=F)
 
-# colors
-NEbasin <- '#e5f5e0'#'#b2df8a' # light green
-platte <- '#74c476'#'#33a02c' # darker green
+# get union bounds
+unioned <- readOGR(gisDir, 'RRCA_RRB_union_aea', verbose=F)
+rrb <- readOGR(gisDir, 'RRB_aea', verbose=F)
+rrca <- readOGR(gisDir, 'RRCA_modified_aea', verbose=F)
+
+# # soft colors - grays bad
+# NEbasin <- '#e5f5e0'#'#b2df8a' # light green
+# platte <- '#74c476'#'#33a02c' # darker green
+# 
+# CObasin <- '#ffffcc'#'#ffff99' # light yellow
+# COall <- '#fee391'#'gold' # darker yellow
+# 
+# KSbasinUP <- '#efedf5'#'#fdbf6f'#'light orange
+# KSrrca <- '#807dba'#'#f46d43'#'dark orange
+# KSlower <- '#bcbddc'#'#fb9a99' # ight red
+
+# green orange yellow colors
+NEbasin <- '#b2df8a' # light green
+platte <- '#33a02c' # darker green
 
 CObasin <- '#ffffcc'#'#ffff99' # light yellow
-COall <- '#fee391'#'gold' # darker yellow
+COall <- 'gold' # darker yellow
 
-KSbasinUP <- '#efedf5'#'#fdbf6f'#'light orange
-KSrrca <- '#807dba'#'#f46d43'#'dark orange
-KSlower <- '#bcbddc'#'#fb9a99' # ight red
+KSbasinUP <- '#dfc27d'#'#fdbf6f'#'light orange
+KSrrca <- '#8c510a'#'#f46d43'#'dark orange
+KSlower <- '#bf812d'#'#fb9a99' # ight red
 
 
 
@@ -475,6 +527,88 @@ legend('top', legend = c('CO RRB', 'CO GRB', 'NE RRB', 'NE Platte',
 
 ```
 
+Make a bunch of subregion maps for panel references
+
+co rrb
+
+```{r m_CoRRB, fig.width = 1.8, fig.height = 1.25, dpi=600, dev=c('png','pdf')}
+mapFill = 'gray60'
+mapHighlight = 'gray85'
+
+par(mar=c(0,0,0,0))
+plot(unioned, col=mapHighlight, border=NA)
+plot(rrbstates3[rrbstates3$STATE_ABBR == 'CO',], add=T, col = mapFill, border=NA)
+```
+
+ne rrb
+
+```{r m_NERRB, fig.width = 1.8, fig.height = 1.25, dpi=600, dev=c('png','pdf')}
+par(mar=c(0,0,0,0))
+plot(unioned, col=mapHighlight, border=NA)
+plot(rrbstates3[rrbstates3$STATE_ABBR == 'NE',], add=T, col = mapFill, border=NA)
+```
+
+ks lower
+
+```{r m_KsLower, fig.width = 1.8, fig.height = 1.25, dpi=600, dev=c('png','pdf')}
+par(mar=c(0,0,0,0))
+plot(unioned, col=mapHighlight, border=NA)
+plot(rrbstates3[rrbstates3$masterID == 'RRB_KS_lowerBasin',], add=T, 
+     col = mapFill, border=NA)
+```
+
+ks upper
+
+```{r m_KsUpper, fig.width = 1.8, fig.height = 1.25, dpi=600, dev=c('png','pdf')}
+par(mar=c(0,0,0,0))
+plot(unioned, col=mapHighlight, border=NA)
+plot(rrca.rrb.states[rrca.rrb.states$masterID == 'RRCARRB_KS_main',], add=T, 
+     col = mapFill, border=NA)
+```
+
+ks rrca
+
+```{r m_KsRrca, fig.width = 1.8, fig.height = 1.25, dpi=600, dev=c('png','pdf')}
+par(mar=c(0,0,0,0))
+plot(unioned, col=mapHighlight, border=NA)
+plot(rrcastates[rrcastates$masterID == 'RRCA_mod_KS_main',], add=T, 
+     col = mapFill, border=NA)
+plot(rrca.rrb.states[rrca.rrb.states$masterID == 'RRCARRB_KS_main',], add=T, 
+     col = mapHighlight, border=NA)
+```
+
+ne platte
+
+```{r m_nePlatte, fig.width = 1.8, fig.height = 1.25, dpi=600, dev=c('png','pdf')}
+par(mar=c(0,0,0,0))
+plot(unioned, col=mapHighlight, border=NA)
+plot(NEplatte, add=T, col = mapFill, border=NA)
+```
+
+grb
+
+```{r m_grb, fig.width = 1.8, fig.height = 1.25, dpi=600, dev=c('png','pdf')}
+par(mar=c(0,0,0,0))
+plot(unioned, col=mapFill, border=NA)
+```
+
+rrb
+
+```{r m_rrb, fig.width = 1.8, fig.height = 1.25, dpi=600, dev=c('png','pdf')}
+par(mar=c(0,0,0,0))
+plot(unioned, col=mapHighlight, border=NA)
+plot(rrb, add=T, col = mapFill, border=NA)
+```
+
+rrca
+
+```{r m_rrca, fig.width = 1.8, fig.height = 1.25, dpi=600, dev=c('png','pdf')}
+par(mar=c(0,0,0,0))
+plot(unioned, col=mapHighlight, border=NA)
+plot(rrca, add=T, col = mapFill, border=NA)
+```
+
+### panel plots
 
 ```{r novelRetired_cumulative_6regions, fig.width = 6.5, fig.height=4, dpi=600, dev=c('png','pdf'), cache=FALSE}
 library(gridExtra)
@@ -497,7 +631,9 @@ botrow <- ggplot(data = regions[regions$rowname != 'one',],
           legend.title = element_text(size=10),
           axis.title=element_text(size=11),
           panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank())
+          panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = 'transparent', colour = NA),
+          plot.background = element_rect(fill = 'transparent', colour = NA))
 botrow
 
 # dummy plot
