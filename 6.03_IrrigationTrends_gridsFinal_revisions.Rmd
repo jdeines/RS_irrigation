@@ -17,7 +17,7 @@ Derived datasets produced:
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
 opts_chunk$set(cache=TRUE, cache.path = 'cache/6.03_gridTrends/',
-               fig.path='figure/6.03_irrTrends_test5annual_grids/')
+               fig.path='figure/6.03_irrTrends_test5annual_grids/softerCol/')
 ```
 
 **R Packages Needed**
@@ -364,6 +364,11 @@ labels <- c(`iRRB_KS_lowerBasin` = 'KS RRB (lower)',
             `bRRB_basin` = 'RRB (full basin)')
 
 # plot
+
+# line colors: softer
+primary <- c('red','blue','black')
+softer <- c('#d6604d','#4393c3','gray40')
+
 ggplot(data = regions,#[regions$rowname != 'one',],
        aes(x = year, y = toPlot, colour = dataset)) + 
     facet_wrap( ~ masterid2, labeller = as_labeller(labels)) +
@@ -373,7 +378,7 @@ ggplot(data = regions,#[regions$rowname != 'one',],
     scale_color_manual(breaks=c('total','novel','retired'),
                          labels=c('total', 'cumulative added',
                                   'cumulative removed'),
-                         values=c('red','blue','black')) +
+                         values=softer) +
     guides(color=guide_legend(title=NULL)) +
     theme_bw() +
     theme(legend.position = c(.5,.17),
@@ -398,7 +403,7 @@ toprow <- ggplot(data = regions[regions$rowname == 'one',],
     scale_color_manual(breaks=c('total','novel','retired'),
                          labels=c('total', 'cumulative novel',
                                   'cumulative retired'),
-                         values=c('red','blue','black')) +
+                         values=softer) +
     theme_bw() +
     theme(legend.position = 'none',
           axis.text=element_text(size=10),
@@ -422,7 +427,6 @@ reproducing this here from 0.2 STudy Bounds in order to better integrate with th
 ```{r subregionPlot_3.25in, fig.width = 3.25, fig.height = 3, dpi=600, dev=c('png','pdf')}
 # load necessary shapefiles
 # load spatial bits
-x<-232
 gisDir <- "C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES"
 NEplatte <- readOGR(gisDir, 'RRCA-nePlatte-noRRB_aea', verbose=F)
 rrbstates3 <- readOGR(gisDir, 'RRB_byState_KS_split_aea', verbose=F)
@@ -430,15 +434,15 @@ rrca.rrb.states <- readOGR(gisDir, 'RRCA-RRB_interesection_byState_aea', verbose
 rrcastates <- readOGR(gisDir, 'RRCA_modified_byState_aea', verbose=F)
 
 # colors
-NEbasin <- '#b2df8a' # light green
-platte <- '#33a02c' # darker green
+NEbasin <- '#e5f5e0'#'#b2df8a' # light green
+platte <- '#74c476'#'#33a02c' # darker green
 
-CObasin <- '#ffff99' # light yellow
-COall <- 'gold' # darker yellow
+CObasin <- '#ffffcc'#'#ffff99' # light yellow
+COall <- '#fee391'#'gold' # darker yellow
 
-KSbasinUP <- '#fdbf6f'#'light orange
-KSrrca <- '#f46d43'#'dark orange
-KSlower <- '#fb9a99' # ight red
+KSbasinUP <- '#efedf5'#'#fdbf6f'#'light orange
+KSrrca <- '#807dba'#'#f46d43'#'dark orange
+KSlower <- '#bcbddc'#'#fb9a99' # ight red
 
 
 
@@ -484,7 +488,7 @@ botrow <- ggplot(data = regions[regions$rowname != 'one',],
     scale_color_manual(breaks=c('total','novel','retired'),
                          labels=c('total', 'cumulative added',
                                   'cumulative removed'),
-                         values=c('red','blue','black')) +
+                         values=softer) +
     guides(color=guide_legend(title=NULL)) +
     theme_bw() +
     theme(legend.position = c(.5,.263),
