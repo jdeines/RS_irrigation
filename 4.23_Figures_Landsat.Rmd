@@ -9,6 +9,8 @@ output:
 
 Goal: plot info for Landsat observations
 
+Update 7/18/2017: re-did with new observation counts that remove path duplicates. This also changed the structure of the data cleaning.
+
 
 ```{r knitrOpts, echo=FALSE}
 library(knitr)
@@ -57,25 +59,75 @@ title('Path', cex.main=1)
 ```
 
 
-
-
 ## Scene Observations
 
-```{r LandsatObservations, fig.width=6, fig.height=3}
-# load data
-df <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/manuscript/tables/LandsatImageryTable.csv')
+### Data processing
+GEE script 01.07_Landsat_Annual_Statistics out a csv for each year; combine them into one dataset
 
-ribbons <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/manuscript/tables/LandsatImageryTable_ribbons.csv')
+```{r processData}
+dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Landsat_Annual_Statistics'
 
-ribbons2 <- read.csv('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/manuscript/tables/LandsatImageryTable_ribbons2.csv')
+# annual file names
+annualFiles <- list.files(dataDir, pattern = '*aim-rrb_extent.csv$')
 
-# line df long
-names(df)[11] <- 'Maximum'
-df.long <- gather(df[,c('Year','Median','Maximum')], value = value,
+# year to start
+yearStart <- 1999
+
+# read in to a single dataframe
+annual = as.data.frame(do.call(rbind, lapply(annualFiles, function(x) {
+              csv1 <- read.csv(paste0(dataDir,'/',x))
+              csv2 <- csv1[, -which(names(csv1) %in%
+                                        c('system.index','.geo'))]
+              csv3 <- csv2[csv2$year >= yearStart,]
+            })))
+
+# rename columns
+names(annual) <- c('Min','X1','Maximum','X25','X5','Median','X75', 
+                   'X99', 'Images','Mean','Year')
+
+# make df for plot lines in long format
+df.long <- gather(annual[,c('Year','Median','Maximum')], value = value,
                   key = stat, 
                   Median:Maximum)
 
-# 1-99
+# extract out information into a df for plot ribbons ---------
+perc.99 <- annual[,c('Year','X1','X99')]
+names(perc.99) <- c('Year','ymin','ymax')
+perc.99$Range <- '1-99'
+
+iqr <- annual[,c('Year','X25','X75')]
+names(iqr) <- c('Year','ymin','ymax')
+iqr$Range <- '25-75'
+
+ribbons2 <- rbind(perc.99, iqr)
+```
+
+### observation stats
+range and mean counts
+
+```{r pixelStats}
+# remove 2012 for a non-2012 count
+annual_no2012 <- annual[annual$Year != 2012,]
+
+# minimum
+min(annual_no2012$X1)
+min(annual$X1)
+
+# maximum
+max(annual_no2012$Maximum)
+
+# overall mean
+mean(annual$Mean)
+mean(annual_no2012$Mean)
+```
+
+
+
+### Total annual observations
+Plot median + IQR, 1-99 percentiles, and maximum
+
+```{r LandsatObservations, fig.width=6, fig.height=3}
+
 p3 <- ggplot(ribbons2) +
   geom_ribbon(data=ribbons2, aes(ymin=ymin, ymax = ymax, x=Year, fill=Range),
               alpha=0.4) +
@@ -101,23 +153,24 @@ p3 <- ggplot(ribbons2) +
 p3
 
 
-# with min/max
-p1 <- ggplot(ribbons) +
-  geom_ribbon(data=ribbons, aes(ymin=ymin, ymax = ymax, x=Year, fill=Range),
-              alpha=0.4) +
-  geom_line(data=df, aes(x=Year, y=Median, lty='Median')) +
-  scale_x_continuous(name = '', 
-                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
-                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
-  scale_fill_manual(values = c("Min-Max"='yellow','xminmax'='yellow',
-                               '1-99'='seagreen2','x1-99'='seagreen2',
-                               "25-75"='skyblue3')) +
-  scale_linetype('') +
-  xlab('') + ylab('Pixel Observations') +
-  theme_bw()
-p1
+# # with min/max
+# p1 <- ggplot(ribbons) +
+#   geom_ribbon(data=ribbons, aes(ymin=ymin, ymax = ymax, x=Year, fill=Range),
+#               alpha=0.4) +
+#   geom_line(data=df, aes(x=Year, y=Median, lty='Median')) +
+#   scale_x_continuous(name = '', 
+#                   breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+#                  labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
+#   scale_fill_manual(values = c("Min-Max"='yellow','xminmax'='yellow',
+#                                '1-99'='seagreen2','x1-99'='seagreen2',
+#                                "25-75"='skyblue3')) +
+#   scale_linetype('') +
+#   xlab('') + ylab('Pixel Observations') +
+#   theme_bw()
+# p1
 ```
 
+### Total number of scenes
 
 ```{r landsatSceneNumber, fig.width=6, fig.height=2}
 
@@ -126,7 +179,7 @@ satellites <- data.frame(y1 = c(660,695,660),
                          xend = c(2011.5, Inf, Inf),
                          Sensor = c('TM','ETM+','OLI'))
 
-p2 <- ggplot(data = df,
+p2 <- ggplot(data = annual,
        aes(x=Year, y = Images)) +
     geom_bar(stat='identity', fill='gray60', alpha=.7) + 
   geom_segment(data=satellites,
@@ -146,6 +199,7 @@ p2 <- ggplot(data = df,
 p2
 ```
 
+### All together now
 figure arranging from https://gist.github.com/tomhopper/faa24797bb44addeba79
 
 ```{r landsatCombined, fig.width=6, fig.height = 5, dpi=600, dev=c('png','pdf')}
