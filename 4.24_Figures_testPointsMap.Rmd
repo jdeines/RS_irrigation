@@ -25,7 +25,7 @@ library(rgdal)
 ## Load and Merge Data
 training points with anthony vars included = v02
 
-```{r FigureS6_testPointMap, fig.width = 5.5, fig.height=4.5, cache=F, dpi=600, dev=c('png','pdf')}
+```{r FigureS6_testPointMap, fig.width = 5.5, fig.height=4.5, cache=F, dpi=600, dev=c('png','pdf','jpeg')}
 # file directory and filenames
 testDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/validation/generatedPointsForUpload'
 
