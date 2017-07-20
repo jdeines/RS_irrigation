@@ -168,8 +168,6 @@ volume.rrb <- aggregate(total_km3 ~ year, data = volume.state, FUN = 'sum', na.r
 ### load Irrigated Area and Precip
 Extract irrigated area and precip for regions of interests
 
-* RRCA domain irrigation and precip in 4.21_Figures_volumeVsArea_randFor... in the 'loadAreaData' chunk
-
 ```{r irrData}
 # load REGIONAL AREA + precip data files ----------------------------------------
 cellArea <- 30*30 # m^2

@@ -326,6 +326,15 @@ dfagg <- aggregateIndexByCrop_quartiles(index = 'GI', year = 2010, df=trainAllLo
 dfPlot <- dfagg
 index <- 'Green'
 
+# adjust facet labels
+# plotty plot
+labels <- c(`alfalfa` = 'Alfalfa',
+            `corn` = 'Corn',
+            `noncrop` = 'Non-crop',
+            `sorghum` = 'Sorghum',
+            `soy` = 'Soy',
+            `wheat` = 'Wheat')
+
 ggplot(data = dfPlot,
          aes(x = month, y = Mean, colour = class, group = class)) +
        geom_ribbon(aes(ymin = Q1, 
@@ -340,7 +349,7 @@ ggplot(data = dfPlot,
                   size=.1, alpha=.8) +
          geom_line(aes(x=month, y = Q3, colour = class, group = class),
                   size=.1, alpha=.8) +
-       facet_wrap(~crop) +
+       facet_wrap(~crop, labeller = as_labeller(labels)) +
        ylab(paste0(index, ' Index')) + 
        xlab('Month (April - November)') + theme_bw() +
        theme(text = element_text(size = 12), 
