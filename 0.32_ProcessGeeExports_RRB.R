@@ -17,10 +17,10 @@ library(rgdal)
 
 
 # directory containing rasters
-rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test5_FINAL/rrb_test5_0_1_raw'
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/AIM_RRB_finalMaps'
 
 # director to write out to
-outDir <- 'S:/Data/GIS_Data/Downloaded/Irrigation_Datasets/HP_AIM_v1.0/binary_rasters_noMasks_noNoDataValues'
+outDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/AIM_RRB_finalMaps/withProjectionDefined'
 
 # specified projection
 # add the datum specification (NAD83) for EPSG 5070 (Albers Equal Area US48)
@@ -36,6 +36,6 @@ files <- list.files(rasDir, pattern='*tif$')
 for (file in files) {
   ras1 <- raster(paste(rasDir,file,sep='/'))
   proj4string(ras1) <- newProj
-  writeRaster(ras1, paste(outDir,file,sep='/'), datatype='INT1S')
+  writeRaster(ras1, paste(outDir,file,sep='/'), datatype='INT1U')
 }
 
