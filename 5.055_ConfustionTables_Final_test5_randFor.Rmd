@@ -7,7 +7,7 @@ output:
     toc: yes
 ---
 
-Goal: Accuracy assessment via confusion tables for test 4, random forest, cleaned with one pass of a 3x3 majority filter, with interannual cleaning (pixels irrigated in a single year removed)
+Goal: Accuracy assessment via confusion tables for test 5, random forest, cleaned with one pass of a 3x3 majority filter, with interannual cleaning (pixels irrigated in a single year removed)
 
 Confusion tables for the 2002 and 2015 test datasets. Jill's thinking is these are the final ones for the manuscript.
 
