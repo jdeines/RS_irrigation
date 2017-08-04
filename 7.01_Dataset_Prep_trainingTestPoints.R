@@ -9,14 +9,11 @@
 # retains the lat/long coordinates in the csv output and rearranges data
 # columns (removes monthly Landsat index numbers as well)
 
-library(rgdal)
 
 # Training Points --------------------------------------------------------------
 # file directory and filenames
 trainFolder <- 'C:/Users/deinesji/Google Drive/GEE_validation/trainingSets'
 files <- list.files(trainFolder, full.names = T, pattern='*_v02.csv')
-
-exportFolder <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/manuscript/data/HydrosharePointData'
 
 
 # load and merge
@@ -67,6 +64,9 @@ write.csv(trainExport, row.names = F,
                  '/Deines_et_al_trainingPointData_2010_2012.csv'))
 
 # Test Points --------------------------------------------------------------
+exportFolder <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/manuscript/data/HydrosharePointData'
+
+
 #  data directory and filenames
 dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Accuracy_PointsforConfusionTables_test5_randFor'
 
@@ -109,6 +109,6 @@ testpoints3 <- testpoints2[,c('lat','long','year','class','binaryClass','binaryN
                               'certainty','AIM_RRB')]
 
 # write out CSV 
-write.csv(trainExport, row.names = F,
+write.csv(testpoints3, row.names = F,
           paste0(exportFolder,
                  '/Deines_et_al_testPointData_2002_2015.csv'))
