@@ -240,7 +240,9 @@ rrca.rrb$area.union <- all[all$masterid == 'RRCA_RRB_Union','irrigated_km2']
 rrca.rrb$Area_km2_else <- rrca.rrb$area.union - rrca.rrb$Area_km2
 ```
 
-### Exploratory analyses: RRB of RRCA domain
+## Exploratory analyses: RRB of RRCA domain
+
+### Precip vs Depth
 
 Average application depth: Divide irrigated pumping by area (average application depth); plot vs precip expressed in mm
 
@@ -297,6 +299,71 @@ depth.state <- ggplot(rrca.rrb.states, aes(Precip_cm, Depth_cm)) +
 depth.state
 ```
 
+### Depth over time, post manuscript
+post-manuscript question: does irrigation depth change over time?
+
+
+```{r depthOverTime}
+# just depth and time
+ggplot(rrca.rrb, aes(Year, Depth_cm)) +
+  geom_point() + 
+  stat_smooth(method = 'lm', se=F, size=.5) +
+  stat_smooth_func_all(geom="text",method="lm",hjust=0,parse=TRUE, 
+                 xpos = 2005, ypos = 95) +
+  theme_bw() + ggtitle('Irrigation Depth Over Time')
+
+# plot with precip
+rrcaPlot2 <- rrca.rrb
+
+# items to plot
+plotUs2 <- c('Depth_m','Precip_cm')
+#plotUs <- c('AArea_km2_else','Volume_km3','Precip_cm','Price')
+
+# gather
+plotdata2 <- gather_(rrcaPlot2, key_col = 'variable', value_col = 'value',
+                          gather_cols = plotUs2)
+
+# plots with trendlines no text
+ggplot(data = plotdata2,
+      aes(x = Year, y = value, colour=variable)) +
+  geom_line() + geom_point() +
+   scale_colour_manual(values=c('black','red','blue','orange')) + 
+  facet_wrap(~variable, nrow=5, scales='free_y') +
+  stat_smooth(method = 'lm', se=F, size=.5) +
+  scale_x_continuous(name = '', 
+                  breaks = c(2000,2002,2004,2006,2008,2010,2012,2014,2016), 
+                 labels = c(2000,2002,2004,2006,2008,2010,2012,2014,2016)) +
+  ylab('') +
+  theme_bw() + theme(legend.position = 'none',
+                     #strip.background=element_blank(), # comment to add labels
+                     #strip.text.x = element_blank(),   # comment to add labels
+                     text = element_text(size = 15),
+                                          panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank())
+
+# multiple regression ----------------------
+depthtimelm <- lm(Depth_cm ~ Year + Precip_cm, data = rrca.rrb)
+summary(depthtimelm)
+
+# cart -------------------------------------
+
+# rrcarrb domain dataset - complete across variables
+depthcart.df <- rrca.rrb[complete.cases(rrca.rrb),]
+
+# add percent area back in, to do it that way
+
+# new cart, RRCA area ---------------------------------------------
+ # control tree
+controls <- ctree_control(minsplit = 2, minbucket = 3, mincriterion = .65)
+
+# run tree
+ct.depth <- ctree(Depth_cm ~ Precip_cm + Year, data = depthcart.df, 
+            controls = controls)
+plot(ct.depth, main="Conditional Inference Tree")
+
+```
+
+### Time Series Plots
 And plot all time series.
 
 ```{r timeSeriesPlot_finalish_rrbrrca, fig.height = 4, fig.width = 6, dpi=600, dev=c('png','pdf')}
@@ -362,7 +429,7 @@ rsq
 summary(lm(Area_km2_else ~ Year,data=rrca.rrb))
 ```
 
-#### redo with percent area
+### redo with percent area
 Dave/Anthony suggested using percent of study area irrigated instead of absolute area
 
 Get relevant boundary areas
@@ -486,7 +553,7 @@ rsq
 summary(lm(AreaPercentOut ~ Year,data=rrca.rrb))
 ```
 
-#### Correlations
+### Correlations
 Let's look at some preliminary correlations for the RRCA domain. 
 
 ```{r corrPlots_rrbrrca, fig.height=5, fig.width=5, dpi=600, dev=c('png','pdf')}
@@ -542,7 +609,7 @@ ggpairs(rrcarrb2, lower=list(continuous = my_fn))
 Hm. A two step model? Predict application depth from precip; predict irrigated area from depth and price? Or a hierarchical model where depth comes from precip...
 
 
-### CaRT
+## CaRT
 Use a CART to analysis, since robust to autocorrelation and we don't have long enough time series for robust time series analysis.
 
 I picked 'ctree' function the party package because of the nice-ish output on an R Blogger's post, but Andy subsequently suggested it as well. Look at that!
