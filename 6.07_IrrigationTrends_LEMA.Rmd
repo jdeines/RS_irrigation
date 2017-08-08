@@ -1,0 +1,75 @@
+---
+title: "Irrigation Over Time: Sheridan 6 LEMA"
+author: "Jill Deines"
+date: "August 8, 2017"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Investigate trends in irrigated area over time - total area, areas gained, areas lost. 
+
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, cache.path = 'cache/6.07_LEMA/',
+               fig.path='figure/6.07_LEMA/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE,cache=FALSE}
+library(rgdal)
+library(rgeos)
+library(latticeExtra)
+library(tidyverse) # for ggplot2, tidyr, dplyr
+library(broom)
+library(colorRamps)
+source('functions/stat_smooth_func_all.R')
+library(gridExtra)
+library(grid)
+```
+
+## Pixel-wise Trends through Time
+
+### load RS estimates of irrigated area
+Counts of each class type were tallied for several administrative boundaries in GEE
+
+```{r loadGee}
+cellArea <- 30*30 # m^2
+
+regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test5_regional_county_Stats'
+
+# regional areas -----------------------------------------------
+# get filenames
+files <- list.files(regionsDir, pattern="*_Sheridan6_aim-rrb.csv")
+
+# read in to a single dataframe
+loadStats <- function(fileList){
+  datOut = as.data.frame(do.call(rbind, lapply(fileList, function(x) {
+              csv1 <- read.csv(paste0(regionsDir,'/',x))
+              csv1$year <- as.numeric(substr(x, start=1,stop=4))
+              return(csv1)
+           })))  
+  # convert cell count to area
+  datOut$irrigated_m2 <- datOut$X1 * cellArea
+  datOut$irrigated_km2 <- datOut$irrigated_m2 / 1000000
+  return(datOut)
+}
+
+all1 = loadStats(files)
+
+# remove weird rows
+all1 <- all1[all1$X1 > 0,]
+
+# keep wanted columns
+all <- all1[,c('year','irrigated_m2','irrigated_km2','pr_ann')]
+
+ggplot(all, aes(year, irrigated_km2)) +
+  geom_point() + geom_line() +
+  ylab('Irrigated Area (km^2)') + xlab('') +
+  ggtitle('Sheridan 6 Irrigated Area') +
+  theme_bw()
+```
+
+
