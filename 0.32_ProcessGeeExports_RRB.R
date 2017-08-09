@@ -4,7 +4,7 @@
 # proj4 projection specification, and writes back out to a new directory
 # using the same filename
 
-# it's set up for the annual maps from HP-AIM-v1, or the greater RRB region.
+# it's set up for the annual maps from AIM-RRB, or the greater RRB region.
 # no tile merging necessary.
 
 
@@ -38,4 +38,11 @@ for (file in files) {
   proj4string(ras1) <- newProj
   writeRaster(ras1, paste(outDir,file,sep='/'), datatype='INT1U')
 }
+
+
+# test hydroshare downloads
+#t1999 <- raster('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/manuscript/data/testMapDownloads/1999_AIM-RRB_20170721.tif')
+#t1999[t1999 == 254] <- NA
+#plot(t1999)
+
 
