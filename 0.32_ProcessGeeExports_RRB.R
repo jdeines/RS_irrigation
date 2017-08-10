@@ -36,7 +36,7 @@ files <- list.files(rasDir, pattern='*tif$')
 for (file in files) {
   ras1 <- raster(paste(rasDir,file,sep='/'))
   proj4string(ras1) <- newProj
-  writeRaster(ras1, paste(outDir,file,sep='/'), datatype='INT1U')
+  writeRaster(ras1, paste(outDir,file,sep='/'), datatype='INT1U', NAflag=999)
 }
 
 
