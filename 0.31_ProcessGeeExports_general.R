@@ -5,7 +5,7 @@
 # proj4 projection specification, merges tiles, and writes back out
 
 # This assumes rasters are written out with the year as the first part of the name
-# also currently assumed output is split into TWO rasters
+# also currently assumed output is a single raster
 
 # Jill Deines
 

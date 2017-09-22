@@ -58,6 +58,34 @@ axis(3, at = c(-220000,-100000,020000,140000,260000,380000),
 title('Path', cex.main=1)
 ```
 
+And do a mock-up for all of CONUS for my GEE tutorial:
+
+```{r sceneLocations_CONUS, fig.width = 4, fig.height=3, dpi=300, dev=c('png')}
+# load data
+shapeDir2 <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile/CONUS_landsatScenes'
+
+conus <- readOGR(shapeDir2, 'States_continental', verbose=F)
+wrs2 <- readOGR(shapeDir2, 'Landsat_scenes_conus_wrs2', verbose=F)
+wrs2 <- spTransform(wrs2, CRS=proj4string(bound))
+conus <- spTransform(conus, CRS=proj4string(bound))
+
+# assign colors by landsat path
+pal2 <- brewer.pal(n=9, name = 'YlGnBu')[5:9]
+#pal2 = c('tomato2','royalblue2','springgreen4','black','indianred','purple','darkblue')
+#pal2 <- bpy.colors((9))
+colorKey2 <- data.frame(PATH = (unique(wrs2$PATH)),
+                       color = rep(pal2,10)[1:length(unique(wrs2$PATH))])
+wrs2 <- merge(wrs2,colorKey2)
+wrs2$color <- as.character(wrs2$color)
+
+# plot
+par(mar=c(0,0,0,0))
+#plot(wrs2, axes=F, ylab = 'Row', font.lab=2, line=-1)
+plot(conus, col='gray75', border='white', lwd=2)
+plot(wrs2, add=T, lwd=0.8, border=wrs2$color)
+```
+
+
 
 ## Scene Observations
 
@@ -65,7 +93,7 @@ title('Path', cex.main=1)
 GEE script 01.07_Landsat_Annual_Statistics out a csv for each year; combine them into one dataset
 
 ```{r processData}
-dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Landsat_Annual_Statistics'
+dataDir <- 'C:/Users/deinesji/Google Drive/GEE_AIM-RRB/GEE_tableExports/Landsat_Annual_Statistics'
 
 # annual file names
 annualFiles <- list.files(dataDir, pattern = '*aim-rrb_extent.csv$')
