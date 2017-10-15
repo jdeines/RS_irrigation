@@ -12,7 +12,7 @@
 # 1 pass of a 3x3 majority filter
 # interannual cleaning that removed any pixels irrigated only 1x between 1999-2016
 
-# update 7/20/17: changed to use revised boundaries
+# update 7/20/17: changed to use revised boundaries 
 
 
 #--------------------------------------------------------

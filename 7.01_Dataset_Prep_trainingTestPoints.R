@@ -3,7 +3,7 @@
 # j deines
 
 # goal: clean up the data tables associated with training and test datasets
-# in preparation for posting to Hydroshare
+# in preparation for posting to Hydroshare 
 
 # this uses the same code as in 1.16_trainingPoints_RRB.Rmd, but it
 # retains the lat/long coordinates in the csv output and rearranges data
