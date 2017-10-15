@@ -1,0 +1,67 @@
+---
+title: "Irrigation Depth in the RRCA"
+author: "Jill Deines"
+date: "October 15, 2017"
+output:
+  html_document:
+    toc: yes
+---
+
+Goal: Model linear trends in irrigation depth over time in the RRCA
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, 
+               fig.path='figure/9.0_rrcaDepth/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(rgdal)
+library(raster)
+```
+
+## Make RRCA polygon grid
+Extract polygon grids of a few resolutions for the RRCA model
+
+* native: 1 mile resolution
+* aggregated: 2 mile, 4 mile
+
+
+```{r rrcaPolygrids, eval=FALSE}
+# load a buffered RRCA boundary
+buffer <- readOGR('S:/Users/deinesji/HPA/gis/lhm','RRB_bound2_6500m',verbose=F)
+
+# create template raster grid based on RRCA model grid (165 rows, 326 columns)    
+CRS <- '+proj=utm +zone=14 +ellps=clrk66 +datum=NAD27 +units=us-ft +no_defs'
+template <- raster(crs=CRS, nrows = 165, ncols=326, resolution = 5280,
+                 ymn = 14092806, ymx = 14964006, 
+                 xmn = 266023, xmx = 1987023)
+template[] <- 1:53790 
+
+# mask with boundary 
+buffer.utm <- spTransform(buffer, crs(CRS))
+ras1mile <- mask(template, buffer.utm)
+plot(ras1mile, main = 'default 1 mile grid')
+
+# aggregate to 2 and 4mile, assigning lowest cell number in new region
+ras2mile <- aggregate(ras1mile, fact = 2, fun = min, expand=FALSE)
+ras4mile <- aggregate(ras2mile, fact = 2, fun = min, expand=FALSE)
+plot(ras4mile, main = '4 mile grid')
+
+# convert to polygons and write out
+poly1mile <- rasterToPolygons(ras1mile)
+poly2mile <- rasterToPolygons(ras2mile)
+poly4mile <- rasterToPolygons(ras4mile)
+plot(poly4mile, main = '4 mile poly grid')
+
+outPolyDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
+
+# writeOGR(poly1mile, outPolyDir, 'RRCA_polygrid_1mile', driver = 'ESRI Shapefile')
+# writeOGR(poly2mile, outPolyDir, 'RRCA_polygrid_2mile', driver = 'ESRI Shapefile')
+# writeOGR(poly4mile, outPolyDir, 'RRCA_polygrid_4mile', driver = 'ESRI Shapefile')
+```
+
+## Pumping Data
+see 4.3_pumpingData in RRB_Rproj
