@@ -20,6 +20,7 @@ opts_chunk$set(cache=FALSE,
 ```{r packages, message=FALSE, echo=TRUE}
 library(rgdal)
 library(raster)
+library(tidyverse)
 ```
 
 ## Make RRCA polygon grid
@@ -63,5 +64,72 @@ outPolyDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FI
 # writeOGR(poly4mile, outPolyDir, 'RRCA_polygrid_4mile', driver = 'ESRI Shapefile')
 ```
 
-## Pumping Data
-see 4.3_pumpingData in RRB_Rproj
+## Load Data
+Pumping data is from the RRCA groundwater model and associated files obtained by Xiao from the guy who works on the model (Sam?). Processed data copied over from S:\Users\deinesji\HPA\gis\Wells\PumpingByGridCell, 
+which was produced with R script 4.3_Pumping_Data.Rmd in the RRB_Rcode R project over
+in Jills s drive. see that folder's readme.txt and/or script for data source and notes
+
+### Irrigation data
+And make a total water column
+
+```{r loadpumping, warning=FALSE}
+# irr water master file
+pumpDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/pumping'
+pumpFile <- 'RRCA_irrAllByCell_1999-2015_longFormat_gw_sw_co.csv'
+irrByCell0 <- read.csv(paste0(pumpDir, '/',pumpFile))
+
+# set NAs to 0 (warning is for text field, no problem)
+irrByCell0[is.na(irrByCell0)] <- 0
+
+# drop extra columns and calculate total irr
+irrByCell <- irrByCell0 %>%
+  mutate(totalIrr_m3 = gwirr_m3+swirr_m3+coirr_m3,
+         unique2 = paste0(year, '-', NODE)) %>%
+  dplyr::select(unique2, NODE, inRRB, state, year, totalIrr_m3) 
+```
+
+### Load irrigated area by RRCA cell
+irrigated pixel counts tallied via GEE script 04.13_RegionalStats_polygrid_interannual in users/jdeines/default/Production
+
+```{r loadAreas}
+cellArea <- 30*30 # m^2
+
+areaDir <-'C:/Users/deinesji/Google Drive/GEE_AIM-RRB/GEE_tableExports/RRB_test5_regional_county_Stats'
+
+# regional areas -----------------------------------------------
+
+# function to read in to a single dataframe
+loadStats <- function(fileList){
+  datOut = as.data.frame(do.call(rbind, lapply(fileList, function(x) {
+              csv1 <- read.csv(paste0(areaDir,'/',x))
+              csv1$year <- as.numeric(substr(x, start=1,stop=4))
+              return(csv1)
+           })))  
+  # convert cell count to area
+  datOut$irrigated_m2 <- datOut$X1 * cellArea
+  datOut$irrigated_km2 <- datOut$irrigated_m2 / 1000000
+  return(datOut)
+}
+
+# load 1 mile files, dropping dummy row
+files1 <- list.files(areaDir, pattern="*_test5_RRCA_POLYGRID_1mile.csv")
+area1 = loadStats(files1)[-1,] %>%
+  dplyr::select(layer, year, pr_ann, irrigated_m2) %>%
+  rename(NODE = layer) %>%
+  mutate(unique2 = paste0(year, '-', NODE))
+```
+
+## Calculate depth
+Match up datasets and calculate depth
+
+```{r depth}
+# combine datasets by year + node/layer and calculate depth
+depth1 <- irrByCell %>%
+  inner_join(area1, by = 'unique2') %>%
+  mutate(depth_cm = totalIrr_m3/irrigated_m2 * 100) 
+
+depthFilter <- 
+
+hist(depth1$depth_cm)
+```
+
