@@ -81,26 +81,15 @@ pumpDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/pumping'
 pumpFile <- 'RRCA_irrAllByCell_1999-2015_longFormat_gw_sw_co_FIXED_20171017.csv'
 irrByCell0 <- read.csv(paste0(pumpDir, '/',pumpFile))
 
-# test for year/node duplicates
-test3 <- irrByCell0 %>% filter (year == 2000)
-nrow(test3)
-sum(duplicated(test3$NODE))
-
-dupes <- test3[duplicated(test3$NODE),]
-dupes[dupes$NODE %in% c(6065,6391,6717),]
-```
-
-Conclusion - some nodes were duplicated in my creation of this master irrigation file. For instance, for NODE/model cell 6717, the gw_acreft was entered 6 time, the sw was 3x2, and the coirr was also 3x2 but in a different pattern. wtf.
-
-```{r}
 # set NAs to 0 (warning is for text field, no problem)
-irrByCell0[is.na(irrByCell0)] <- 0
+colsToZero <- c('swirr_m3','swirr_km3','swirr_acreft','coirr_m3','coirr_km3','coirr_acreft')
+irrByCell0[,colsToZero][is.na(irrByCell0[,colsToZero])] <- 0 
 
 # drop extra columns and calculate total irr
 irrByCell <- irrByCell0 %>%
   mutate(totalIrr_m3 = gwirr_m3+swirr_m3+coirr_m3,
-         unique2 = paste0(year, '-', NODE)) %>%
-  dplyr::select(unique2, NODE, inRRB, state, year, totalIrr_m3) 
+         unique2 = paste0(Year, '-', NODE)) %>%
+  dplyr::select(unique2, NODE, inRRB, state, Year, totalIrr_m3) 
 ```
 
 ### Load irrigated area by RRCA cell
@@ -142,22 +131,12 @@ Match up datasets and calculate depth. I wrote out my generated raster/polygon a
 ```{r depth}
 # combine datasets by year + node/layer and calculate depth
 depth1 <- irrByCell %>%
+  rename(year = Year) %>%
   left_join(area1) %>%  # drops polys from buffer, and 2016
   mutate(depth_cm = totalIrr_m3/irrigated_m2 * 100) 
-
-# real quick: how many model cells?
-length(unique(depth1$NODE))
-nrow(depth1 %>% filter(year == 2000))
-test <- depth1 %>% filter(year == 2000)
-test[duplicated(test$NODE),]  # seems duplication in irrByCell
-test2 <- irrByCell %>% filter(year == 2000)
-nrow(test2)
 
 # get depth calculation stats
 summary(depth1$depth_cm)
 
-depthFilter <- 
-
-hist(depth1$depth_cm)
 ```
 
