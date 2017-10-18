@@ -26,6 +26,7 @@ library(grid)
 library(colorRamps)
 library(ggplot2)
 library(tidyr)
+library(dplyr)
 source('functions/stat_smooth_func_all.R')
 ```
 
@@ -35,28 +36,36 @@ Pumping data from the RRB_Rcode project (4.3_Pumping_Data.Rmd). This file is dat
 
 UPDATE 2/20/17: big change to use combined gw/sw dataset
 
-```{r loadPumpingData}
+UPDATE 10/17/17: checking fixed irrigation water data
+
+```{r loadPumpingData_fixed}
 # years wanted
 startYear = 1999
 endYear = 2015 # current dataset extent
 
 # # pumping data extracted from the RRCA groundwater model folks, see readme notes
 # pumpDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/pumping'
-# allIrr0 <- read.csv(paste0(pumpDir,'/RRCA_irrAllByCell_1918-2015_longFormat_gw_sw_co.csv'))
+# #allIrr0 <- read.csv(paste0(pumpDir,'/RRCA_irrAllByCell_1918-2015_longFormat_gw_sw_co.csv'))
+# allIrr0 <- read.csv(paste0(pumpDir,'/RRCA_irrAllByCell_1918-2015_longFormat_gw_sw_co_FIXED_20171017.csv'))
+# 
 # 
 # # subset years
-# allIrr <- allIrr0[allIrr0$year >= startYear & allIrr0$year <= endYear,]
+# allIrr <- allIrr0[allIrr0$Year >= startYear & allIrr0$Year <= endYear,]
 # 
 # # write out subset for future easier use
 # write.csv(allIrr, row.names=F,
-#           paste0(pumpDir,'/RRCA_irrAllByCell_1999-2015_longFormat_gw_sw_co.csv'))
+#           paste0(pumpDir,'/RRCA_irrAllByCell_1999-2015_longFormat_gw_sw_co_FIXED_20171017.csv'))
 
 #load year-restricted dataset
 pumpDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/pumping'
-allIrr <- read.csv(paste0(pumpDir,'/RRCA_irrAllByCell_1999-2015_longFormat_gw_sw_co.csv'))
+#allIrr <- read.csv(paste0(pumpDir,'/RRCA_irrAllByCell_1999-2015_longFormat_gw_sw_co.csv'))
+allIrr <- read.csv(paste0(pumpDir,'/RRCA_irrAllByCell_1999-2015_longFormat_gw_sw_co_FIXED_20171017.csv'))
+
 
 # replace NA's with zeros
-allIrr[,18:23][is.na(allIrr[,18:23])] <- 0 
+#allIrr[,18:23][is.na(allIrr[,18:23])] <- 0 
+colsToZero <- c('swirr_m3','swirr_km3','swirr_acreft','coirr_m3','coirr_km3','coirr_acreft')
+allIrr[,colsToZero][is.na(allIrr[,colsToZero])] <- 0 
 
 # sum total water use
 allIrr$total_km3 <- allIrr$gwirr_km3 + allIrr$swirr_km3 + allIrr$coirr_km3
@@ -71,6 +80,7 @@ allIrr$total_m3 <- allIrr$gwirr_m3 + allIrr$swirr_m3 + allIrr$coirr_m3
 #                               sw = sum(swirr_km3),
 #                               co = sum(coirr_km3))
 
+allIrr <- allIrr %>% rename(year = Year)
 irrStates.RRCA.km3 <- aggregate(cbind(total_km3, gwirr_km3, swirr_km3, coirr_km3)
                             ~ state + year, data = allIrr, 
                            FUN = 'sum')
@@ -127,15 +137,15 @@ ggplot(data=allIrr.years.long,
 
 # export the cleaned datasets that retains state and type
 derivedDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/derivedDatasets'
-#write.csv(irrStates.RRCA.km3, row.names=F,
-#          paste0(derivedDir, '/RRCA_fullModel_irrigation_volume.csv'))
-#write.csv(irrStates.RRB.km3, row.names=F,
-#          paste0(derivedDir, '/RRB_byState_irrigation_volume.csv'))
+# write.csv(irrStates.RRCA.km3, row.names=F,
+#          paste0(derivedDir, '/RRCA_fullModel_irrigation_volume_FIXED_20171017.csv'))
+# write.csv(irrStates.RRB.km3, row.names=F,
+#          paste0(derivedDir, '/RRB_byState_irrigation_volume_FIXED_20171017.csv'))
 ```
 
 Make a 'master data' file for the RRCA boundary
 
-```{r loadAreaData}
+```{r loadAreaData, eval=FALSE}
 cellArea <- 30*30 # m^2
 
 regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test5_regional_county_Stats'
@@ -186,7 +196,7 @@ write.csv(areaRRCA.states, paste0(derivedDir, '/RRCA_fullModel_area-rfTest5_ppt-
 ## RRCA groundwater model boundary analyses
 started 3/1/2017
 
-```{r rrcaPlots}
+```{r rrcaPlots, eval = FALSE}
 # merge pumping and area data
 plotData2 <- merge(areaRRCA.states, irrStates.RRCA.km3, by='key', all.x = T)
 plotData2 <- plotData2[,c('year.x','state.x','irrigated_km2','total_km3','pr_ann')]
@@ -200,7 +210,7 @@ plotDataLong2 <- gather(plotData2, key = variable, value = value,
 
 ## Republican Basin Boundary analyses
 
-```{r stateBasinPlots}
+```{r stateBasinPlots, eval=FALSE}
 # state basin data only
 areaStates <- all1[grepl('basin', all1$masterID) & !grepl('NRD', all1$masterID),]
 
@@ -255,7 +265,7 @@ ggplot(data = plotDataLong[plotDataLong$state.x == state,],
 
 ```
 
-```{r fullRRB_plots, fig.height = 5.5, fig.width = 6}
+```{r fullRRB_plots, fig.height = 5.5, fig.width = 6, eval=FALSE}
 # replace volume NA's with 0 for now
 plotData[is.na(plotData$total_km3),'total_km3'] <- 0
 
@@ -315,7 +325,7 @@ ggplot(data = plotDataRRBLong,
                      text = element_text(size = 16))
 ```
 
-```{r fullRRB_plots_lm, fig.height = 5.5, fig.width = 6}
+```{r fullRRB_plots_lm, fig.height = 5.5, fig.width = 6, eval=FALSE}
 
 
 # plots with no facet labels
@@ -346,33 +356,33 @@ ggplot(data = plotDataRRBLong,
 ### Area vs Precip
 
 ```{r precipVarea, fig.width = 3, fig.height = 3.25}
-ggplot(data = plotDataRRB,
-       aes(x = zPrecipitation, y = Irrigated_Area)) +
-  geom_point() +
-  ylab('Irrigated Area (km^2)') + xlab('Precipitation (mm)') +
-  ggtitle('Precip vs Irrigated Area') +
-  theme_bw()
+# ggplot(data = plotDataRRB,
+#        aes(x = zPrecipitation, y = Irrigated_Area)) +
+#   geom_point() +
+#   ylab('Irrigated Area (km^2)') + xlab('Precipitation (mm)') +
+#   ggtitle('Precip vs Irrigated Area') +
+#   theme_bw()
 ```
 
 ### Pumping vs precip
 
 ```{r precipVpumping, fig.width = 3, fig.height = 3.25}
-ggplot(data = plotDataRRB,
-       aes(x = zPrecipitation, y = Pumping)) +
-  geom_point() +
-  ylab('Pumping (km^3)') + xlab('Precipitation (mm)') +
-  ggtitle('Precip vs Pumping') +
-  theme_bw()
+# ggplot(data = plotDataRRB,
+#        aes(x = zPrecipitation, y = Pumping)) +
+#   geom_point() +
+#   ylab('Pumping (km^3)') + xlab('Precipitation (mm)') +
+#   ggtitle('Precip vs Pumping') +
+#   theme_bw()
 ```
 
 ### Pumping vs irrigated
 
 ```{r areaVpumping, fig.width = 3, fig.height = 3.25}
-ggplot(data = plotDataRRB,
-       aes(x = Irrigated_Area, y = Pumping)) +
-  geom_point() +
-  ylab('Pumping (km^3)') + xlab('Irrigated Area (km^2)') +
-  ggtitle('Irrigated Area vs Pumping') +
-  theme_bw()
+# ggplot(data = plotDataRRB,
+#        aes(x = Irrigated_Area, y = Pumping)) +
+#   geom_point() +
+#   ylab('Pumping (km^3)') + xlab('Irrigated Area (km^2)') +
+#   ggtitle('Irrigated Area vs Pumping') +
+#   theme_bw()
 ```
 
