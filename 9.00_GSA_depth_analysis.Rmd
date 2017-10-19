@@ -89,7 +89,8 @@ irrByCell0[,colsToZero][is.na(irrByCell0[,colsToZero])] <- 0
 irrByCell <- irrByCell0 %>%
   mutate(totalIrr_m3 = gwirr_m3+swirr_m3+coirr_m3,
          unique2 = paste0(Year, '-', NODE)) %>%
-  dplyr::select(unique2, NODE, inRRB, state, Year, totalIrr_m3) 
+  dplyr::select(unique2, NODE, inRRB, state, Year, totalIrr_m3)  %>%
+  rename(year = Year)
 ```
 
 ### Load irrigated area by RRCA cell
@@ -107,7 +108,8 @@ areaDir <-'C:/Users/deinesji/Google Drive/GEE_AIM-RRB/GEE_tableExports/RRB_test5
 # function to read in to a single dataframe
 loadStats <- function(fileList){
   datOut = as.data.frame(do.call(rbind, lapply(fileList, function(x) {
-              csv1 <- read.csv(paste0(areaDir,'/',x))
+              csv1 <- read.csv(paste0(areaDir,'/',x)) %>%
+                mutate(X1 = replace(X1, is.na(X1),0))
               csv1$year <- as.numeric(substr(x, start=1,stop=4))
               return(csv1)
            })))  
@@ -129,7 +131,7 @@ files4 <- list.files(areaDir, pattern="*_test5_RRCA_POLYGRID_4mile.csv")
 area4 = loadStats(files4)[-1,] %>%
   dplyr::select(layer, year, pr_ann, irrigated_m2) %>%
   rename(NODE = layer) %>%
-  mutate(unique2 = paste0(year, '-', NODE))
+  mutate(unique2 = paste0(year, '-', NODE)) 
 ```
 
 ## Calculate depth
@@ -140,7 +142,7 @@ Match up datasets and calculate depth. I wrote out my generated raster/polygon a
 ### Match up datasets
 The 4 mile grid aggregates 4 RRCA cells, which are nonsequential. Get the 4 NODE values per polygon.
 
-```{r getNodes4}
+```{r getNodes4, cache=TRUE}
 # load the 4 mile polygrid
 outPolyDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
 poly4 <- readOGR(outPolyDir, 'RRCA_polygrid_4mile', verbose=FALSE)
@@ -189,9 +191,18 @@ join irrigation volume df with area df and calculate depth already
 # combine datasets by year + node/layer and calculate depth
 depth4 <- irrBy4 %>%
   left_join(area4) %>%
-  mutate(depth_cm = totalIrr_m3/irrigated_m2 * 100) 
+  mutate(depth_cm = totalIrr_m3/irrigated_m2 * 100) %>%
+  filter(is.finite(depth_cm))
 
 # check out the depth data range
 summary(depth4$depth_cm)
+
+# good quantiles for cleaning?
+quantile(depth4$depth_cm, c(.9,.99))
+
+# filter for the 90% quantile and lower
+depth4.90 <- depth4 %>% filter(depth_cm < 107)
+hist(depth4.90$depth_cm)
+boxplot(depth4.90$depth_cm)
 ```
 
