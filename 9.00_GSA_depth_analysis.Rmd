@@ -134,10 +134,10 @@ area4 = loadStats(files4)[-1,] %>%
   mutate(unique2 = paste0(year, '-', NODE)) 
 ```
 
-## Calculate depth
+# Calculate depth
 Match up datasets and calculate depth. I wrote out my generated raster/polygon and confirmed the 'layer' variable (cell number) matched the shapefile for pumping data 'node' column
 
-### 1 mile RRCA grid
+## 4 mile RRCA grid
 
 ### Match up datasets
 The 4 mile grid aggregates 4 RRCA cells, which are nonsequential. Get the 4 NODE values per polygon.
@@ -204,5 +204,92 @@ quantile(depth4$depth_cm, c(.9,.99))
 depth4.90 <- depth4 %>% filter(depth_cm < 107)
 hist(depth4.90$depth_cm)
 boxplot(depth4.90$depth_cm)
+```
+
+### plots and analysis
+
+#### Mean Depth
+Calculate and map the mean depth in space
+
+```{r mean4, cache=TRUE}
+# get mean depth per year for Xiao
+depth4.mean <- depth4.90  %>%
+  group_by(NODE) %>%
+  summarize(meanDepth_cm = mean(depth_cm))
+
+summary(depth4.mean$meanDepth_cm)
+
+# join the data
+poly4.meanDepth <- merge(poly4, depth4.mean, by.x = 'layer', by.y = 'NODE')
+
+# rasterize for better plotting
+meanDepth_4mile <- rasterize(poly4.meanDepth, template, 
+                             field = 'meanDepth_cm')
+spplot(meanDepth_4mile, main = 'Mean Irrigation Depth, 1999-2015')
+
+# write out 
+outRas <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/pumping/depthRasters'
+writeRaster(meanDepth_4mile, 
+            paste0(outRas,'/RRCA_4mile_1999-2015_meanDepth_cm_90p.tif'))
+```
+
+#### Depth Trend
+Calculate and map the trend in depth over time, accounting for precip
+
+```{r}
+
+```
+
+
+## 1 mile grid
+To check with Xiao's
+
+```{r 1mile, cache=TRUE}
+# load 1 mile files, dropping dummy row
+files1 <- list.files(areaDir, pattern="*_test5_RRCA_POLYGRID_1mile.csv")
+area1 = loadStats(files1)[-1,] %>%
+  dplyr::select(layer, year, pr_ann, irrigated_m2) %>%
+  rename(NODE = layer) 
+
+# combine datasets by year + node/layer and calculate depth
+depth1 <- irrByCell %>%
+  left_join(area1) %>%
+  mutate(depth_cm = totalIrr_m3/irrigated_m2 * 100) %>%
+  filter(is.finite(depth_cm))
+
+# check out the depth data range - raw
+summary(depth1$depth_cm)
+
+# good quantiles for cleaning?
+quantile(depth1$depth_cm, c(.9,.99))
+
+# filter for irrigation < 80 cm to match Xiao
+depth1.Xiao <- depth1 %>% filter(depth_cm < 80)
+summary(depth1.Xiao$depth_cm)
+hist(depth1.Xiao$depth_cm)
+boxplot(depth1.Xiao$depth_cm)
+
+# get mean depth per year for Xiao
+depth1.mean <- depth1.Xiao %>%
+  group_by(NODE) %>%
+  summarize(meanDepth_cm = mean(depth_cm))
+
+summary(depth1.mean$meanDepth_cm)
+
+# load the 1 mile polygrid
+outPolyDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
+poly1 <- readOGR(outPolyDir, 'RRCA_polygrid_1mile', verbose=FALSE)
+
+# join the data
+poly1.meanDepth <- merge(poly1, depth1.mean, by.x = 'layer', by.y = 'NODE')
+
+# rasterize for better plotting
+meanDepth_1mile <- rasterize(poly1.meanDepth, template, field = 'meanDepth_cm')
+spplot(meanDepth_1mile)
+
+# write out for Xiao
+outRas <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/pumping/depthRasters'
+writeRaster(meanDepth_1mile, paste0(outRas,
+                                    '/RRCA_1mile_1999-2015_meanDepth_cm.tif'))
 ```
 
