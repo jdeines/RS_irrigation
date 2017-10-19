@@ -171,7 +171,7 @@ Extract irrigated area and precip for regions of interests
 ```{r irrData}
 # load REGIONAL AREA + precip data files ----------------------------------------
 cellArea <- 30*30 # m^2
-regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test5_regional_county_Stats'
+regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_AIM-RRB/GEE_tableExports/RRB_test5_regional_county_Stats'
 
 # get filenames
 files <- list.files(regionsDir,
@@ -316,7 +316,7 @@ ggplot(rrca.rrb, aes(Year, Depth_cm)) +
 rrcaPlot2 <- rrca.rrb
 
 # items to plot
-plotUs2 <- c('Depth_m','Precip_cm')
+plotUs2 <- c('Depth_cm','Precip_cm')
 #plotUs <- c('AArea_km2_else','Volume_km3','Precip_cm','Price')
 
 # gather
