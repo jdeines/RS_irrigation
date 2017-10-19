@@ -30,7 +30,7 @@ Extract polygon grids of a few resolutions for the RRCA model
 * aggregated: 2 mile, 4 mile
 
 
-```{r rrcaPolygrids, eval=FALSE}
+```{r rrcaPolygrids}
 # load a buffered RRCA boundary
 buffer <- readOGR('S:/Users/deinesji/HPA/gis/lhm','RRB_bound2_6500m',verbose=F)
 
@@ -91,6 +91,8 @@ irrByCell <- irrByCell0 %>%
 ### Load irrigated area by RRCA cell
 irrigated pixel counts tallied via GEE script 04.13_RegionalStats_polygrid_interannual in users/jdeines/default/Production
 
+The 1 mile grid gave some bizarre depths, using a larger aggregation (4 mile)
+
 ```{r loadAreas}
 cellArea <- 30*30 # m^2
 
@@ -111,9 +113,16 @@ loadStats <- function(fileList){
   return(datOut)
 }
 
-# load 1 mile files, dropping dummy row
-files1 <- list.files(areaDir, pattern="*_test5_RRCA_POLYGRID_1mile.csv")
-area1 = loadStats(files1)[-1,] %>%
+# # load 1 mile files, dropping dummy row
+# files1 <- list.files(areaDir, pattern="*_test5_RRCA_POLYGRID_1mile.csv")
+# area1 = loadStats(files1)[-1,] %>%
+#   dplyr::select(layer, year, pr_ann, irrigated_m2) %>%
+#   rename(NODE = layer) %>%
+#   mutate(unique2 = paste0(year, '-', NODE))
+
+# load 4 mile files, dropping dummy row
+files4 <- list.files(areaDir, pattern="*_test5_RRCA_POLYGRID_4mile.csv")
+area4 = loadStats(files4)[-1,] %>%
   dplyr::select(layer, year, pr_ann, irrigated_m2) %>%
   rename(NODE = layer) %>%
   mutate(unique2 = paste0(year, '-', NODE))
@@ -122,14 +131,61 @@ area1 = loadStats(files1)[-1,] %>%
 ## Calculate depth
 Match up datasets and calculate depth
 
+### Match up datasets
+The 4 mile grid aggregates 4 RRCA cells, which are nonsequential. Get the 4 NODE values per polygon.
+
+```{r getNodes4}
+# load the 4 mile polygrid
+outPolyDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
+poly4 <- readOGR(outPolyDir, 'RRCA_polygrid_4mile', verbose=FALSE)
+
+# remake the 1 mile raster with grid cell numbers
+CRS <- '+proj=utm +zone=14 +ellps=clrk66 +datum=NAD27 +units=us-ft +no_defs'
+template <- raster(crs=CRS, nrows = 165, ncols=326, resolution = 5280,
+                 ymn = 14092806, ymx = 14964006, 
+                 xmn = 266023, xmx = 1987023)
+template[] <- 1:53790 
+
+# get the raster values per polygon
+poly4$ID <- 1:nrow(poly4)
+nodeLookup <- raster::extract(template, poly4, df=TRUE)
+
+# add a column back in for the node/layer value of the polygrid 
+nodeLookup2 <- nodeLookup %>%
+  rename(NODE = layer) %>%
+  full_join(poly4@data)
+
+# so the following NODES from the irrigation water data are associated with 
+# aggregated cell "2725"
+nodeLookup2 %>% filter(layer == 2725)
+```
+
+Awesome. Now, join the irrigation water data to this lookup table and aggregated to layer (poly4 )cells.
+
+Note due to using the polygon buffer to "clip" the 4 mile grid raster, there are some poly4 cells 100% outside of the RRCA model grid (and hence have NA values; remove them)
+
+```{r aggregateWater}
+# aggregate irrigation water by 4 mile polygons for each year
+irrBy4 <- nodeLookup2 %>%
+  full_join(irrByCell) %>%                       # join irrigation water dataset
+  filter(!is.na(totalIrr_m3)) %>%                # remove NAs
+  group_by(year, layer) %>%                      
+  summarise(totalIrr_m3 = sum(totalIrr_m3)) %>%  # get total for 16 model cells
+  rename(NODE = layer)                           # rename to match area df
+#looky
+irrBy4 %>% filter(NODE==2725)
+```
+
+### calculate depth
+join irrigation volume df with area df and calculate depth already
+
 ```{r depth}
 # combine datasets by year + node/layer and calculate depth
-depth1 <- irrByCell %>%
-  inner_join(area1, by = 'unique2') %>%
+depth4 <- irrBy4 %>%
+  left_join(area4) %>%
   mutate(depth_cm = totalIrr_m3/irrigated_m2 * 100) 
 
-depthFilter <- 
-
-hist(depth1$depth_cm)
+# check out the depth data range
+summary(depth4$depth_cm)
 ```
 
