@@ -30,17 +30,13 @@ Extract polygon grids of a few resolutions for the RRCA model
 * aggregated: 2 mile, 4 mile
 
 
-<<<<<<< HEAD
-```{r rrcaPolygrids}
-=======
 ```{r rrcaPolygrids, eval=FALSE}
 outRas <- 'S:/Users/deinesji/HPA/gis/Wells/PumpingByGridCell/modelGridRasters'
 
->>>>>>> 91de30272c528eca68344120b58482900c702b7d
 # load a buffered RRCA boundary
 buffer <- readOGR('S:/Users/deinesji/HPA/gis/lhm','RRB_bound2_6500m',verbose=F)
 
-# create template raster grid based on RRCA model grid (165 rows, 326 columns)    
+# create template raster grid based on RRCA model grid (165 rows, 326 columns)  
 CRS <- '+proj=utm +zone=14 +ellps=clrk66 +datum=NAD27 +units=us-ft +no_defs'
 template <- raster(crs=CRS, nrows = 165, ncols=326, resolution = 5280,
                  ymn = 14092806, ymx = 14964006, 
@@ -191,22 +187,11 @@ join irrigation volume df with area df and calculate depth already
 
 ```{r depth}
 # combine datasets by year + node/layer and calculate depth
-<<<<<<< HEAD
 depth4 <- irrBy4 %>%
   left_join(area4) %>%
   mutate(depth_cm = totalIrr_m3/irrigated_m2 * 100) 
 
 # check out the depth data range
 summary(depth4$depth_cm)
-=======
-depth1 <- irrByCell %>%
-  rename(year = Year) %>%
-  left_join(area1) %>%  # drops polys from buffer, and 2016
-  mutate(depth_cm = totalIrr_m3/irrigated_m2 * 100) 
-
-# get depth calculation stats
-summary(depth1$depth_cm)
-
->>>>>>> 91de30272c528eca68344120b58482900c702b7d
 ```
 
