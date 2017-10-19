@@ -21,6 +21,9 @@ opts_chunk$set(cache=FALSE,
 library(rgdal)
 library(raster)
 library(tidyverse)
+library(broom)
+library(sf)
+library(latticeExtra)
 ```
 
 ## Make RRCA polygon grid
@@ -127,7 +130,8 @@ loadStats <- function(fileList){
 #   mutate(unique2 = paste0(year, '-', NODE))
 
 # load 4 mile files, dropping dummy row
-files4 <- list.files(areaDir, pattern="*_test5_RRCA_POLYGRID_4mile.csv")
+files4 <- list.files(areaDir,
+                     pattern="*_test5_RRCA_POLYGRID_4mile_weighted.csv")
 area4 = loadStats(files4)[-1,] %>%
   dplyr::select(layer, year, pr_ann, irrigated_m2) %>%
   rename(NODE = layer) %>%
@@ -208,6 +212,86 @@ boxplot(depth4.90$depth_cm)
 
 ### plots and analysis
 
+#### Depth Trend
+Calculate and map the trend in depth over time, accounting for precip. Model form: depth_cm ~ year + pr_ann
+
+Plot: the coefficient for year
+
+```{r trend4}
+# function to get significant year coeffs by cell
+getSpatialRegression <- function(dataset, polygrid, p = 0.05){
+  # run regressions
+  lms <- dataset %>% 
+      mutate(pr_ann_cm = pr_ann/10) %>%   # convert precip to cm
+      group_by(NODE) %>% 
+      do(model = lm(depth_cm ~ year + pr_ann_cm, data = .))
+ 
+  # tidy up with broom
+  coeffs <- lms %>% tidy(model)
+  coeffs <- coeffs[coeffs$term == 'year',]
+ 
+   # merge coefficients with grid polygons
+  poly <- sp::merge(polygrid, coeffs[,c('NODE','estimate','p.value')])
+  # just sig trends
+  poly[is.na(poly$p.value),'p.value'] <- 1 # dummy p value no data county
+  poly$sigCoeffs <- poly$estimate
+  poly[poly$p.value >= p, 'sigCoeffs'] <- NA
+  return(poly)
+} 
+
+# add a node layer
+poly4$NODE <- poly4$layer
+# run for 4 miles
+trends4 <- getSpatialRegression(depth4.90, poly4)
+# plot
+spplot(trends4, 'sigCoeffs', main = 'Depth trends...by year?!')
+```
+
+And make a trend map
+
+```{r trendMap}
+#nice plotting -------------------------
+# polygon boundaries
+gisDir <- "C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES"
+rrbpoly <- readOGR(gisDir, 'RRB_aea', verbose=F)
+rrca <- readOGR(gisDir, 'RRCA_modified_aea', verbose=F)
+# get union bounds
+unioned <- readOGR(gisDir, 'RRCA_RRB_union_aea', verbose=F)
+
+states <- readOGR('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile', 'States', verbose=F)
+states <- states[states$STATE_ABBR %in% c('CO','NE','KS'),]
+states <- spTransform(states, CRS(proj4string(rrca)))
+
+# palette parameters
+# blue and red color ramps pulled from color brewer (no white)
+redRamp2 <- colorRampPalette(c('#fddbc7','#f4a582','#d6604d','#b2182b','#67001f'))
+blueRamp2 <- colorRampPalette(rev(c('#d1e5f0','#92c5de','#4393c3','#2166ac','#053061')))
+
+colorbreaks <- 200
+biPal <- c(blueRamp2(colorbreaks/2),redRamp2(colorbreaks/2))
+
+# scale range
+palMin <- -12
+palMax <- 12
+
+# reproject trends4
+trends4.aea <- spTransform(trends4, crs(proj4string(rrca)))
+
+# gray background
+spplot(trends4.aea, 'sigCoeffs', col.regions=biPal, col=NA,
+       at=seq(palMin,palMax,(-palMin+palMax)/colorbreaks),
+              main = 'Trends in Depth (cm/year)',
+       colorkey=list(space='bottom',
+                     labels=list(
+                       labels = c('-12','-8','-4','0','4','8','12'),
+                       at = c(-12,-8,-4,0,4,8,12)))) +
+  latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=.8)) + 
+  latticeExtra::layer(sp.polygons(rrca,lwd=.8)) +
+  latticeExtra::layer(sp.polygons(states, lwd=1, col='gray30')) + 
+  latticeExtra::layer(sp.polygons(rrca, fill = 'gray50', col=NA), under=T)
+
+```
+
 #### Mean Depth
 Calculate and map the mean depth in space
 
@@ -227,18 +311,48 @@ meanDepth_4mile <- rasterize(poly4.meanDepth, template,
                              field = 'meanDepth_cm')
 spplot(meanDepth_4mile, main = 'Mean Irrigation Depth, 1999-2015')
 
-# write out 
-outRas <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/pumping/depthRasters'
-writeRaster(meanDepth_4mile, 
-            paste0(outRas,'/RRCA_4mile_1999-2015_meanDepth_cm_90p.tif'))
+# try an sf plot
+meanDepth4.sf <- st_as_sf(poly4.meanDepth)
+plot(meanDepth4.sf['meanDepth_cm'], border = NA, main = 'Mean Depth 1999-2015, 4m')
+
+# area trends stle plot -------------------------------------
+
+# palette parameters
+# blue and red color ramps pulled from color brewer (no white)
+redRamp2 <- colorRampPalette(c('#fddbc7','#f4a582','#d6604d','#b2182b','#67001f'))
+blueRamp2 <- colorRampPalette(rev(c('#d1e5f0','#92c5de','#4393c3','#2166ac','#053061')))
+
+colorbreaks <- 200
+biPal <- c(blueRamp2(colorbreaks/2),redRamp2(colorbreaks/2))
+
+# scale range
+palMin <- -12
+palMax <- 12
+
+# reproject trends4
+poly4.meanDepth.aea <- spTransform(poly4.meanDepth, crs(proj4string(rrbpoly)))
+
+# gray background
+spplot(poly4.meanDepth.aea, 'meanDepth_cm', col.regions=biPal, col=NA,
+       #at=seq(palMin,palMax,(-palMin+palMax)/colorbreaks),
+              #main = 'Absolute area, 4 km grid, sig only',
+       colorkey=list(space='bottom') + #,
+                     #labels=list(
+                    #   labels = c('-12','-8','-4','0','4','8','12'),
+                    #   at = c(-12,-8,-4,0,4,8,12)))) +
+  latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=.8)) + 
+  latticeExtra::layer(sp.polygons(rrca,lwd=.8)) +
+  latticeExtra::layer(sp.polygons(states, lwd=1, col='gray30')) + 
+  latticeExtra::layer(sp.polygons(unioned, fill = 'gray50', col=NA), under=T)
+
+
+# # write out 
+# outRas <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/pumping/depthRasters'
+# writeRaster(meanDepth_4mile, 
+#             paste0(outRas,'/RRCA_4mile_1999-2015_meanDepth_cm_90p.tif'))
 ```
 
-#### Depth Trend
-Calculate and map the trend in depth over time, accounting for precip
 
-```{r}
-
-```
 
 
 ## 1 mile grid
