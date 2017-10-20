@@ -343,7 +343,7 @@ spplot(poly4.meanDepth.aea, 'meanDepth_cm', col.regions=biPal, col=NA,
   latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=.8)) + 
   latticeExtra::layer(sp.polygons(rrca,lwd=.8)) +
   latticeExtra::layer(sp.polygons(states, lwd=1, col='gray30')) + 
-  latticeExtra::layer(sp.polygons(unioned, fill = 'gray50', col=NA), under=T)
+  latticeExtra::layer(sp.polygons(unioned, fill = 'gray50', col=NA), under=T))
 
 
 # # write out 

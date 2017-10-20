@@ -39,7 +39,7 @@ Exported raster of years irrigated from 06.0_summaryMaps in GEE.
 
 ```{r userVars}
 # dirs and names
-rasDir <- 'C:/Users/deinesji/Google Drive/GEE_classification/RRB_test5_randFor_interannualClean_unionBound'
+rasDir <- 'C:/Users/deinesji/Google Drive/GEE_AIM-RRB/GEE_classification/RRB_test5_randFor_interannualClean_unionBound'
 rasRaw <- 'IrrigationFrequencyMap_0and1neg.tif'
 rasMasked <- 'IrrigationFrequencyMap_0and1neg_boundMask.tif'
   
@@ -69,9 +69,10 @@ Set some common color scales, etc, among figures
 numYears <- 18
 #backgroundcolor <- 'gray60'
 backgroundcolor <- 'gray32'
+backgroundcolor2 <- 'gray50'
 
 # number of years color ramp
-matlab <- matlab.like2(numYears+1)
+matlab <- matlab.like2(numYears)
 #matlab <- viridis(numYears+1)
 
 # year color ramp
@@ -205,7 +206,7 @@ plot(insetPoly, add=T)
 
 
 
-```{r freqMap_matlab2_bottom_matlab, fig.width = 7, fig.height = 5, dpi=600, dev=c('png','pdf')}
+```{r freqMap_matlab2_bottom_matlab, fig.width = 7, fig.height = 5, dpi=600, dev=c('png','pdf'), eval=FALSE}
 # load full raster
 freq2 <- raster(paste0(rasDir,'/',rasMasked))
 rrbpoly <- readOGR(extentDir, rrb, verbose=F)
@@ -241,7 +242,7 @@ spplot(freq2, col.regions = c(backgroundcolor,matlab), maxpixels = 2000000,
 #levelplot(freq2, col.regions=c(backgroundcolor,matlab), axes=F)
 
 # color ramp
-image.plot(z=0:18,add=F,legend.only=T,  col=c(backgroundcolor,matlab), 
+image.plot(z=0:18,add=F,legend.only=T,  col=c(backgroundcolor3,matlab), 
            horizontal = T,
           smallplot=c(0.05,.95,.15,.2), 
          axis.args=list(at=c(0,3,6,9,12,15,18), 
@@ -254,7 +255,7 @@ image.plot(z=0:18,add=F,legend.only=T,  col=c(backgroundcolor,matlab),
 
 and a lighter gray to help the outlines pop
 
-```{r freqMap_matlab2_bottom_matlab_lightgray, fig.width = 7, fig.height = 5, dpi=600, dev=c('png','pdf')}
+```{r freqMap_matlab2_bottom_matlab_lightgray, fig.width = 7, fig.height = 5, dpi=600, dev=c('png','pdf'), eval=FALSE}
 
 backgroundcolor2 <- 'gray50'
 
@@ -267,6 +268,99 @@ spplot(freq2, col.regions = c(backgroundcolor2,matlab), maxpixels = 2000000,
   latticeExtra::layer(sp.polygons(rrca, lwd=1.5)) 
 ```
 
+And one for use on dark background slides
+
+```{r freqMap_matlab2_GSA, fig.width = 9, fig.height = 5, dpi = 300, dev = c('pdf','png'), cache=FALSE}
+freq2 <- raster(paste0(rasDir,'/',rasMasked))
+extent0 <- readOGR(extentDir, extentName, verbose=F)
+extent1 <- spTransform(extent0, CRS(proj4string(freq2)))
+
+backgroundcolor3 <- 'black'
+#backgroundcolor3 <- '#262626'
+
+# plot scale
+scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
+  offset = c(-240000,1785000), scale = 100000, fill=c("transparent","black"))
+text1 = list("sp.text", c(-235000,1775000), "0", cex=1)
+text2 = list("sp.text", c(-140000,1775000), "100 km",cex = 1)
+#arrow = list("SpatialPolygonsRescale", layout.north.arrow(type=1), 
+#             offset = c(-223000, 1780000), scale = 40000)
+
+
+spplot(freq2, col.regions = c(backgroundcolor3,matlab), maxpixels = 1000000,
+       sp.layout=list(scale), #, arrow), 
+       par.settings=list(axis.line=list(col=NA)), 
+       colorkey=F)# +
+  #latticeExtra::layer(sp.polygons(extent1, lwd=1.5, col='#EEECE1')) 
+
+
+# color ramp
+fields::image.plot(z=0:18,add=F,legend.only=T,  col=c('black',matlab), 
+           horizontal = T,
+          smallplot=c(0.05,.95,.15,.2), 
+         axis.args=list(at=c(0,3,6,9,12,15,18), 
+                          labels=as.character(c(0,3,6,9,12,15,18))))
+
+```
+
+One with state lines
+
+```{r freqMap2_GSA_states_nobox_nowatershed, fig.width = 9, fig.height = 5, dpi = 300, dev = 'png', cache=FALSE}
+freq2 <- raster(paste0(rasDir,'/',rasMasked))
+extent0 <- readOGR(extentDir, extentName, verbose=F)
+extent1 <- spTransform(extent0, CRS(proj4string(freq2)))
+
+rrbpoly <- readOGR(extentDir, rrb, verbose=F)
+rrca <- readOGR(extentDir, 'RRCA_modified_aea', verbose=F)
+
+states <- readOGR('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile', 'States', verbose=F)
+states <- states[states$STATE_ABBR %in% c('CO','NE','KS'),]
+states <- spTransform(states, CRS(proj4string(freq2)))
+
+
+backgroundcolor3 <- 'black'
+#backgroundcolor3 <- '#262626'
+
+# plot scale
+scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
+  offset = c(-240000,1785000), scale = 100000, fill=c("transparent","black"))
+text1 = list("sp.text", c(-235000,1775000), "0", cex=1)
+text2 = list("sp.text", c(-140000,1775000), "100 km",cex = 1)
+#arrow = list("SpatialPolygonsRescale", layout.north.arrow(type=1), 
+#             offset = c(-223000, 1780000), scale = 40000)
+
+
+spplot(freq2, col.regions = c(backgroundcolor3,matlab), maxpixels = 1000000,
+       #sp.layout=list(scale), #, arrow), 
+       par.settings=list(axis.line=list(col=NA)), 
+       colorkey=F) +
+  #latticeExtra::layer(sp.polygons(extent1, lwd=1, col='#EEECE1')) +
+  latticeExtra::layer(sp.polygons(extent1, lty=1, lwd=.8,col= '#EEECE1')) + 
+  latticeExtra::layer(sp.polygons(states, lwd=1, col= '#EEECE1'))
+  
+
+```
+
+Ghetto way to get a scale bar into AI
+
+```{r freqMap_GSA_scaleBar, fig.width = 9, fig.height = 5, dpi = 300, dev = c('pdf','png'), cache=FALSE}
+
+
+# plot scale
+scale = list("SpatialPolygonsRescale", layout.scale.bar(), 
+  offset = c(-240000,1785000), scale = 100000, fill=c("transparent","black"))
+text1 = list("sp.text", c(-235000,1775000), "0", cex=1)
+text2 = list("sp.text", c(-140000,1775000), "100 km",cex = 1)
+#arrow = list("SpatialPolygonsRescale", layout.north.arrow(type=1), 
+#             offset = c(-223000, 1780000), scale = 40000)
+
+
+spplot(freq2, col.regions = c(backgroundcolor3,matlab), maxpixels = 1000,
+       sp.layout=list(scale, text1, text2), #, arrow), 
+       par.settings=list(axis.line=list(col=NA)), 
+       colorkey=F)# +
+  #latticeExtra::layer(sp.polygons(extent1, lwd=1.5, col='#EEECE1')) 
+```
 Integrated colorbar on right (retains map frame border)
 
 ```{r freqMap_matlab2_right, eval=FALSE, fig.width = 10, fig.height = 5, dpi=96, eval=FALSE}
@@ -292,7 +386,7 @@ grid.text('Years Irrigated',x=unit(0.975, "npc"),y=unit(0.5, 'npc'), rot=-90, gp
 
 3 location options
 
-```{r inset1_freqMap_matlab, fig.width = 2.5, fig.height = 3.2, dpi=600, dev=c('png','pdf')}
+```{r inset1_freqMap_matlab, fig.width = 2.5, fig.height = 3.2, dpi=600, dev=c('png','pdf'), eval=FALSE}
 # load full raster
 freq_inset1 <- raster(paste0(rasDir,'/',rasSmall1.name))
 freq_inset1[freq_inset1 == -1] <- 0
@@ -331,7 +425,7 @@ spplot(freq_inset1, col.regions = c(backgroundcolor,matlab), maxpixels = 200000,
 
 inset with lighter backgrounds
 
-```{r inset1_freqMap_matlab_lightgray, fig.width = 2.5, fig.height = 3.2, dpi=600, dev=c('png','pdf')}
+```{r inset1_freqMap_matlab_lightgray, fig.width = 2.5, fig.height = 3.2, dpi=600, dev=c('png','pdf'), eval=FALSE}
 
 # color ramp 
 spplot(freq_inset1, col.regions = c(backgroundcolor2,matlab), maxpixels = 200000,
@@ -423,6 +517,21 @@ spplot(early_inset1, col.regions = c(yearramp), maxpixels = 200000,
   #layer(sp.polygons(extent, fill=backgroundcolor), under=T)
 ```
 
+
+```{r inset1_early_black, fig.width = 3.5, fig.height = 4.2, dpi=300, dev=c('png','pdf'), cache=FALSE}
+# load full raster
+early_inset1 <- raster(paste0(rasDir,'/',earlyInset1.name))
+early_inset1[early_inset1 == 0] <- NA
+
+# color ramp 
+spplot(early_inset1, col.regions = c(yearramp), maxpixels = 200000,
+       par.settings = list(layout.widths=list(right.padding=4.5),
+                           panel.background=list(col=backgroundcolor3)),
+       #sp.layout=list(scale, text1, text2),
+       colorkey=F) #+
+  #layer(sp.polygons(extent, fill=backgroundcolor), under=T)
+```
+
 ```{r inset2_early, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE, eval=FALSE}
 # load full raster
 early_inset2 <- raster(paste0(rasDir,'/',earlyInset2.name))
@@ -494,6 +603,20 @@ spplot(late_inset1, col.regions = c(yearramp), maxpixels = 200000,
                      width = .85,
                      tck = .7)) #+
 ```
+
+```{r inset1_late_black, fig.width = 3.5, fig.height = 4.2, dpi=300, dev=c('png','pdf'), cache=FALSE}
+
+# load full raster
+late_inset1 <- raster(paste0(rasDir,'/',lateInset1.name))
+late_inset1[late_inset1 == 0] <- NA
+
+# color ramp 
+spplot(late_inset1, col.regions = c(yearramp), maxpixels = 200000,
+       par.settings = list(layout.widths=list(right.padding=4.5),
+                           panel.background=list(col=backgroundcolor3)),
+             colorkey=F) #+
+```
+
 
 ```{r inset2_late, fig.width = 2.5, fig.height = 3.2, dpi=96, cache=FALSE, eval=FALSE}
 # load full raster
