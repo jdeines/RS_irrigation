@@ -1,0 +1,69 @@
+---
+title: "Irrigated Area from the RRCA"
+author: "Jill Deines"
+date: "October 22, 2017"
+output:
+  html_document:
+    toc: yes
+---
+
+Goal: make a quick plot of irrigated area over time from the RRCA documentation data (RRCA 2003) for GSA talk
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, 
+               fig.path='figure/9.1_rrcaArea/')
+```
+
+**R Packages Needed**
+
+```{r packages, message=FALSE, echo=TRUE}
+library(tidyverse)
+```
+
+## make dataframe
+taken from page 14 of RRCA 2003 (citation should be in Deines et al. 2017)
+
+```{r makeData}
+rrcadata <- data.frame(year = seq(1940,2000,by=10),
+                Colorado = c(5409,15900,62736,428009,664161,667351,667891),
+                Kansas = c(2952,6080,50882,196831,357710,402132,434767),
+                Nebraska=c(22427,188031,451385,638969,1428685,1498400,1654452))
+rrcadata
+
+# get overall expansion factor
+rrcadata$total <- rrcadata$Colorado + rrcadata$Kansas + rrcadata$Nebraska
+rrcadata$total[7]/rrcadata$total[1]
+```
+
+## tranform
+make long format and get metric area
+
+```{r datadoodling}
+# longify
+rrca.long <- gather(rrcadata, key = state, value = acres, Colorado:Nebraska)
+
+# make a metric column
+rrca.long$km_2 <- rrca.long$acres * 0.00404686
+```
+
+
+## plot it
+
+```{r areaRRCA, dev.args = list(bg = 'transparent'), fig.width=4.25, fig.height = 3.75,dev=c('png','pdf')}
+ggplot(rrca.long, aes(x=year, y = km_2, color = state)) +
+  geom_line(lwd=2) + geom_point(cex=4) +
+  theme_bw()+ ggtitle('Irrigated Area by State')+
+  ylab('Square Kilometers') + xlab('')  +
+  theme(axis.text=element_text(size=15),
+        legend.key = element_blank(),
+        legend.position = c(.3,.8),
+        legend.title=element_blank(),
+        legend.text=element_text(size=15),
+        axis.title=element_text(size=16),        
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = "transparent", colour = NA),
+        plot.background = element_rect(fill = "transparent", colour = NA))
+```
+
