@@ -42,7 +42,7 @@ Counts of each class type were tallied for several administrative boundaries in 
 ```{r loadGee}
 cellArea <- 30*30 # m^2
 
-regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test5_regional_county_Stats'
+regionsDir <- 'C:/Users/deinesji/Google Drive/GEE_AIM-RRB/GEE_tableExports/RRB_test5_regional_county_Stats'
 
 # regional areas -----------------------------------------------
 # get filenames
@@ -151,7 +151,7 @@ palMax <- .6
 
 Plot it
 
-```{r gridRegress4_redbluegray_bigger, fig.width = 4.2, fig.height = 2.8, dpi=800, dev=c('png','pdf'), cache=TRUE}
+```{r gridRegress4_redbluegray_bigger, fig.width = 4.2, fig.height = 2.8, dpi=800, dev=c('png','pdf'), cache=TRUE, eval=FALSE}
 # polygon boundaries
 
 rrbpoly <- readOGR(gisDir, 'RRB_aea', verbose=F)
@@ -174,6 +174,53 @@ spplot(poly4.union, 'sigCoeffs', col.regions=biPal, col=NA,
   latticeExtra::layer(sp.polygons(unioned, fill = 'gray50', col=NA), under=T)
 ``` 
 
+Plot one for GSA
+```{r gridRegress4_redbluegray_GSA_whitelines, fig.width = 5.2, fig.height = 3.8, dpi=300, dev=c('png','pdf'), cache=TRUE, eval=FALSE}
+# polygon boundaries
+
+rrbpoly <- readOGR(gisDir, 'RRB_aea', verbose=F)
+rrca <- readOGR(gisDir, 'RRCA_modified_aea', verbose=F)
+
+states <- readOGR('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile', 'States', verbose=F)
+states <- states[states$STATE_ABBR %in% c('CO','NE','KS'),]
+states <- spTransform(states, CRS(proj4string(rrca)))
+
+# gray background
+spplot(poly4.union, 'sigCoeffs', col.regions=biPal, col=NA,
+       at=seq(palMin,palMax,(-palMin+palMax)/colorbreaks),
+              #main = 'Absolute area, 4 km grid, sig only',
+       colorkey=list(space='bottom',
+                     labels=list(
+                       labels = c('-0.6','-0.4','-0.2','0','0.2','0.4','0.6')))) +
+  latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=1.1, col='#EEECE1')) + 
+  latticeExtra::layer(sp.polygons(rrca,lwd=1.1, col='#EEECE1')) +
+  latticeExtra::layer(sp.polygons(states, lwd=1.2, col='gray80')) + 
+  latticeExtra::layer(sp.polygons(unioned, fill = 'gray20', col=NA), under=T)
+``` 
+
+```{r gridRegress4_redbluegray_GSA_black_300_2, fig.width = 4.2, fig.height = 2.8, dpi=800, dev=c('png','pdf'), cache=TRUE}
+# polygon boundaries
+
+rrbpoly <- readOGR(gisDir, 'RRB_aea', verbose=F)
+rrca <- readOGR(gisDir, 'RRCA_modified_aea', verbose=F)
+
+states <- readOGR('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile', 'States', verbose=F)
+states <- states[states$STATE_ABBR %in% c('CO','NE','KS'),]
+states <- spTransform(states, CRS(proj4string(rrca)))
+
+# gray background
+spplot(poly4.union, 'sigCoeffs', col.regions=biPal, col=NA,
+       at=seq(palMin,palMax,(-palMin+palMax)/colorbreaks),
+              #main = 'Absolute area, 4 km grid, sig only',
+       colorkey=list(space='bottom',
+                     labels=list(
+                       labels = c('-0.6','-0.4','-0.2','0','0.2','0.4','0.6')))) +
+  latticeExtra::layer(sp.polygons(rrbpoly, lty=2, lwd=1.1, col='black')) + 
+  latticeExtra::layer(sp.polygons(rrca,lwd=1.1, col='black')) +
+  latticeExtra::layer(sp.polygons(states, lwd=1.2, col='gray40')) + 
+  latticeExtra::layer(sp.polygons(unioned, fill = 'gray60', col=NA), under=T)
+``` 
+
 ## Novel/Retired Irrigated Area by year
 plot total, novel, and retired irrigation by year, by multiple regions of interest
 
@@ -183,7 +230,7 @@ exported from GEE 03.8_novel_Retired_Irrigation
 ```{r loadYearly}
 cellArea <- 30*30 # m^2
 
-yearsDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/earliestLatestTable'
+yearsDir <- 'C:/Users/deinesji/Google Drive/GEE_AIM-RRB/GEE_tableExports/earliestLatestTable'
 
 # load 
 early <- read.csv(paste0(yearsDir, '/', 'test5_randFor_earliest_revisionBoundaries_ksSplit_regionCounts.csv'))

@@ -9,7 +9,7 @@ output:
 
 Goal: Access USDA NASS Ag Census Data through the Quick Stats API, and identify all crops irrigated within boundaries for my remote sensing study.
 
-Note: updated figure used in the SI for the counties 100% within the study area is produced in 2.02_NASS_adk_v_jmd_UpdatedNassCleaningFunction.Rmd
+Note: updated figure used in the SI for the counties 100% within the study area is produced in 2.14_NASS_rsVAlidation_test5randFor.Rmd
 
 
 ```{r knitrOpts, echo=FALSE}
