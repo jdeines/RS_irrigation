@@ -25,13 +25,16 @@ library(grid)
 
 library(rgdal)
 library(RColorBrewer)
+
+# for black plots
+library(salustools)
 ```
 
 ## Data processing
 GEE script 01.07_Landsat_Annual_Statistics out a csv for each year; combine them into one dataset
 
 ```{r processData}
-dataDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/Landsat_Annual_Statistics'
+dataDir <- 'C:/Users/deinesji/Google Drive/GEE_AIM-RRB/GEE_tableExports/Landsat_Annual_Statistics'
 
 # annual file names
 annualFiles <- list.files(dataDir, pattern = '*extent.csv$')
@@ -45,17 +48,17 @@ annual = as.data.frame(do.call(rbind, lapply(annualFiles, function(x) {
                                         c('system.index','.geo'))]
             })))
 
-early = as.data.frame(do.call(rbind, lapply(earlyFiles, function(x) {
-              csv1 <- read.csv(paste0(dataDir,'/',x))
-              csv2 <- csv1[, -which(names(csv1) %in%
-                                        c('system.index','.geo'))]
-            })))
-
-late = as.data.frame(do.call(rbind, lapply(lateFiles, function(x) {
-              csv1 <- read.csv(paste0(dataDir,'/',x))
-              csv2 <- csv1[, -which(names(csv1) %in%
-                                        c('system.index','.geo'))]
-            })))
+# early = as.data.frame(do.call(rbind, lapply(earlyFiles, function(x) {
+#               csv1 <- read.csv(paste0(dataDir,'/',x))
+#               csv2 <- csv1[, -which(names(csv1) %in%
+#                                         c('system.index','.geo'))]
+#             })))
+# 
+# late = as.data.frame(do.call(rbind, lapply(lateFiles, function(x) {
+#               csv1 <- read.csv(paste0(dataDir,'/',x))
+#               csv2 <- csv1[, -which(names(csv1) %in%
+#                                         c('system.index','.geo'))]
+#             })))
 ```
 
 
@@ -87,6 +90,31 @@ p1
 
 ```
 
+#### in black
+
+```{r annualObs_nqb, fig.width=8, fig.height=3}
+ggplot(annual) +
+  geom_ribbon(aes(ymin=GI_p25, ymax = GI_p75, x=year),
+              alpha=0.8, fill = 'cornflowerblue') +
+  geom_line(aes(x=year, y=GI_p50, lty='Median'),linetype='solid', 
+            col = '#EEECE1',lwd=1) +
+    #geom_point(aes(x=year, y=GI_p50)) +
+    geom_line(aes(x=year, y=GI_p1, lty='1'), linetype = 'dashed', 
+              col = '#EEECE1') +
+      geom_line(aes(x=year, y=GI_p100, lty='1'), linetype = 'dashed', 
+                col = '#EEECE1') +
+  scale_x_continuous(name = '', 
+                  breaks = c(1985,1990,1995,2000,2005,2010,2015), 
+                 labels = c(1985,1990,1995,2000,2005,2010,2015),
+                     limits = c(1982.5,2016.5)) +
+  xlab('year') + ylab('Pixel Observations') +
+ theme_nqblack() + theme(axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     axis.title=element_text(size=11),
+                     panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank())
+```
+
 
 ```{r annual_SceneNumber, fig.width=8, fig.height=2.5}
 
@@ -97,7 +125,7 @@ satellites <- data.frame(y1 = c(695,660,695,660),
 
 p2 <- ggplot(data = annual,
        aes(x=year, y = images)) +
-    geom_bar(stat='identity', fill='gray60', alpha=.7) + 
+    geom_col(fill='gray60', alpha=.7) + 
   geom_segment(data=satellites,
                 aes(x=x1, xend = xend, y=y1, yend=y1, color=Sensor),lwd=2) +
   scale_color_manual(values=c('#fb9a99','#a6cee3','#1f78b4','#b2df8a')) +
@@ -116,9 +144,33 @@ p2
 ```
 
 
+#### in black
+
+```{r annual_SceneNumber_nqb, fig.width=8, fig.height=2.5}
+ggplot(data = annual,
+       aes(x=year, y = images)) +
+    geom_col(fill='gray60', alpha=.7) + 
+  geom_segment(data=satellites,
+                aes(x=x1, xend = xend, y=y1, yend=y1, color=Sensor),lwd=2) +
+  scale_color_manual(values=c('#fb9a99','#a6cee3','#1f78b4','#b2df8a')) +
+  scale_x_continuous(name = '', 
+                  breaks = c(1985,1990,1995,2000,2005,2010,2015), 
+                 labels = c(1985,1990,1995,2000,2005,2010,2015), 
+                 limits = c(1982.5,2016.5)) +
+  xlab('year') + ylab('Landsat Scenes') +
+  theme_nqblack() + theme(legend.title=element_blank(),
+                     axis.text=element_text(size=10),
+                     legend.text=element_text(size=10),
+                     legend.key = element_blank(),
+                     axis.title=element_text(size=11),
+                     panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank())
+```
+
+
 ### Total peak scenes
 
-```{r peakObs, fig.width=8, fig.height=3}
+```{r peakObs, fig.width=8, fig.height=3, eval = FALSE}
 
 # interquartile
 ggplot(late) +
@@ -144,7 +196,7 @@ ggplot(late) +
 ```
 
 
-```{r peak_SceneNumber, fig.width=8, fig.height=2.5}
+```{r peak_SceneNumber, fig.width=8, fig.height=2.5, eval = FALSE}
 
 satellites2 <- data.frame(y1 = c(115,100,115,100),
                          x1 = c(1982.5, 1984,1999,2012.5),
@@ -174,7 +226,7 @@ ggplot(data = late,
 
 ### Total early scenes
 
-```{r earlyObs, fig.width=8, fig.height=3}
+```{r earlyObs, fig.width=8, fig.height=3, eval = FALSE}
 
 # interquartile
 ggplot(early) +
@@ -200,7 +252,7 @@ ggplot(early) +
 ```
 
 
-```{r early_SceneNumber, fig.width=8, fig.height=2.5}
+```{r early_SceneNumber, fig.width=8, fig.height=2.5, eval = FALSE}
 
 satellites2 <- data.frame(y1 = c(115,100,115,100),
                          x1 = c(1982.5, 1984,1999,2012.5),
