@@ -7,7 +7,7 @@ output:
     toc: yes
 ---
 
-Goal: Document full production of study area boundary, and evaluate the number of counties various options include for a robust county validation. This aggregates study bound polygon generation from several sources prior to manuscript revisions. It also incorporates the area calculations from the old 0.01_polygonAreaFinder.R script.
+Goal: Document full production of study area boundary, and evaluate the number of counties various options include for a robust county validation. This aggregates study bound polygon generation from several sources prior to manuscript revisions. It also incorporates the area calculations from the old 0.01_polygonAreaFinder.R script. 
 
 Also generates an aggregated 4km grid to summarize irrigated trends for, instead of counties, for Figure 4.
 
