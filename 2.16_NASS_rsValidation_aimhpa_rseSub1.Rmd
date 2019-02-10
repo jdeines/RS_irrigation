@@ -1,0 +1,467 @@
+---
+title: "NASS vs Remote Sensing Validation"
+author: "Jill Deines"
+date: "February 08, 2019"
+output: 
+  html_document:
+    toc: yes
+---
+
+Goal: Compare irrigated acreages between remote sensing products and USDA NASS Ag Census Data. NASS data acquired through the Quick Stats API.
+
+This runs the AIM-RRB county stats on the RSE submission 1 version of the AIM-HPA maps, just for a fun comparision.
+
+```{r knitrOpts, echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=FALSE, cache.path='cache/2.16_NASS_rf/',
+               fig.path='figure/2.16_NASS_rf_aimhpa/')
+```
+
+**R Packages Needed**
+
+* `httr`: Vignette at https://cran.r-project.org/web/packages/httr/vignettes/quickstart.html
+
+```{r packages, message=FALSE, echo=TRUE}
+# for API interaction
+library(httr) 
+library(jsonlite)
+library(maps)  # to translate state fp codes to 2 letter abbrevs
+library(rgdal)
+library(tigris)
+library(RColorBrewer)
+
+# for data manipulation
+library(tidyr)
+library(ggplot2)
+library(broom)
+library(dplyr)
+
+# my functions (to be packaged)
+source('functions/getNASS.R')
+source('functions/cleanNassCensusCounty.R')
+source('functions/stat_smooth_func.R')
+```
+
+
+## Load county data
+In GEE, I calculated the number of cells of each classification type in each county overlapping the RRB/RRCA boundary.
+
+Here, I load this dataset from yearly files, add a year attribute, and converting cell counts to areas (both retained).
+
+### specify fips of counties to use
+based on counties completely contained within study boundary
+```{r setFips}
+fipsDir <- '/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
+fips <- read.csv(paste0(fipsDir,'/boundary_options_fips_for_contained_countyies.csv'),
+                 colClasses = 'character')
+fipsToUse0 <- fips$original37
+fipsToUse <- fipsToUse0[!is.na(fipsToUse0)]
+```
+
+
+```{r loadGee}
+# years with county level datasets
+yearsDesired <- c(2000, 2002, 2005, 2007, 2010, 2012)
+cellArea <- 30*30 # m^2
+
+countyDir <- '/Users/deinesji/Google Drive/GEE_AIM-RRB/GEE_tableExports/RRB_test5_regional_county_Stats'
+
+# get filenames
+countyfiles <- list.files(countyDir, pattern="*aimhpa_RSEsubmission1")
+
+# subset to years wanted
+yearsAvailable <- as.numeric(substr(countyfiles, start =1, stop = 4))
+wanted <- yearsAvailable %in% yearsDesired
+countyfiles <- countyfiles[wanted]
+
+# read in to a single dataframe
+countyAll = do.call(rbind, lapply(countyfiles, function(x) {
+             # print(x)
+              csv0 <- read.csv(paste0(countyDir,'/',x), stringsAsFactors = FALSE)
+              # extract county regions only
+              csv <- csv0[grepl('county',csv0$masterid),]
+              # make columns
+              csv$year <- as.numeric(substr(x, start=1,stop=4))
+              csv$fips5 <- substr(csv$masterid, start=11,stop=15)
+              csv$fips3 <- substr(csv$masterid, start=13,stop=15)
+              csv$state2 <- substr(csv$masterid, start=11,stop=12)
+              csv <- csv[,c('fips5','state2','fips3','X0','X1','masterid','year')]
+            }))
+
+# subset counties -------------------
+# get kml with county proportion in bounds
+countyShape <- readOGR('/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile',
+            'Counties_RRCAextent_Clip', verbose=F)
+# retrieve list of fips within bounds
+fips.in <- as.character(countyShape[countyShape$proportion == 1,]$fips5)
+fips.in <- fipsToUse
+
+
+# keep counties 100% within the rrca
+countyAll <- countyAll[countyAll$fips5 %in% fips.in,]
+
+# convert cell count to area
+countyAll$irrigated_m2 <- countyAll$X1 * cellArea
+countyAll$irrArea.km2 <- countyAll$irrigated_m2 / 1000000
+
+# # convert dryland cell count to area
+# countyAll$dryland_m2 <- countyAll$X0 * cellArea
+# countyAll$dryland_km2 <- countyAll$dryland_m2 / 1000000
+# 
+# # convert cropland area to km^2 for RS
+# # convert cell count to area
+# countyAll$cropland_m2 <- (countyAll$X1+countyAll$X0) * cellArea
+# countyAll$cropland_km2 <- countyAll$cropland_m2 / 1000000
+
+# add a state 2-letter abbrev column
+# fill in state abbrevs column based on FIPS
+data(state.fips)  # from maps package
+state.fips$STATEFP <- sprintf("%02d",state.fips$fips) # add leading zero
+countyAll <- merge(countyAll, state.fips[,c('abb','STATEFP')], 
+                   by.x = 'state2', by.y = 'STATEFP',all.y=F)
+
+# # write out csv for Anthony to use
+# anthony <- countyAll[countyAll$year == 2002,c('state2','fips5','fips3','abb')]
+# outdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass'
+# outfile3 <- 'NASS_countiesToGet_forADK.csv'
+# write.csv(anthony, paste0(outdir, '/', outfile3), row.names=F)
+```
+
+## Get and Clean NASS Data
+From the NASS Quick Stats API, using county list generated above
+
+re-run on 1/24/2017 to get all counties 90% or greater within RRB/RRCA bound.
+On this date, also retrieved data for all counties in the HPA using 2.00_NASS_countyStats.Rmd, in order to safeguard data.
+
+### Get Data 
+And write out to not rely on NASS API
+
+* API website: http://quickstats.nass.usda.gov/api
+* My API key: 28EAA9E6-8060-34A4-981A-B2ED4692228A
+
+```{r getNASS, eval=FALSE}
+# set up variables for data calls
+apiKey <- '28EAA9E6-8060-34A4-981A-B2ED4692228A'
+program = 'CENSUS'
+sector <- 'CROPS'
+group <- 'FIELD CROPS'
+aggregation <- 'COUNTY'
+
+# get just 1 set of counties (so for 1 year)
+counties <- countyAll[countyAll$year == unique(countyAll$year)[3],]
+
+# make empty list to populate, and loop through counties
+nass.list <- list()
+for(i in 1:nrow(counties)){
+  nass.list[[i]] <- getNASS(apiKey, program, sector, group, aggregation, 
+                              state = counties$abb[i],
+                              county = counties$fips3[i])
+}
+
+# convert list of data frames to 1 giant dataframe
+nass.df <- do.call("rbind",nass.list)
+
+# write out raw data
+outdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass'
+outfile <- 'NASS_FieldCrops_County_RRB_raw_90_47counties.csv'
+write.csv(nass.df, paste0(outdir, '/', outfile), row.names=F)
+```
+
+
+### clean data
+load raw nass download file, clean it up. also has data for 1997 but not used here
+
+```{r cleanNass}
+# load data
+outdir <- '/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass'
+outfile <- 'NASS_FieldCrops_County_RRB_raw_90_47counties.csv'
+nass.df <- read.csv(paste0(outdir, '/', outfile), stringsAsFactors=F)
+
+# # get a list of commodities for Anthony
+#  # remove (D) values, remove commas (!), convert to numeric
+#   nass.df <- nass.df[!grepl('(D)',nass.df$Value),]
+#   nass.df$Value <- gsub(",", "", nass.df$Value, fixed = T)
+#   nass.df$Value <- as.numeric(nass.df$Value)
+#   
+#   # keep only records with "ACRES HARVESTED"
+#   phrase <- 'ACRES HARVESTED'
+#   nass.df <- nass.df[grepl(phrase,nass.df$short_desc),]
+# 
+#   commodities <- unique(nass.df$commodity_desc)
+#   outfile2 <- 'NASS_commodities_Anthony.csv'
+#   write.csv(commodities, paste0(outdir, '/', outfile2), row.names=F)
+
+# clean data
+rrb2002 <- cleanNassCensusCounty(nass.df, year = 2002)
+rrb2007 <- cleanNassCensusCounty(nass.df, year = 2007)
+rrb2012 <- cleanNassCensusCounty(nass.df, year = 2012)
+
+# get irrigated acreage by county
+rrb2002.irr <- aggregate(IRRIGATED ~ fips5, data=rrb2002, FUN='sum')
+rrb2007.irr <- aggregate(IRRIGATED ~ fips5, data=rrb2007, FUN='sum')
+rrb2012.irr <- aggregate(IRRIGATED ~ fips5, data=rrb2012, FUN='sum')
+
+# add years
+rrb2002.irr$year <- 2002
+rrb2007.irr$year <- 2007
+rrb2012.irr$year <- 2012
+```
+
+## Compare!!
+
+Here we go: compare irrigated areas by county
+
+### Multipanel NASS
+
+```{r multipanel_bigger_usda, fig.width = 8, fig.height = 3}
+# merge NASS and RS data
+countyAll.2002 <- countyAll[countyAll$year == 2002,]
+merged2002 <- merge(rrb2002.irr, countyAll.2002[,c('fips5','irrArea.km2')])
+
+countyAll.2007 <- countyAll[countyAll$year == 2007,]
+merged2007 <- merge(rrb2007.irr, countyAll.2007[,c('fips5','irrArea.km2')])
+
+countyAll.2012 <- countyAll[countyAll$year == 2012,]
+merged2012 <- merge(rrb2012.irr, countyAll.2012[,c('fips5','irrArea.km2')])
+
+allyears <- rbind(merged2002, merged2007, merged2012)
+
+# plot
+ggplot(allyears, aes(x=IRRIGATED,y=irrArea.km2)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) + 
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 100, ypos = 800) +
+  #geom_smooth(method="lm",se=FALSE) +
+  facet_wrap(~year, nrow=1) +
+  ylab(expression(paste("HP-AIM Area (", km^2,")"))) + 
+  xlab(expression(paste('USDA County Area (', km^2,')'))) + theme_bw() +
+       theme(text = element_text(size = 15))  
+```
+
+### USGS Waterdata
+just USGS data
+
+```{r usgs, fig.height = 6}
+# load usgs water data (compiled by Anthony)
+usgsdir <- '/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass/USGS_waterdata_county'
+usgsname <- 'irrigation_water_use_by_county_1985_2010_w_acreage.csv'
+usgsAll <- read.csv(paste0(usgsdir,'/',usgsname))
+
+# make a fips column
+usgsAll$fips5 <- paste0(sprintf("%02d",usgsAll$State_Code),
+                        sprintf("%03d",usgsAll$Area_Code))
+
+# subset to the 35 county fips
+usgsIn <- usgsAll[usgsAll$fips5 %in% fips.in,]
+
+# convert "thousand acres" to irrArea.km2
+usgsIn$IRRIGATED <- usgsIn$IR.IrTot * 1000 * 0.00404686
+
+# subset to relevant years
+usgsYears <- usgsIn[usgsIn$Year %in% c(2000,2005,2010),]
+
+# subset columns
+usgs <- usgsYears[,c('fips5', 'IRRIGATED','Year')]
+names(usgs)[3] <- 'year'
+
+# merge with remote sensing data -------------
+usgs$yearfips <- paste0(usgs$year, '-', usgs$fips5)
+
+countyUSGS <- countyAll[countyAll$year %in% c(2000,2005,2010),]
+countyUSGS$yearfips <- paste0(countyUSGS$year, '-', countyUSGS$fips5)
+
+mergedUSGS <- merge(usgs, countyUSGS[,c('yearfips','irrArea.km2')])
+mergedUSGS <- mergedUSGS[,c('fips5','IRRIGATED', 'year', 'irrArea.km2')]
+
+# add source
+mergedUSGS$source <- 'usgs'
+```
+
+plot usgs data vs remote sensing, by year 
+
+```{r usgs_panel,fig.width = 8, fig.height = 3}
+# plot
+ggplot(mergedUSGS, aes(x=IRRIGATED,y=irrArea.km2)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) + 
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 100, ypos = 800) +
+  #geom_smooth(method="lm",se=FALSE) +
+  facet_wrap(~year, nrow=1) +
+  ylab(expression(paste("HP-AIM Area (", km^2,")"))) + 
+  xlab(expression(paste('USGS County Area (', km^2,')'))) + theme_bw() +
+       theme(text = element_text(size = 15))  
+```
+
+multipanel with nass data
+
+```{r nassusgs, fig.width = 8, fig.height = 6, dev=c('png','pdf')}
+# combine with NASS data
+allyears$source <- 'NASS'
+
+countyValid <- rbind(allyears, mergedUSGS)
+     
+# plot
+ggplot(countyValid, aes(x=IRRIGATED,y=irrArea.km2)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype='dashed') + 
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 100, ypos = 800) + 
+  stat_smooth(method = 'lm', se=F, size=.5, colour='black') +
+  #geom_smooth(method="lm",se=FALSE) +
+  facet_wrap(~year, nrow=2) + 
+  coord_equal(xlim=c(0,1075), ylim=c(0,1075)) + 
+  ylab(expression(paste("HP-AIM Area (", km^2,")"))) + 
+  xlab(expression(paste('County Statistics (', km^2,')'))) + theme_bw() +
+       theme(text = element_text(size = 15))
+```
+
+Change color of facet label strip by dataset. taken from http://stackoverflow.com/questions/19440069/ggplot2-facet-wrap-strip-color-based-on-variable-in-data-set
+
+```{r nassusgs_colored, fig.width = 6.5, fig.height = 5, dpi=600, dev=c('png','pdf')}
+library(gtable)
+library(grid)
+# store main plot
+p1 <- ggplot(countyValid, aes(x=IRRIGATED,y=irrArea.km2)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype='dashed') + 
+  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE, xpos = 0, ypos = 1000) + 
+  stat_smooth(method = 'lm', se=F, size=.3, colour='black') +
+  #geom_smooth(method="lm",se=FALSE) +
+  facet_wrap(~year, nrow=2) + 
+  coord_equal(xlim=c(0,1100), ylim=c(0,1100)) + 
+  ylab(expression(paste("HP-AIM Area (", km^2,")"))) + 
+  xlab(expression(paste('County Statistics (', km^2,')'))) + theme_bw() +
+       theme(axis.text=element_text(size=10),
+             legend.text=element_text(size=10),
+             axis.title=element_text(size=11),
+             panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank()) 
+
+# dummy plot
+dummy <- ggplot(countyValid, aes(x=IRRIGATED,y=irrArea.km2)) +
+  facet_wrap(~year, nrow=2) +
+  scale_fill_manual(values = c('peachpuff1','lightsteelblue')) +
+  geom_rect(aes(fill=source), color='black',
+            xmin=-Inf, xmax = Inf, ymin = -Inf, ymax=Inf) + 
+  theme_minimal() + theme(text = element_text(size = 15))
+
+# gtable stuff
+g1 <- ggplotGrob(p1)
+g2 <- ggplotGrob(dummy)
+
+gtable_select <- function (x, ...) 
+{
+  matches <- c(...)
+  x$layout <- x$layout[matches, , drop = FALSE]
+  x$grobs <- x$grobs[matches]
+  x
+}
+
+panels <- grepl(pattern="panel", g2$layout$name)
+strips <- grepl(pattern="strip-t", g2$layout$name)
+g2$layout$t[panels] <- g2$layout$t[panels] - 1
+g2$layout$b[panels] <- g2$layout$b[panels] - 1
+
+new_strips <- gtable_select(g2, panels | strips)
+#grid.newpage()
+#grid.draw(new_strips)
+
+gtable_stack <- function(g1, g2){
+  g1$grobs <- c(g1$grobs, g2$grobs)
+  g1$layout <- transform(g1$layout, z= z-max(z), name="g2")
+  g1$layout <- rbind(g1$layout, g2$layout)
+  g1
+}
+## ideally you'd remove the old strips, for now they're just covered
+new_plot <- gtable_stack(g1, new_strips)
+grid.newpage()
+grid.draw(new_plot)
+
+```
+
+## Trends in NASS and USGS
+
+getting slopes for these datasets to compare to HPAIM, to demonstrate year sampling affects on understanding of irrigation trends
+
+```{r nassUSGSTrend}
+# get total irrigation by year, by dataset
+statTotals <- aggregate(IRRIGATED ~ year + source, data = countyValid,
+                        FUN = 'sum')
+
+ggplot(data = statTotals,
+       aes(x=year, y = IRRIGATED, color=source)) +
+  geom_line() + geom_point() +
+  theme_bw() + 
+  ggtitle('NASS and USGS Trendlines')
+
+# run regressions by dataset
+sourcelms <- statTotals %>% 
+  group_by(source) %>% 
+  do(model = lm(IRRIGATED ~ year, data = .))
+
+# tidy up with broom
+coeffs <- sourcelms %>% tidy(model)
+coeffs <- coeffs[coeffs$term == 'year',] # remove intercept lines
+coeffs
+
+# all county statistics together
+allstats <- lm(IRRIGATED ~ year, data = statTotals)
+summary(allstats)
+
+```
+
+
+
+## error in space
+
+```{r space, fig.height = 6, fig.width = 4}
+# get county bounds
+gisDir <- "/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile"
+cnty <- readOGR(gisDir, 'Counties_RRCAextent_Clip', verbose=F)
+
+# calculate difference from 1:1 (rs - NASS)
+merged2002$diff_2002 <- merged2002$irrArea.km2 - merged2002$IRRIGATED
+hist(merged2002$diff_2002, main = '2002: RS - NASS')
+
+merged2007$diff_2007 <- merged2007$irrArea.km2 - merged2007$IRRIGATED
+hist(merged2007$diff_2007, main = '2007: RS - NASS')
+
+merged2012$diff_2012 <- merged2012$irrArea.km2 - merged2012$IRRIGATED
+hist(merged2012$diff_2012, main = '2012: RS - NASS')
+
+# calculate percent error
+merged2002$percErr_2002 <- (merged2002$irrArea.km2 - merged2002$IRRIGATED) /
+                              merged2002$IRRIGATED * 100
+hist(merged2002$percErr_2002, main = '2002: RS - NASS/NASS')
+
+merged2007$percErr_2007 <- (merged2007$irrArea.km2 - merged2007$IRRIGATED) /
+                              merged2007$IRRIGATED * 100
+hist(merged2007$percErr_2007, main = '2007: RS - NASS/NASS')
+
+merged2012$percErr_2012 <- (merged2012$irrArea.km2 - merged2012$IRRIGATED) /
+                              merged2012$IRRIGATED * 100
+hist(merged2012$percErr_2012, main = '2012: RS - NASS/NASS')
+
+# add difference to spatial map
+cntydiff02 <- merge(cnty, merged2002)
+cntydiff0207 <- merge(cntydiff02, merged2007, by = 'fips5')
+cntydiffall <- merge(cntydiff0207, merged2012, by = 'fips5')
+
+# plot
+palette <- brewer.pal(11, 'RdBu') 
+palette2 <- c("#67001F", "#B2182B", "#D6604D", "#F4A582", "#FDDBC7",
+              "gray90",
+              "#D1E5F0", "#92C5DE", "#4393C3", "#2166AC", "#053061")
+
+# difference
+ticks = seq(-400,400,(400+400)/11)
+spplot(cntydiffall, c('diff_2002','diff_2007','diff_2012'), 
+       col.regions = palette2, 
+       at = ticks, main = 'Difference: RS minus NASS')
+
+ticks = seq(-200,200,(400)/11)
+spplot(cntydiffall, c('percErr_2002','percErr_2007','percErr_2012'), 
+       col.regions = palette2, 
+       at = ticks, main = 'Percent Error (RS-NASS/NASS)')
+```
+
+

@@ -62,8 +62,8 @@ Here, I load this dataset from yearly files, add a year attribute, and convertin
 ### specify fips of counties to use
 based on counties completely contained within study boundary
 ```{r setFips}
-fipsDir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
-fips <- read.csv(paste0(outDir,'/boundary_options_fips_for_contained_countyies.csv'),
+fipsDir <- '/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/FINAL_BOUNDARIES'
+fips <- read.csv(paste0(fipsDir,'/boundary_options_fips_for_contained_countyies.csv'),
                  colClasses = 'character')
 fipsToUse0 <- fips$original37
 fipsToUse <- fipsToUse0[!is.na(fipsToUse0)]
@@ -75,7 +75,7 @@ fipsToUse <- fipsToUse0[!is.na(fipsToUse0)]
 yearsDesired <- c(2000, 2002, 2005, 2007, 2010, 2012)
 cellArea <- 30*30 # m^2
 
-countyDir <- 'C:/Users/deinesji/Google Drive/GEE_tableExports/RRB_test5_regional_county_Stats'
+countyDir <- '/Users/deinesji/Google Drive/GEE_AIM-RRB/GEE_tableExports/RRB_test5_regional_county_Stats'
 
 # get filenames
 countyfiles <- list.files(countyDir, pattern="*test5_randFor_interannual_plusAncillary.csv")
@@ -101,7 +101,7 @@ countyAll = do.call(rbind, lapply(countyfiles, function(x) {
 
 # subset counties -------------------
 # get kml with county proportion in bounds
-countyShape <- readOGR('C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile',
+countyShape <- readOGR('/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile',
             'Counties_RRCAextent_Clip', verbose=F)
 # retrieve list of fips within bounds
 fips.in <- as.character(countyShape[countyShape$proportion == 1,]$fips5)
@@ -184,7 +184,7 @@ load raw nass download file, clean it up. also has data for 1997 but not used he
 
 ```{r cleanNass}
 # load data
-outdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass'
+outdir <- '/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass'
 outfile <- 'NASS_FieldCrops_County_RRB_raw_90_47counties.csv'
 nass.df <- read.csv(paste0(outdir, '/', outfile), stringsAsFactors=F)
 
@@ -254,7 +254,7 @@ just USGS data
 
 ```{r usgs, fig.height = 6}
 # load usgs water data (compiled by Anthony)
-usgsdir <- 'C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass/USGS_waterdata_county'
+usgsdir <- '/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/nass/USGS_waterdata_county'
 usgsname <- 'irrigation_water_use_by_county_1985_2010_w_acreage.csv'
 usgsAll <- read.csv(paste0(usgsdir,'/',usgsname))
 
@@ -426,7 +426,7 @@ summary(allstats)
 
 ```{r space, fig.height = 6, fig.width = 4}
 # get county bounds
-gisDir <- "C:/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile"
+gisDir <- "/Users/deinesji/Dropbox/1PhdJill/hpa/irrigation/data/GIS/kml/shapefile"
 cnty <- readOGR(gisDir, 'Counties_RRCAextent_Clip', verbose=F)
 
 # calculate difference from 1:1 (rs - NASS)
